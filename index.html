@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bar App</title>
+
+<!-- Link to external CSS -->
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<div class="app-container">
+  <div id="home-screen"></div>
+
+  <div id="detail-screen">
+    <img id="detail-image" class="detail-image" src="" alt="Bar Image">
+    <div class="detail-header">
+      <button class="back-button" onclick="showHome()">←</button>
+      <span id="detail-name"></span>
+    </div>
+    <div class="detail-content">
+
+      <div class="detail-section">
+        <h3>Open Hours</h3>
+        <table id="detail-hours" class="open-hours-table"></table>
+      </div>
+
+      <div class="detail-section">
+        <h3>Specials</h3>
+        <div id="detail-specials" class="detail-specials"></div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- Link to external JS -->
+<script src="js/app.js"></script>
+</body>
+</html>
