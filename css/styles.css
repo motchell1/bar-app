@@ -1,0 +1,246 @@
+/* ===== Base ===== */
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background-color: #f5f5f5;
+  color: #333;
+}
+
+.app-container {
+  max-width: 480px;
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+
+/* ===== Home Screen ===== */
+#home-screen {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px;
+}
+
+.bar-card {
+  background-color: #fff;
+  border-radius: 14px;
+  box-shadow: 0 6px 14px rgba(0,0,0,0.08);
+  cursor: pointer;
+  transition: transform 0.1s;
+  overflow: hidden;
+}
+.bar-card:hover { transform: translateY(-2px); }
+
+.card-image { width: 100%; height: 180px; object-fit: cover; }
+
+.card-content {
+  padding: 16px;
+  position: relative;
+}
+
+.bar-name { font-size: 1.3em; font-weight: bold; }
+
+.bar-neighborhood {
+  font-size: 0.75em;
+  color: #777;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  position: absolute;
+  top: 16px;
+  right: 16px;
+}
+
+.specials-list {
+  padding: 0;
+  margin: 12px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.special-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background-color: #f7f9fc;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid #e6ecf5;
+}
+
+.time-badge {
+  background-color: #007bff;
+  color: #fff;
+  padding: 3px 8px;
+  border-radius: 20px;
+  font-size: 0.65em;
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.special-description { flex: 1; font-size: 0.85em; }
+
+.open-hours {
+  font-size: 0.85em;
+  margin-top: 8px;
+}
+
+/* ===== Detail Screen ===== */
+.detail-image {
+  width: 100%;
+  max-width: 480px;
+  height: 220px;
+  object-fit: cover;
+  display: block;
+  position: sticky;
+  top: 0;
+  z-index: -1;
+}
+
+.detail-header {
+  background-color: #007bff;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  padding: 12px 16px;
+  font-size: 1.1em;
+  font-weight: bold;
+  text-transform: uppercase;
+}
+
+.detail-header .back-button {
+  position: absolute;
+  left: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  background-color: transparent;
+  color: #fff;
+  border: none;
+  font-size: 0.9em;
+  cursor: pointer;
+}
+
+.detail-content {
+  padding: 16px;
+  background-color: #ffffff;
+  position: relative;
+  z-index: 1;
+}
+
+.detail-section {
+  margin-bottom: 24px;
+}
+
+.detail-section h3 {
+  margin-bottom: 8px;
+  font-size: 1em;
+  text-transform: uppercase;
+  color: #555;
+  letter-spacing: 1px;
+}
+
+/* Open hours table */
+.open-hours-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85em;
+  margin-bottom: 16px;
+}
+
+.open-hours-table td, .open-hours-table th {
+  padding: 4px 8px;
+}
+
+.open-hours-table tr.today {
+  font-weight: bold;
+  color: #007bff;
+}
+
+/* ===== Collapsible specials by day ===== */
+.day-group {
+  margin-bottom: 16px;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid #e6ecf5;
+}
+
+.day-header {
+  padding: 12px 14px;
+  font-weight: bold;
+  font-size: 0.95em;
+  background-color: #f7f9fc;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  transition: background 0.2s ease;
+}
+
+.day-header.today {
+  background-color: #e7f1ff;
+  color: #007bff;
+}
+
+.day-header:hover {
+  background-color: #eef3fb;
+}
+
+.arrow {
+  transition: transform 0.25s ease;
+  font-size: 0.8em;
+}
+
+.arrow.rotate {
+  transform: rotate(90deg);
+}
+
+.day-content {
+  overflow: hidden;
+  max-height: 0;
+  transition: max-height 0.35s ease, padding 0.35s ease;
+  background-color: #ffffff;
+  padding: 0 14px;
+}
+
+.day-content.expanded {
+  padding: 10px 14px;
+}
+
+/* Detail screen specials alignment */
+#detail-screen .day-content {
+  padding: 0;
+}
+
+#detail-screen .special-item {
+  display: grid;
+  grid-template-columns: 70px 1fr; /* fixed column for badge, second fills remaining */
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid #e0e0e0;
+  background-color: transparent;
+  border-radius: 0;
+}
+
+#detail-screen .special-item:last-child {
+  border-bottom: none;
+}
+
+#detail-screen .special-item .time-badge {
+  justify-self: start;
+  font-size: 0.65em;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 20px;
+  background-color: #007bff;
+  color: #fff;
+  white-space: nowrap;
+  margin-left: 8px;
+}
+
+#detail-screen .special-item .special-description {
+  justify-self: start;
+}
