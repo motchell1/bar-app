@@ -10,38 +10,66 @@ function format12Hour(timeStr) {
   return minute === 0 ? `${hour} ${ampm}` : `${hour}:${minuteStr} ${ampm}`;
 }
 
-// Format special time for AM/PM display
 function formatSpecialTime(startTime, endTime) {
   if (!startTime || !endTime) return '';
-
   const [sHourStr, sMinStr] = startTime.split(':');
   const [eHourStr, eMinStr] = endTime.split(':');
-
   let sHour = parseInt(sHourStr, 10);
   const sMin = sMinStr;
   let eHour = parseInt(eHourStr, 10);
   const eMin = eMinStr;
-
   const sAMPM = sHour >= 12 ? 'PM' : 'AM';
   const eAMPM = eHour >= 12 ? 'PM' : 'AM';
-
   sHour = sHour % 12 || 12;
   eHour = eHour % 12 || 12;
-
   const sStr = sMin === '00' ? `${sHour}` : `${sHour}:${sMin}`;
   const eStr = eMin === '00' ? `${eHour}` : `${eHour}:${eMin}`;
-
   return sAMPM === eAMPM ? `${sStr} – ${eStr} ${eAMPM}` : `${sStr} ${sAMPM} – ${eStr} ${eAMPM}`;
 }
+
+// ===== Global State =====
+let barsData = [];
+let selectedDayIndex = new Date().getDay();
+const DAYS = ['SUN','MON','TUE','WED','THU','FRI','SAT'];
 
 // ===== Render Home Screen =====
 function renderBars(bars) {
   const container = document.getElementById('home-screen');
   container.innerHTML = '';
-  const todayIndex = new Date().getDay();
-  const DAYS = ['SUN','MON','TUE','WED','THU','FRI','SAT'];
-  const today = DAYS[todayIndex];
 
+  // --- Toolbar ---
+  const toolbar = document.createElement('div');
+  toolbar.className = 'home-toolbar';
+
+  const prevBtn = document.createElement('button');
+  prevBtn.className = 'day-arrow';
+  prevBtn.textContent = '←';
+
+  const nextBtn = document.createElement('button');
+  nextBtn.className = 'day-arrow';
+  nextBtn.textContent = '→';
+
+  const dayLabel = document.createElement('div');
+  dayLabel.className = 'current-day';
+  dayLabel.id = 'current-day-label';
+  dayLabel.textContent = DAYS[selectedDayIndex];
+
+  toolbar.appendChild(prevBtn);
+  toolbar.appendChild(dayLabel);
+  toolbar.appendChild(nextBtn);
+  container.appendChild(toolbar);
+
+  prevBtn.onclick = () => {
+    selectedDayIndex = (selectedDayIndex + 6) % 7;
+    renderBarsWithSelectedDay();
+  };
+  nextBtn.onclick = () => {
+    selectedDayIndex = (selectedDayIndex + 1) % 7;
+    renderBarsWithSelectedDay();
+  };
+
+  // --- Bars ---
+  const today = DAYS[selectedDayIndex];
   bars.forEach(bar => {
     const card = document.createElement('div');
     card.className = 'bar-card';
@@ -100,6 +128,12 @@ function renderBars(bars) {
   });
 }
 
+// ===== Helper to re-render with selected day =====
+function renderBarsWithSelectedDay() {
+  document.getElementById('current-day-label').textContent = DAYS[selectedDayIndex];
+  renderBars(barsData);
+}
+
 // ===== Detail Screen =====
 function showDetail(bar) {
   document.getElementById('home-screen').style.display = 'none';
@@ -110,12 +144,12 @@ function showDetail(bar) {
 
   const hoursEl = document.getElementById('detail-hours');
   hoursEl.innerHTML = '';
-  
+
   const DAYS_FULL = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   const todayIndex = new Date().getDay();
-  const DAYS = DAYS_FULL.slice(todayIndex).concat(DAYS_FULL.slice(0, todayIndex));
+  const DAYS_ORDERED = DAYS_FULL.slice(todayIndex).concat(DAYS_FULL.slice(0, todayIndex));
 
-  DAYS.forEach(day => {
+  DAYS_ORDERED.forEach(day => {
     const h = bar.hours_by_day ? bar.hours_by_day[day.slice(0,3).toUpperCase()] : null;
     const row = document.createElement('tr');
     if (day === DAYS_FULL[todayIndex]) row.classList.add('today');
@@ -132,7 +166,7 @@ function showDetail(bar) {
   const specialsContainer = document.getElementById('detail-specials');
   specialsContainer.innerHTML = '';
 
-  DAYS.forEach(day => {
+  DAYS_FULL.forEach(day => {
     const key = day.slice(0,3).toUpperCase();
     const specials = (bar.specials_by_day && bar.specials_by_day[key]) || [];
 
@@ -214,8 +248,8 @@ async function loadBars() {
   try {
     const response = await fetch('https://qz5rs9i9ya.execute-api.us-east-2.amazonaws.com/default/getStartupData');
     const data = await response.json();
-    const parsed = typeof data.body === "string" ? JSON.parse(data.body) : data;
-    renderBars(parsed.bars);
+    barsData = typeof data.body === "string" ? JSON.parse(data.body) : data;
+    renderBarsWithSelectedDay();
   } catch (err) {
     console.error('Failed to load bars:', err);
   }
