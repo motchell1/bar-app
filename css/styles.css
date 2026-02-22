@@ -85,30 +85,6 @@ body {
   margin-top: 8px;
 }
 
-/* ===== Home Toolbar ===== */
-.home-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 0 16px 0;
-  font-weight: bold;
-  font-size: 1em;
-  color: #007bff;
-}
-
-.day-arrow {
-  background: none;
-  border: none;
-  font-size: 1.3em;
-  cursor: pointer;
-  color: #007bff;
-}
-
-.current-day {
-  text-align: center;
-  flex: 1;
-}
-
 /* ===== Detail Screen ===== */
 .detail-image {
   width: 100%;
@@ -241,7 +217,7 @@ body {
 
 #detail-screen .special-item {
   display: grid;
-  grid-template-columns: 70px 1fr;
+  grid-template-columns: 70px 1fr; /* fixed column for badge, second fills remaining */
   align-items: center;
   padding: 12px 0;
   border-bottom: 1px solid #e0e0e0;
