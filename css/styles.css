@@ -67,6 +67,12 @@ body {
 }
 
 
+.app-container.detail-mode {
+  margin-top: 0;
+  height: 100vh;
+}
+
+
 /* ===== Home Screen ===== */
 #home-screen {
   display: flex;

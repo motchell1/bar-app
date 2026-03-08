@@ -313,6 +313,7 @@ function renderBarsWeek(bars) {
 function showDetail(bar) {
   document.getElementById('home-screen').style.display = 'none';
   document.getElementById('detail-screen').style.display = 'block';
+  setScreenLayout(false);
 
   document.getElementById('detail-image').src = bar.image_url || '';
   document.getElementById('detail-name').textContent = bar.name.toUpperCase();
@@ -431,9 +432,40 @@ function showDetail(bar) {
 }
 
 // ===== Navigation =====
+function setScreenLayout(isHome) {
+  const toolbar = document.querySelector('.home-toolbar');
+  const appContainer = document.querySelector('.app-container');
+
+  if (toolbar) toolbar.style.display = isHome ? 'block' : 'none';
+  if (appContainer) appContainer.classList.toggle('detail-mode', !isHome);
+}
+
 function showHome() {
   document.getElementById('home-screen').style.display = 'flex';
   document.getElementById('detail-screen').style.display = 'none';
+  setScreenLayout(true);
+}
+
+function initHomeScrollCapture() {
+  document.addEventListener('wheel', (event) => {
+    const homeScreen = document.getElementById('home-screen');
+    const detailScreen = document.getElementById('detail-screen');
+    const appContainer = document.querySelector('.app-container');
+
+    if (!homeScreen || !detailScreen || !appContainer) return;
+    if (homeScreen.style.display === 'none' || detailScreen.style.display !== 'none') return;
+
+    if (appContainer.contains(event.target)) return;
+
+    const maxScroll = homeScreen.scrollHeight - homeScreen.clientHeight;
+    if (maxScroll <= 0) return;
+
+    const nextScrollTop = Math.max(0, Math.min(maxScroll, homeScreen.scrollTop + event.deltaY));
+    if (nextScrollTop === homeScreen.scrollTop) return;
+
+    homeScreen.scrollTop = nextScrollTop;
+    event.preventDefault();
+  }, { passive: false });
 }
 
 // ===== Load Bars =====
@@ -555,4 +587,6 @@ async function loadBars() {
 }
 // ===== Initialize =====
 initSidebarFilters();
+initHomeScrollCapture();
+setScreenLayout(true);
 loadBars();
