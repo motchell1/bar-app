@@ -9,20 +9,51 @@
 <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
-
+<div class="home-toolbar">
+  <div class="toolbar-inner">
+	<span class="app-title">Bar App</span>
+	<button class="hamburger-button">☰</button>
+  </div>
+</div>
 <div class="app-container">
   <div id="home-screen">
 
-    <div class="home-toolbar">
-      <div class="toolbar-inner">
-        <span class="app-title">Bar App</span>
-        <button class="hamburger-button">☰</button>
-      </div>
-    </div>
-
+    
     <div id="home-bars"></div>
-
   </div>
+  
+  <div id="side-menu-overlay" class="side-menu-overlay"></div>
+  
+  <div id="side-menu" class="side-menu">
+    <div class="side-menu-header">Filters</div>
+	
+	<div class="side-menu-content">
+		<div id="special-type-filters" class="filter-section">
+			<div class="filter-section-title">Special Type</div>
+			<div class="filter-row">
+				<input type="checkbox" id="drinkFilter" />
+				
+				<label for="filter-drinks">Drinks</label>
+				<span class="side-menu-type-icon" data-lucide="beer"></span>
+			</div>
+				
+			<div class="filter-row">
+				<input type="checkbox" id="foodFilter" /> 
+				
+				<label for="filter-food">Food</label>
+				<span class="side-menu-type-icon" data-lucide="utensils"></span>
+			</div>
+		</div>
+		<div id="neighborhood-filters" class="filter-section">
+			<div class="filter-section-title">Neighborhood</div>
+		</div>
+	</div>
+	<div class="side-menu-footer">
+		<hr class="menu-divider" />
+		<button class="apply-filters-button" id="applyFiltersBtn">Apply Filters</button>
+	</div>
+  </div>
+  
 
   <div id="detail-screen" style="display:none;">
     <img id="detail-image" class="detail-image" src="" alt="Bar Image">
@@ -45,7 +76,8 @@
     </div>
   </div>
 </div>
-
+<script src="https://cdn.jsdelivr.net/npm/lucide@0.575.0/dist/umd/lucide.js"></script>
+<script> lucide.createIcons();</script>
 <!-- Link to external JS -->
 <script src="js/app.js"></script>
 </body>
