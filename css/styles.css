@@ -73,7 +73,8 @@ body {
   flex-direction: column;
   gap: 16px;
   padding: 16px;
-  height: 100%;
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
   scrollbar-width: none;
   -ms-overflow-style: none;
@@ -310,7 +311,8 @@ body {
 /* ===== Detail Screen ===== */
 #detail-screen {
   display: none;
-  height: 100%;
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
 }
 
