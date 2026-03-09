@@ -84,6 +84,8 @@ const DAYS_FULL = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','
 let currentTab = 'specials';
 let barsSearchQuery = '';
 let previousScreenState = null;
+let favorites = [];
+let currentSpecialContext = null;
 
 // ===== Helpers =====
 
@@ -495,6 +497,130 @@ function showDetail(bar, previousScreen = currentTab) {
   });
 }
 
+
+function getSpecialId(bar, special, dayLabel = '') {
+  const barId = bar.id || bar.name || '';
+  const parts = [
+    barId,
+    special.day || dayLabel || '',
+    special.start_time || '',
+    special.end_time || '',
+    special.description || '',
+    special.type || '',
+    special.all_day ? 'all_day' : 'timed'
+  ];
+  return parts.join('|');
+}
+
+function isFavoriteSpecial(bar, special, dayLabel = '') {
+  const specialId = getSpecialId(bar, special, dayLabel);
+  return favorites.some(item => item.id === specialId);
+}
+
+function toggleFavoriteSpecial(bar, special, dayLabel = 'Day unavailable') {
+  const specialId = getSpecialId(bar, special, dayLabel);
+  const existingIndex = favorites.findIndex(item => item.id === specialId);
+
+  if (existingIndex >= 0) {
+    favorites.splice(existingIndex, 1);
+    return false;
+  }
+
+  favorites.push({
+    id: specialId,
+    bar,
+    special,
+    dayLabel
+  });
+
+  return true;
+}
+
+function updateSpecialFavoriteButton(isFavorited) {
+  const button = document.querySelector('.special-favorite-button');
+  if (!button) return;
+
+  button.classList.toggle('active', isFavorited);
+  button.setAttribute('aria-pressed', isFavorited ? 'true' : 'false');
+}
+
+function renderFavorites() {
+  const favoritesScreen = document.getElementById('favorites-screen');
+  const favoritesList = document.getElementById('favorites-list');
+  if (!favoritesScreen || !favoritesList) return;
+
+  favoritesList.innerHTML = '';
+
+  if (favorites.length === 0) {
+    const emptyState = document.createElement('div');
+    emptyState.className = 'no-specials-line';
+    emptyState.style.padding = '12px';
+    emptyState.textContent = 'No favorites yet. Tap the star on a special to save it here.';
+    favoritesList.appendChild(emptyState);
+    return;
+  }
+
+  favorites.forEach(item => {
+    const card = document.createElement('div');
+    card.className = 'bar-card';
+    card.onclick = () => showSpecialDetail(item.bar, item.special, { previousScreen: 'favorites', dayLabel: item.dayLabel });
+
+    if (item.bar.image_url && item.bar.image_url !== 'null') {
+      const img = document.createElement('img');
+      img.className = 'card-image';
+      img.src = item.bar.image_url;
+      img.alt = item.bar.name;
+      card.appendChild(img);
+    }
+
+    const content = document.createElement('div');
+    content.className = 'card-content';
+
+    const name = document.createElement('div');
+    name.className = 'bar-name';
+    name.textContent = item.bar.name;
+
+    const neighborhood = document.createElement('div');
+    neighborhood.className = 'bar-neighborhood';
+    neighborhood.textContent = item.bar.neighborhood || '';
+
+    const dayBadge = document.createElement('div');
+    dayBadge.className = 'special-day-badge';
+    dayBadge.textContent = item.dayLabel || 'Day unavailable';
+
+    const specialItem = buildSpecialItem(item.special);
+
+    content.appendChild(name);
+    content.appendChild(neighborhood);
+    content.appendChild(dayBadge);
+    content.appendChild(specialItem);
+
+    card.appendChild(content);
+    favoritesList.appendChild(card);
+  });
+
+  lucide.createIcons();
+}
+
+function initSpecialFavoriteButton() {
+  const favoriteButton = document.querySelector('.special-favorite-button');
+  if (!favoriteButton) return;
+
+  favoriteButton.addEventListener('click', () => {
+    if (!currentSpecialContext) return;
+
+    const nowFavorited = toggleFavoriteSpecial(
+      currentSpecialContext.bar,
+      currentSpecialContext.special,
+      currentSpecialContext.dayLabel
+    );
+
+    updateSpecialFavoriteButton(nowFavorited);
+    renderFavorites();
+    lucide.createIcons();
+  });
+}
+
 function showSpecialDetail(bar, special, { previousScreen = 'specials', returnTo = 'specials', dayLabel = '' } = {}) {
   previousScreenState = { type: previousScreen, bar, returnTo };
 
@@ -522,6 +648,8 @@ function showSpecialDetail(bar, special, { previousScreen = 'specials', returnTo
   specialDay.textContent = dayLabel || 'Day unavailable';
   specialMeta.appendChild(specialDay);
 
+  currentSpecialContext = { bar, special, dayLabel: dayLabel || 'Day unavailable' };
+
   const specialRow = buildSpecialItem(special);
 
   specialCard.appendChild(barName);
@@ -529,6 +657,7 @@ function showSpecialDetail(bar, special, { previousScreen = 'specials', returnTo
   specialCard.appendChild(specialRow);
 
   resetSpecialReportForm();
+  updateSpecialFavoriteButton(isFavoriteSpecial(bar, special, dayLabel || 'Day unavailable'));
   lucide.createIcons();
 }
 
@@ -598,15 +727,16 @@ function showHome() {
 function showTab(tabName) {
   const homeScreen = document.getElementById('home-screen');
   const barsScreen = document.getElementById('bars-screen');
+  const favoritesScreen = document.getElementById('favorites-screen');
 
   currentTab = tabName;
 
   if (homeScreen) homeScreen.style.display = tabName === 'specials' ? 'flex' : 'none';
   if (barsScreen) barsScreen.style.display = tabName === 'bars' ? 'flex' : 'none';
+  if (favoritesScreen) favoritesScreen.style.display = tabName === 'favorites' ? 'flex' : 'none';
 
   if (tabName === 'favorites') {
-    if (homeScreen) homeScreen.style.display = 'none';
-    if (barsScreen) barsScreen.style.display = 'none';
+    renderFavorites();
   }
 
   document.querySelectorAll('.taskbar-tab').forEach(btn => {
@@ -771,6 +901,7 @@ initTaskbar();
 initBarsSearch();
 initHomeScrollCapture();
 initSpecialReport();
+initSpecialFavoriteButton();
 showTab(currentTab);
 setScreenLayout(true);
 loadBars();

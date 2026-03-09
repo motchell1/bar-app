@@ -959,3 +959,27 @@ body {
   padding: 10px 12px;
   cursor: pointer;
 }
+
+
+#favorites-screen {
+  display: none;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 8px 0;
+}
+
+#favorites-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 0 10px 12px;
+}
+
+.special-favorite-button.active {
+  color: #f4c542;
+}
+
+.special-favorite-button.active svg {
+  fill: currentColor;
+}
