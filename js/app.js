@@ -3,7 +3,6 @@ function format12Hour(timeStr) {
   if (!timeStr || timeStr === 'null') return '';
   const [hourStr, minuteStr] = timeStr.split(':');
   let hour = parseInt(hourStr, 10);
-  const minute = parseInt(minuteStr, 10);
 
   if (hour === 24) hour = 0;
 
@@ -11,37 +10,6 @@ function format12Hour(timeStr) {
   hour = hour % 12;
   if (hour === 0) hour = 12;
   return `${hour}:${minuteStr} ${ampm}`;
-}
-
-function formatSpecialTime(startTime, endTime) {
-  if (!startTime || !endTime) return '';
-
-  const formatSingle = (timeStr) => {
-    if (!timeStr) return '';
-    const [hourStr, minStr] = timeStr.split(':');
-    let hour = parseInt(hourStr, 10);
-    const minute = parseInt(minStr, 10);
-
-    let ampm = hour >= 12 ? 'PM' : 'AM';
-    if (hour === 0) ampm = 'AM'; // midnight
-    hour = hour % 12;
-    if (hour === 0) hour = 12;
-
-    return `${hour}:${minStr} ${ampm}`;
-  };
-
-  const sStr = formatSingle(startTime);
-  const eStr = formatSingle(endTime);
-
-  // Determine AM/PM for display
-  const sHour = parseInt(startTime.split(':')[0], 10);
-  const eHour = parseInt(endTime.split(':')[0], 10);
-  const sAMPM = sHour === 0 ? 'AM' : sHour >= 12 ? 'PM' : 'AM';
-  const eAMPM = eHour === 0 ? 'AM' : eHour >= 12 ? 'PM' : 'AM';
-
-  if (!sStr || !eStr) return ''; // fallback
-
-  return `${sStr} – ${eStr}`;
 }
 
 // Check if a special is currently ongoing
@@ -109,7 +77,6 @@ function isSpecialPast(special, isToday) {
 
 // Sort bars for a day
 function sortBarsBySpecials(bars, dayKey, isToday) {
- const nowMinutes = new Date().getHours() * 60 + new Date().getMinutes();
  return bars.slice().sort((a, b) => {
    const specialsA = a.specials_by_day[dayKey] || [];
    const specialsB = b.specials_by_day[dayKey] || [];
@@ -313,6 +280,7 @@ function renderBarsWeek(bars) {
 function showDetail(bar) {
   document.getElementById('home-screen').style.display = 'none';
   document.getElementById('detail-screen').style.display = 'block';
+  setScreenLayout(false);
 
   document.getElementById('detail-image').src = bar.image_url || '';
   document.getElementById('detail-name').textContent = bar.name.toUpperCase();
@@ -431,66 +399,85 @@ function showDetail(bar) {
 }
 
 // ===== Navigation =====
+function setScreenLayout(isHome) {
+  const toolbar = document.querySelector('.home-toolbar');
+  const appContainer = document.querySelector('.app-container');
+
+  if (toolbar) toolbar.style.display = isHome ? 'block' : 'none';
+  if (appContainer) appContainer.classList.toggle('detail-mode', !isHome);
+}
+
 function showHome() {
   document.getElementById('home-screen').style.display = 'flex';
   document.getElementById('detail-screen').style.display = 'none';
+  setScreenLayout(true);
 }
 
-// ===== Load Bars =====
-async function loadBars() {
-  try {
-    const response = await fetch('https://qz5rs9i9ya.execute-api.us-east-2.amazonaws.com/default/getStartupData');
-    const data = await response.json();
-    const parsed = typeof data.body === "string" ? JSON.parse(data.body) : data;
-    barsData = parsed.bars || [];
-    renderBarsWeek(barsData);
-  } catch (err) {
-    console.error('Failed to load bars:', err);
-  }
+function initHomeScrollCapture() {
+  document.addEventListener('wheel', (event) => {
+    const homeScreen = document.getElementById('home-screen');
+    const detailScreen = document.getElementById('detail-screen');
+    const appContainer = document.querySelector('.app-container');
+
+    if (!homeScreen || !detailScreen || !appContainer) return;
+    if (homeScreen.style.display === 'none' || detailScreen.style.display !== 'none') return;
+
+    if (appContainer.contains(event.target)) return;
+
+    const maxScroll = homeScreen.scrollHeight - homeScreen.clientHeight;
+    if (maxScroll <= 0) return;
+
+    const nextScrollTop = Math.max(0, Math.min(maxScroll, homeScreen.scrollTop + event.deltaY));
+    if (nextScrollTop === homeScreen.scrollTop) return;
+
+    homeScreen.scrollTop = nextScrollTop;
+    event.preventDefault();
+  }, { passive: false });
 }
 
 
 // ===== Sidebar and Filters Initialization =====
-// ===== Initialize Sidebar Filters =====
 function initSidebarFilters() {
  const hamburgerButton = document.querySelector('.hamburger-button');
  const sideMenu = document.getElementById('side-menu');
  const menuOverlay = document.getElementById('side-menu-overlay');
  const applyButton = document.getElementById('applyFiltersBtn');
+
  // ===== Special Type Rows =====
  const typeRows = document.querySelectorAll('.filter-section:nth-child(1) .filter-row');
  typeRows.forEach(row => {
    const checkbox = row.querySelector('input[type="checkbox"]');
-   checkbox.checked = false; // default = show all
+   checkbox.checked = false;
    row.classList.toggle('selected', checkbox.checked);
    row.addEventListener('click', () => {
      checkbox.checked = !checkbox.checked;
      row.classList.toggle('selected', checkbox.checked);
    });
  });
+
  // ===== Open / Close Side Menu =====
  hamburgerButton.addEventListener('click', () => {
    sideMenu.classList.add('open');
    menuOverlay.classList.add('active');
    lucide.createIcons();
  });
+
  menuOverlay.addEventListener('click', () => {
    sideMenu.classList.remove('open');
    menuOverlay.classList.remove('active');
  });
+
  // ===== Apply Filters Button =====
  applyButton.addEventListener('click', () => {
-   // Special Types
    const selectedTypes = Array.from(typeRows)
      .filter(r => r.querySelector('input[type="checkbox"]').checked)
      .map(r => r.querySelector('input[type="checkbox"]').id.replace('Filter', '').toLowerCase());
-   // Neighborhoods
-   const neighborhoodSection = document.getElementById('neighborhood-filters');
-   const neighborhoodRows = Array.from(neighborhoodSection.querySelectorAll('.filter-row'));
+
+   const neighborhoodRows = Array.from(document.getElementById('neighborhood-filters').querySelectorAll('.filter-row'));
    const selectedNeighborhoods = neighborhoodRows
      .filter(r => r.querySelector('input[type="checkbox"]').checked)
      .map(r => r.querySelector('input[type="checkbox"]').dataset.name);
-   // Filter bars
+
    const filteredBars = barsData.map(bar => {
      const specials_by_day = Object.fromEntries(
        Object.entries(bar.specials_by_day).map(([day, specials]) => [
@@ -504,42 +491,46 @@ function initSidebarFilters() {
      );
      return { ...bar, specials_by_day };
    });
+
    renderBarsWeek(filteredBars);
    sideMenu.classList.remove('open');
    menuOverlay.classList.remove('active');
  });
 }
-// ===== Generate Dynamic Neighborhood Filters =====
+
 function generateNeighborhoodFilters() {
  const neighborhoodSection = document.getElementById('neighborhood-filters');
- // Keep the section title; remove only old rows
- const oldRows = neighborhoodSection.querySelectorAll('.filter-row');
- oldRows.forEach(row => row.remove());
- // Unique neighborhoods from barsData
- const neighborhoods = [...new Set(barsData.map(bar => bar.neighborhood).filter(Boolean))].sort((a, b) => 
-	a.toLowerCase().localeCompare(b.toLowerCase())
- );
+ neighborhoodSection.querySelectorAll('.filter-row').forEach(row => row.remove());
+
+ const neighborhoods = [...new Set(barsData.map(bar => bar.neighborhood).filter(Boolean))]
+   .sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
+
  neighborhoods.forEach(name => {
    const row = document.createElement('div');
    row.className = 'filter-row';
+
    const checkbox = document.createElement('input');
    checkbox.type = 'checkbox';
-   checkbox.dataset.name = name; // store actual neighborhood
-checkbox.id = `neigh-${name.replace(/\s+/g, '')}`;
-   checkbox.checked = false; // default = show all
+   checkbox.dataset.name = name;
+   checkbox.id = `neigh-${name.replace(/\s+/g, '')}`;
+   checkbox.checked = false;
+
    const label = document.createElement('label');
    label.setAttribute('for', checkbox.id);
    label.textContent = name;
+
    row.appendChild(checkbox);
    row.appendChild(label);
    row.addEventListener('click', () => {
      checkbox.checked = !checkbox.checked;
      row.classList.toggle('selected', checkbox.checked);
    });
+
    neighborhoodSection.appendChild(row);
  });
 }
-// ===== Load Bars and Initialize Filters =====
+
+// ===== Load Bars =====
 async function loadBars() {
  try {
    const response = await fetch('https://qz5rs9i9ya.execute-api.us-east-2.amazonaws.com/default/getStartupData');
@@ -555,4 +546,6 @@ async function loadBars() {
 }
 // ===== Initialize =====
 initSidebarFilters();
+initHomeScrollCapture();
+setScreenLayout(true);
 loadBars();
