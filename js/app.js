@@ -82,6 +82,7 @@ function getOpenStatus(hours) {
 let barsData = [];
 const DAYS_FULL = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 let currentTab = 'specials';
+let barsSearchQuery = '';
 
 // ===== Helpers =====
 
@@ -310,13 +311,32 @@ function renderBarsWeek(bars) {
  });
 }
 
+function getSortedFilteredBars(bars) {
+  const query = barsSearchQuery.trim().toLowerCase();
+
+  return bars
+    .filter(bar => {
+      if (!query) return true;
+      const name = (bar.name || '').toLowerCase();
+      const neighborhood = (bar.neighborhood || '').toLowerCase();
+      return name.includes(query) || neighborhood.includes(query);
+    })
+    .sort((a, b) => {
+      const neighborhoodCompare = (a.neighborhood || '').localeCompare(b.neighborhood || '', undefined, { sensitivity: 'base' });
+      if (neighborhoodCompare !== 0) return neighborhoodCompare;
+      return (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' });
+    });
+}
+
 function renderBarsList(bars) {
   const list = document.getElementById('bars-list');
   if (!list) return;
 
   list.innerHTML = '';
 
-  bars.forEach(bar => {
+  const sortedBars = getSortedFilteredBars(bars);
+
+  sortedBars.forEach(bar => {
     const card = document.createElement('div');
     card.className = 'bars-list-card';
     card.onclick = () => showDetail(bar);
@@ -524,6 +544,16 @@ function initTaskbar() {
   });
 }
 
+function initBarsSearch() {
+  const searchInput = document.getElementById('bars-search-input');
+  if (!searchInput) return;
+
+  searchInput.addEventListener('input', () => {
+    barsSearchQuery = searchInput.value || '';
+    renderBarsList(barsData);
+  });
+}
+
 function initHomeScrollCapture() {
   document.addEventListener('wheel', (event) => {
     const homeScreen = document.getElementById('home-screen');
@@ -653,6 +683,7 @@ async function loadBars() {
 // ===== Initialize =====
 initSidebarFilters();
 initTaskbar();
+initBarsSearch();
 initHomeScrollCapture();
 showTab(currentTab);
 setScreenLayout(true);

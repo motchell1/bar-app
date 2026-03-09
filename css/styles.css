@@ -115,6 +115,27 @@ body {
   display: none;
 }
 
+
+.bars-search-wrap {
+  padding: 0 16px 8px;
+}
+
+.bars-search-input {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #e1e1e6;
+  background: #fff;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  padding: 10px 12px;
+  outline: none;
+}
+
+.bars-search-input:focus {
+  border-color: #007aff;
+  box-shadow: 0 0 0 2px rgba(0, 122, 255, 0.15);
+}
+
 #bars-list {
   display: flex;
   flex-direction: column;
