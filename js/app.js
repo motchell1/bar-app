@@ -84,6 +84,8 @@ const DAYS_FULL = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','
 let currentTab = 'specials';
 let barsSearchQuery = '';
 let previousScreenState = null;
+let favorites = [];
+let currentSpecialContext = null;
 
 // ===== Helpers =====
 
@@ -205,8 +207,8 @@ function renderBarsWeek(bars) {
      date.setDate(date.getDate() + offset);
      const dayIndex = date.getDay();
      const dayKey = DAYS_FULL[dayIndex].slice(0,3).toUpperCase();
-     const formatted = date.toLocaleDateString(undefined, { month: 'long', day: 'numeric' });
-     const label = offset === 0 ? `Today – ${formatted}` : `${DAYS_FULL[dayIndex]} – ${formatted}`;
+     const dayName = DAYS_FULL[dayIndex];
+     const label = offset === 0 ? `${dayName} (Today)` : dayName;
      const isToday = offset === 0;
      const barsWithSpecials = bars.filter(bar => (bar.specials_by_day[dayKey] || []).length > 0);
      
@@ -399,6 +401,7 @@ function showDetail(bar, previousScreen = currentTab) {
   previousScreenState = { type: previousScreen };
   document.getElementById('home-screen').style.display = 'none';
   document.getElementById('bars-screen').style.display = 'none';
+  document.getElementById('favorites-screen').style.display = 'none';
   document.getElementById('special-screen').style.display = 'none';
   document.getElementById('detail-screen').style.display = 'block';
   setScreenLayout(false);
@@ -495,11 +498,128 @@ function showDetail(bar, previousScreen = currentTab) {
   });
 }
 
+
+function getSpecialId(bar, special, dayLabel = '') {
+  const barId = bar.id || bar.name || '';
+  const parts = [
+    barId,
+    special.day || dayLabel || '',
+    special.start_time || '',
+    special.end_time || '',
+    special.description || '',
+    special.type || '',
+    special.all_day ? 'all_day' : 'timed'
+  ];
+  return parts.join('|');
+}
+
+function isFavoriteSpecial(bar, special, dayLabel = '') {
+  const specialId = getSpecialId(bar, special, dayLabel);
+  return favorites.some(item => item.id === specialId);
+}
+
+function toggleFavoriteSpecial(bar, special, dayLabel = 'Day unavailable') {
+  const specialId = getSpecialId(bar, special, dayLabel);
+  const existingIndex = favorites.findIndex(item => item.id === specialId);
+
+  if (existingIndex >= 0) {
+    favorites.splice(existingIndex, 1);
+    return false;
+  }
+
+  favorites.push({
+    id: specialId,
+    bar,
+    special,
+    dayLabel
+  });
+
+  return true;
+}
+
+function updateSpecialFavoriteButton(isFavorited) {
+  const button = document.querySelector('.special-favorite-button');
+  if (!button) return;
+
+  button.classList.toggle('active', isFavorited);
+  button.setAttribute('aria-pressed', isFavorited ? 'true' : 'false');
+}
+
+function renderFavorites() {
+  const favoritesScreen = document.getElementById('favorites-screen');
+  const favoritesList = document.getElementById('favorites-list');
+  if (!favoritesScreen || !favoritesList) return;
+
+  favoritesList.innerHTML = '';
+
+  if (favorites.length === 0) {
+    const emptyState = document.createElement('div');
+    emptyState.className = 'no-specials-line';
+    emptyState.style.padding = '12px';
+    emptyState.textContent = 'No favorites yet. Tap the star on a special to save it here.';
+    favoritesList.appendChild(emptyState);
+    return;
+  }
+
+  favorites.forEach(item => {
+    const card = document.createElement('div');
+    card.className = 'bar-card';
+    card.onclick = () => showSpecialDetail(item.bar, item.special, { previousScreen: 'favorites', dayLabel: item.dayLabel });
+
+    const content = document.createElement('div');
+    content.className = 'card-content';
+
+    const name = document.createElement('div');
+    name.className = 'bar-name';
+    name.textContent = item.bar.name;
+
+    const neighborhood = document.createElement('div');
+    neighborhood.className = 'bar-neighborhood';
+    neighborhood.textContent = item.bar.neighborhood || '';
+
+    const dayBadge = document.createElement('div');
+    dayBadge.className = 'special-day-badge';
+    dayBadge.textContent = item.dayLabel || 'Day unavailable';
+
+    const specialItem = buildSpecialItem(item.special);
+
+    content.appendChild(name);
+    content.appendChild(neighborhood);
+    content.appendChild(dayBadge);
+    content.appendChild(specialItem);
+
+    card.appendChild(content);
+    favoritesList.appendChild(card);
+  });
+
+  lucide.createIcons();
+}
+
+function initSpecialFavoriteButton() {
+  const favoriteButton = document.querySelector('.special-favorite-button');
+  if (!favoriteButton) return;
+
+  favoriteButton.addEventListener('click', () => {
+    if (!currentSpecialContext) return;
+
+    const nowFavorited = toggleFavoriteSpecial(
+      currentSpecialContext.bar,
+      currentSpecialContext.special,
+      currentSpecialContext.dayLabel
+    );
+
+    updateSpecialFavoriteButton(nowFavorited);
+    renderFavorites();
+    lucide.createIcons();
+  });
+}
+
 function showSpecialDetail(bar, special, { previousScreen = 'specials', returnTo = 'specials', dayLabel = '' } = {}) {
   previousScreenState = { type: previousScreen, bar, returnTo };
 
   document.getElementById('home-screen').style.display = 'none';
   document.getElementById('bars-screen').style.display = 'none';
+  document.getElementById('favorites-screen').style.display = 'none';
   document.getElementById('detail-screen').style.display = 'none';
   document.getElementById('special-screen').style.display = 'block';
   setScreenLayout(false);
@@ -522,6 +642,8 @@ function showSpecialDetail(bar, special, { previousScreen = 'specials', returnTo
   specialDay.textContent = dayLabel || 'Day unavailable';
   specialMeta.appendChild(specialDay);
 
+  currentSpecialContext = { bar, special, dayLabel: dayLabel || 'Day unavailable' };
+
   const specialRow = buildSpecialItem(special);
 
   specialCard.appendChild(barName);
@@ -529,6 +651,7 @@ function showSpecialDetail(bar, special, { previousScreen = 'specials', returnTo
   specialCard.appendChild(specialRow);
 
   resetSpecialReportForm();
+  updateSpecialFavoriteButton(isFavoriteSpecial(bar, special, dayLabel || 'Day unavailable'));
   lucide.createIcons();
 }
 
@@ -598,15 +721,16 @@ function showHome() {
 function showTab(tabName) {
   const homeScreen = document.getElementById('home-screen');
   const barsScreen = document.getElementById('bars-screen');
+  const favoritesScreen = document.getElementById('favorites-screen');
 
   currentTab = tabName;
 
   if (homeScreen) homeScreen.style.display = tabName === 'specials' ? 'flex' : 'none';
   if (barsScreen) barsScreen.style.display = tabName === 'bars' ? 'flex' : 'none';
+  if (favoritesScreen) favoritesScreen.style.display = tabName === 'favorites' ? 'flex' : 'none';
 
   if (tabName === 'favorites') {
-    if (homeScreen) homeScreen.style.display = 'none';
-    if (barsScreen) barsScreen.style.display = 'none';
+    renderFavorites();
   }
 
   document.querySelectorAll('.taskbar-tab').forEach(btn => {
@@ -641,22 +765,26 @@ function initBarsSearch() {
 function initHomeScrollCapture() {
   document.addEventListener('wheel', (event) => {
     const homeScreen = document.getElementById('home-screen');
+    const favoritesScreen = document.getElementById('favorites-screen');
     const detailScreen = document.getElementById('detail-screen');
     const specialScreen = document.getElementById('special-screen');
-    const appContainer = document.querySelector('.app-container');
 
-    if (!homeScreen || !detailScreen || !specialScreen || !appContainer) return;
-    if (homeScreen.style.display === 'none' || detailScreen.style.display !== 'none' || specialScreen.style.display !== 'none') return;
+    if (!homeScreen || !favoritesScreen || !detailScreen || !specialScreen) return;
+    if (detailScreen.style.display !== 'none' || specialScreen.style.display !== 'none') return;
 
-    if (appContainer.contains(event.target)) return;
+    const activeScrollable = homeScreen.style.display !== 'none'
+      ? homeScreen
+      : (favoritesScreen.style.display !== 'none' ? favoritesScreen : null);
 
-    const maxScroll = homeScreen.scrollHeight - homeScreen.clientHeight;
+    if (!activeScrollable) return;
+
+    const maxScroll = activeScrollable.scrollHeight - activeScrollable.clientHeight;
     if (maxScroll <= 0) return;
 
-    const nextScrollTop = Math.max(0, Math.min(maxScroll, homeScreen.scrollTop + event.deltaY));
-    if (nextScrollTop === homeScreen.scrollTop) return;
+    const nextScrollTop = Math.max(0, Math.min(maxScroll, activeScrollable.scrollTop + event.deltaY));
+    if (nextScrollTop === activeScrollable.scrollTop) return;
 
-    homeScreen.scrollTop = nextScrollTop;
+    activeScrollable.scrollTop = nextScrollTop;
     event.preventDefault();
   }, { passive: false });
 }
@@ -771,6 +899,7 @@ initTaskbar();
 initBarsSearch();
 initHomeScrollCapture();
 initSpecialReport();
+initSpecialFavoriteButton();
 showTab(currentTab);
 setScreenLayout(true);
 loadBars();
