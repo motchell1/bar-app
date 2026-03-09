@@ -83,6 +83,7 @@ let barsData = [];
 const DAYS_FULL = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 let currentTab = 'specials';
 let barsSearchQuery = '';
+let previousScreenState = null;
 
 // ===== Helpers =====
 
@@ -140,6 +141,54 @@ function sortBarsBySpecials(bars, dayKey, isToday) {
 
 
 
+
+function buildSpecialItem(special, { isToday = false, clickable = false, onClick = null } = {}) {
+  const item = document.createElement('div');
+  item.className = 'special-item';
+
+  const timeBadge = document.createElement('span');
+  timeBadge.className = 'time-badge';
+  if (special.all_day) {
+    timeBadge.textContent = 'ALL DAY';
+  } else {
+    const startFormatted = format12Hour(special.start_time);
+    const endFormatted = format12Hour(special.end_time);
+    timeBadge.innerHTML = `${startFormatted}<br>${endFormatted}`;
+  }
+
+  if (!special.all_day && isToday && isSpecialPast(special, true)) {
+    timeBadge.classList.add('past');
+  }
+
+  if (isToday && isSpecialActive(special)) item.classList.add('live');
+
+  const typeIcon = document.createElement('span');
+  typeIcon.className = `type-icon ${special.type || ''}`;
+  if (special.type === 'food') typeIcon.setAttribute('data-lucide', 'utensils');
+  else if (special.type === 'drink') typeIcon.setAttribute('data-lucide', 'beer');
+
+  const desc = document.createElement('span');
+  desc.className = 'special-description';
+  desc.textContent = special.description;
+
+  item.appendChild(timeBadge);
+  item.appendChild(desc);
+  item.appendChild(typeIcon);
+
+  if (isToday && isSpecialActive(special)) {
+    const dot = document.createElement('span');
+    dot.className = 'active-dot';
+    item.appendChild(dot);
+  }
+
+  if (clickable && typeof onClick === 'function') {
+    item.classList.add('clickable-special');
+    item.onclick = onClick;
+  }
+
+  return item;
+}
+
 // ===== Render Home Screen for next 7 days =====
 function renderBarsWeek(bars) {
  const container = document.getElementById('home-bars');
@@ -188,7 +237,7 @@ function renderBarsWeek(bars) {
      sortedBars.forEach(bar => {
        const card = document.createElement('div');
        card.className = 'bar-card';
-	   card.onclick = () => showDetail(bar);
+	   card.onclick = () => showDetail(bar, currentTab);
        
 	   if (bar.image_url && bar.image_url !== "null") {
          const img = document.createElement('img');
@@ -217,45 +266,14 @@ function renderBarsWeek(bars) {
        const daySpecials = bar.specials_by_day[dayKey];
 			   
        daySpecials.forEach(special => {
-         const li = document.createElement('li');
-         li.className = 'special-item';
-		 
-         // Time badge
-         const timeBadge = document.createElement('span');
-         timeBadge.className = 'time-badge';
-         if (special.all_day) {
-           timeBadge.textContent = 'ALL DAY';
-         } else {
-           const startFormatted = format12Hour(special.start_time);
-           const endFormatted = format12Hour(special.end_time);
-           timeBadge.innerHTML = `${startFormatted}<br>${endFormatted}`;
-         }
-		 
-         if (!special.all_day && isToday && isSpecialPast(special, true)) {
-           timeBadge.classList.add('past');
-         }
-         if (isToday && isSpecialActive(special)) li.classList.add('live');
-		 
-         // Type icon
-         const typeIcon = document.createElement('span');
-         typeIcon.className = `type-icon ${special.type || ''}`;
-         if (special.type === 'food') typeIcon.setAttribute("data-lucide", "utensils");
-         else if (special.type === 'drink') typeIcon.setAttribute("data-lucide", "beer");
-		 
-         const desc = document.createElement('span');
-         desc.className = 'special-description';
-         desc.textContent = special.description;
-		 
-         li.appendChild(timeBadge);
-         li.appendChild(desc);
-         li.appendChild(typeIcon);
-		 
-         if (isToday && isSpecialActive(special)) {
-           const dot = document.createElement('span');
-           dot.className = 'active-dot';
-           li.appendChild(dot);
-         }
-		 
+         const li = buildSpecialItem(special, {
+           isToday,
+           clickable: true,
+           onClick: (event) => {
+             event.stopPropagation();
+             showSpecialDetail(bar, special, { previousScreen: currentTab, dayLabel: label });
+           }
+         });
          specialsList.appendChild(li);
        });
 	   
@@ -340,7 +358,7 @@ function renderBarsList(bars) {
   sortedBars.forEach(bar => {
     const card = document.createElement('div');
     card.className = 'bars-list-card';
-    card.onclick = () => showDetail(bar);
+    card.onclick = () => showDetail(bar, currentTab);
 
     const img = document.createElement('img');
     img.className = 'bars-list-thumb';
@@ -377,9 +395,11 @@ function renderBarsList(bars) {
 }
 
 // ===== Detail Screen =====
-function showDetail(bar) {
+function showDetail(bar, previousScreen = currentTab) {
+  previousScreenState = { type: previousScreen };
   document.getElementById('home-screen').style.display = 'none';
   document.getElementById('bars-screen').style.display = 'none';
+  document.getElementById('special-screen').style.display = 'none';
   document.getElementById('detail-screen').style.display = 'block';
   setScreenLayout(false);
 
@@ -433,36 +453,12 @@ function showDetail(bar) {
 
     if (specials.length > 0) {
       specials.forEach(special => {
-  		const div = document.createElement('div');
-		div.className = 'special-item';
-
-		const badge = document.createElement('span');
-		badge.className = 'time-badge';
-		if (special.all_day) {
-			  badge.textContent = 'ALL DAY';
-		} else {
-			const startFormatted = format12Hour(special.start_time);
-			const endFormatted = format12Hour(special.end_time);
-			badge.innerHTML = `${startFormatted}<br>${endFormatted}`;
-		}
-		
-		const icon = document.createElement('span');
-		icon.className = 'type-icon';
-		if (special.type === 'food') icon.setAttribute("data-lucide", "utensils");
-		else if (special.type === 'drink') icon.setAttribute("data-lucide", "beer");
-
-
-		const desc = document.createElement('span');
-		desc.className = 'special-description';
-		desc.textContent = special.description;
-
-		// Append badge and description first
-		div.appendChild(badge);
-		div.appendChild(desc);
-		div.appendChild(icon)
-
-		content.appendChild(div);
-	  });
+        const div = buildSpecialItem(special, {
+          clickable: true,
+          onClick: () => showSpecialDetail(bar, special, { previousScreen: 'detail', returnTo: previousScreenState?.type || currentTab, dayLabel: day === DAYS_FULL[todayIndex] ? `${day} (Today)` : day })
+        });
+        content.appendChild(div);
+      });
     } else {
   		const noSpecials = document.createElement('div');
   		noSpecials.className = 'special-item no-specials-item';
@@ -499,6 +495,89 @@ function showDetail(bar) {
   });
 }
 
+function showSpecialDetail(bar, special, { previousScreen = 'specials', returnTo = 'specials', dayLabel = '' } = {}) {
+  previousScreenState = { type: previousScreen, bar, returnTo };
+
+  document.getElementById('home-screen').style.display = 'none';
+  document.getElementById('bars-screen').style.display = 'none';
+  document.getElementById('detail-screen').style.display = 'none';
+  document.getElementById('special-screen').style.display = 'block';
+  setScreenLayout(false);
+
+  const barImage = document.getElementById('special-bar-image');
+  barImage.src = (bar.image_url && bar.image_url !== 'null') ? bar.image_url : 'https://placehold.co/640x360?text=Bar';
+
+  const specialCard = document.getElementById('special-card');
+  specialCard.innerHTML = '';
+
+  const barName = document.createElement('div');
+  barName.className = 'special-bar-name';
+  barName.textContent = bar.name;
+
+  const specialMeta = document.createElement('div');
+  specialMeta.className = 'special-meta';
+
+  const specialDay = document.createElement('span');
+  specialDay.className = 'special-day-badge';
+  specialDay.textContent = dayLabel || 'Day unavailable';
+  specialMeta.appendChild(specialDay);
+
+  const specialRow = buildSpecialItem(special);
+
+  specialCard.appendChild(barName);
+  specialCard.appendChild(specialMeta);
+  specialCard.appendChild(specialRow);
+
+  resetSpecialReportForm();
+  lucide.createIcons();
+}
+
+function showPreviousScreen() {
+  const previousType = previousScreenState?.type || 'specials';
+
+  if (previousType === 'detail') {
+    showDetail(previousScreenState.bar, previousScreenState.returnTo || 'specials');
+    return;
+  }
+
+  document.getElementById('special-screen').style.display = 'none';
+  document.getElementById('detail-screen').style.display = 'none';
+  showTab(previousType);
+  setScreenLayout(true);
+}
+
+
+function resetSpecialReportForm() {
+  const form = document.getElementById('special-report-form');
+  const reasonSelect = document.getElementById('special-report-reason');
+  if (!form || !reasonSelect) return;
+
+  form.style.display = 'none';
+  reasonSelect.value = '';
+}
+
+function initSpecialReport() {
+  const toggleButton = document.getElementById('special-report-toggle');
+  const reportForm = document.getElementById('special-report-form');
+
+  if (!toggleButton || !reportForm) return;
+
+  toggleButton.addEventListener('click', () => {
+    const isOpen = reportForm.style.display !== 'none';
+    reportForm.style.display = isOpen ? 'none' : 'flex';
+  });
+}
+
+function submitSpecialReport(event) {
+  event.preventDefault();
+
+  const reasonSelect = document.getElementById('special-report-reason');
+  if (!reasonSelect || !reasonSelect.value) return;
+
+  // Placeholder only for now. Future iteration will post this reason to an API.
+  resetSpecialReportForm();
+}
+
 // ===== Navigation =====
 function setScreenLayout(isHome) {
   const toolbar = document.querySelector('.home-toolbar');
@@ -510,7 +589,9 @@ function setScreenLayout(isHome) {
 
 function showHome() {
   document.getElementById('detail-screen').style.display = 'none';
-  showTab(currentTab);
+  document.getElementById('special-screen').style.display = 'none';
+  const fallbackTab = previousScreenState?.type && previousScreenState.type !== 'detail' ? previousScreenState.type : currentTab;
+  showTab(fallbackTab);
   setScreenLayout(true);
 }
 
@@ -539,6 +620,7 @@ function initTaskbar() {
     tab.addEventListener('click', () => {
       const tabName = tab.dataset.tab;
       document.getElementById('detail-screen').style.display = 'none';
+      document.getElementById('special-screen').style.display = 'none';
       showTab(tabName);
       setScreenLayout(true);
     });
@@ -560,10 +642,11 @@ function initHomeScrollCapture() {
   document.addEventListener('wheel', (event) => {
     const homeScreen = document.getElementById('home-screen');
     const detailScreen = document.getElementById('detail-screen');
+    const specialScreen = document.getElementById('special-screen');
     const appContainer = document.querySelector('.app-container');
 
-    if (!homeScreen || !detailScreen || !appContainer) return;
-    if (homeScreen.style.display === 'none' || detailScreen.style.display !== 'none') return;
+    if (!homeScreen || !detailScreen || !specialScreen || !appContainer) return;
+    if (homeScreen.style.display === 'none' || detailScreen.style.display !== 'none' || specialScreen.style.display !== 'none') return;
 
     if (appContainer.contains(event.target)) return;
 
@@ -687,6 +770,7 @@ initSidebarFilters();
 initTaskbar();
 initBarsSearch();
 initHomeScrollCapture();
+initSpecialReport();
 showTab(currentTab);
 setScreenLayout(true);
 loadBars();

@@ -801,3 +801,161 @@ body {
 .taskbar-tab.active {
   color: #007aff;
 }
+
+.clickable-special {
+  cursor: pointer;
+}
+
+/* ===== Special Detail Screen ===== */
+#special-screen {
+  display: none;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  background: #f5f5f5;
+}
+
+.special-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 8;
+  background-color: #007bff;
+  color: #fff;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 8px;
+}
+
+.special-toolbar-title {
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
+.special-back-button,
+.special-favorite-button {
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 18px;
+  background: transparent;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.special-content {
+  padding: 14px;
+}
+
+.special-bar-image {
+  width: 100%;
+  height: 180px;
+  object-fit: cover;
+  border-radius: 12px;
+  box-shadow: 0 5px 12px rgba(0,0,0,0.12);
+  margin-bottom: 14px;
+}
+
+.special-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 12px;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+}
+
+.special-bar-name {
+  font-weight: 700;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  color: #555;
+  font-size: 0.8rem;
+  letter-spacing: 0.8px;
+}
+
+
+.special-meta {
+  margin-bottom: 10px;
+}
+
+.special-day-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #e7f1ff;
+  color: #0a58ca;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+}
+.special-report-section {
+  margin-top: 16px;
+  background: #fff;
+  border-radius: 12px;
+  padding: 12px;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+}
+
+.special-report-section h3 {
+  margin: 0 0 8px;
+  text-transform: uppercase;
+  font-size: 0.85rem;
+  color: #555;
+}
+
+.special-report-copy {
+  margin: 0;
+  font-size: 0.88rem;
+  color: #666;
+  line-height: 1.4;
+}
+
+.special-report-toggle {
+  margin-top: 12px;
+  width: 100%;
+  border: 1px solid #007bff;
+  background: #f0f7ff;
+  color: #007bff;
+  font-weight: 600;
+  font-size: 0.9rem;
+  border-radius: 10px;
+  padding: 10px 12px;
+  cursor: pointer;
+}
+
+.special-report-form {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.special-report-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  color: #777;
+}
+
+.special-report-select {
+  border: 1px solid #d3dae6;
+  border-radius: 10px;
+  padding: 10px;
+  font-size: 0.9rem;
+  background: #fff;
+}
+
+.special-report-submit {
+  border: none;
+  border-radius: 10px;
+  background: #007bff;
+  color: #fff;
+  font-size: 0.9rem;
+  font-weight: 700;
+  padding: 10px 12px;
+  cursor: pointer;
+}
