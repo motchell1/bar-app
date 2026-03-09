@@ -773,19 +773,26 @@ function initBarsSearch() {
 function initHomeScrollCapture() {
   document.addEventListener('wheel', (event) => {
     const homeScreen = document.getElementById('home-screen');
+    const favoritesScreen = document.getElementById('favorites-screen');
     const detailScreen = document.getElementById('detail-screen');
     const specialScreen = document.getElementById('special-screen');
 
-    if (!homeScreen || !detailScreen || !specialScreen) return;
-    if (homeScreen.style.display === 'none' || detailScreen.style.display !== 'none' || specialScreen.style.display !== 'none') return;
+    if (!homeScreen || !favoritesScreen || !detailScreen || !specialScreen) return;
+    if (detailScreen.style.display !== 'none' || specialScreen.style.display !== 'none') return;
 
-    const maxScroll = homeScreen.scrollHeight - homeScreen.clientHeight;
+    const activeScrollable = homeScreen.style.display !== 'none'
+      ? homeScreen
+      : (favoritesScreen.style.display !== 'none' ? favoritesScreen : null);
+
+    if (!activeScrollable) return;
+
+    const maxScroll = activeScrollable.scrollHeight - activeScrollable.clientHeight;
     if (maxScroll <= 0) return;
 
-    const nextScrollTop = Math.max(0, Math.min(maxScroll, homeScreen.scrollTop + event.deltaY));
-    if (nextScrollTop === homeScreen.scrollTop) return;
+    const nextScrollTop = Math.max(0, Math.min(maxScroll, activeScrollable.scrollTop + event.deltaY));
+    if (nextScrollTop === activeScrollable.scrollTop) return;
 
-    homeScreen.scrollTop = nextScrollTop;
+    activeScrollable.scrollTop = nextScrollTop;
     event.preventDefault();
   }, { passive: false });
 }
