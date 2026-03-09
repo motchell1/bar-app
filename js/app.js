@@ -342,10 +342,17 @@ function renderBarsList(bars) {
     content.appendChild(name);
     content.appendChild(neighborhood);
 
+    const chevron = document.createElement('span');
+    chevron.className = 'bars-list-chevron';
+    chevron.setAttribute('data-lucide', 'chevron-right');
+
     card.appendChild(img);
     card.appendChild(content);
+    card.appendChild(chevron);
     list.appendChild(card);
   });
+
+  lucide.createIcons();
 }
 
 // ===== Detail Screen =====
