@@ -80,6 +80,46 @@
 
     </div>
   </div>
+
+  <div id="special-screen" style="display:none;">
+    <div class="special-toolbar">
+      <button class="special-back-button" onclick="showPreviousScreen()" aria-label="Back">
+        <span data-lucide="arrow-left"></span>
+      </button>
+      <span class="special-toolbar-title">SPECIAL</span>
+      <button class="special-favorite-button" aria-label="Favorite special">
+        <span data-lucide="star"></span>
+      </button>
+    </div>
+
+    <div class="special-content">
+      <img id="special-bar-image" class="special-bar-image" src="" alt="Bar image">
+
+      <div id="special-card" class="special-card"></div>
+
+      <div class="special-report-section">
+        <h3>Report this special</h3>
+        <p class="special-report-copy">
+          Think this special is inaccurate, unavailable, or out of date?
+        </p>
+        <button id="special-report-toggle" class="special-report-toggle" type="button">
+          Report this special
+        </button>
+
+        <form id="special-report-form" class="special-report-form" style="display:none;" onsubmit="submitSpecialReport(event)">
+          <label for="special-report-reason" class="special-report-label">Reason for review</label>
+          <select id="special-report-reason" class="special-report-select" required>
+            <option value="" selected disabled>Select a reason</option>
+            <option value="inaccurate">Special details are inaccurate</option>
+            <option value="expired">Special is no longer available</option>
+            <option value="not-found">Special could not be found</option>
+            <option value="other">Other issue</option>
+          </select>
+          <button class="special-report-submit" type="submit">Submit report</button>
+        </form>
+      </div>
+    </div>
+  </div>
 </div>
 
 <nav class="bottom-taskbar" aria-label="Primary">
