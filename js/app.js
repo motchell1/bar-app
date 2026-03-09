@@ -435,6 +435,28 @@ function initHomeScrollCapture() {
   }, { passive: false });
 }
 
+function initHomeScrollCapture() {
+  document.addEventListener('wheel', (event) => {
+    const homeScreen = document.getElementById('home-screen');
+    const detailScreen = document.getElementById('detail-screen');
+    const appContainer = document.querySelector('.app-container');
+
+    if (!homeScreen || !detailScreen || !appContainer) return;
+    if (homeScreen.style.display === 'none' || detailScreen.style.display !== 'none') return;
+
+    if (appContainer.contains(event.target)) return;
+
+    const maxScroll = homeScreen.scrollHeight - homeScreen.clientHeight;
+    if (maxScroll <= 0) return;
+
+    const nextScrollTop = Math.max(0, Math.min(maxScroll, homeScreen.scrollTop + event.deltaY));
+    if (nextScrollTop === homeScreen.scrollTop) return;
+
+    homeScreen.scrollTop = nextScrollTop;
+    event.preventDefault();
+  }, { passive: false });
+}
+
 
 // ===== Sidebar and Filters Initialization =====
 function initSidebarFilters() {
