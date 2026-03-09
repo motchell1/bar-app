@@ -812,69 +812,82 @@ body {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  background: #f5f5f5;
+  background: #f2f2f7;
+  transform: translateX(100%);
+  opacity: 0;
+  transition: transform 0.28s ease, opacity 0.28s ease;
+  will-change: transform, opacity;
+}
+
+#special-screen.is-active {
+  transform: translateX(0);
+  opacity: 1;
 }
 
 .special-toolbar {
   position: sticky;
   top: 0;
   z-index: 8;
-  background-color: #007bff;
-  color: #fff;
-  height: 48px;
+  height: 52px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 8px;
+  padding: 0 10px;
+  background: rgba(248, 248, 248, 0.9);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-bottom: 0.5px solid rgba(60, 60, 67, 0.2);
+  color: #111;
 }
 
 .special-toolbar-title {
-  font-weight: 700;
-  letter-spacing: 1px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0;
 }
 
 .special-back-button,
 .special-favorite-button {
-  width: 36px;
-  height: 36px;
+  min-width: 44px;
+  height: 44px;
   border: none;
-  border-radius: 18px;
   background: transparent;
-  color: #fff;
+  color: #007aff;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 .special-content {
-  padding: 14px;
-}
-
-.special-bar-image {
-  width: 100%;
-  height: 180px;
-  object-fit: cover;
-  border-radius: 12px;
-  box-shadow: 0 5px 12px rgba(0,0,0,0.12);
-  margin-bottom: 14px;
+  padding: 12px;
 }
 
 .special-card {
   background: #fff;
-  border-radius: 12px;
-  padding: 12px;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid #e5e5ea;
+}
+
+.special-bar-image {
+  width: 100%;
+  height: 210px;
+  object-fit: cover;
+  display: block;
+}
+
+.special-card-body {
+  padding: 14px;
 }
 
 .special-bar-name {
+  font-size: 1rem;
   font-weight: 700;
   margin-bottom: 8px;
-  text-transform: uppercase;
-  color: #555;
-  font-size: 0.8rem;
-  letter-spacing: 0.8px;
+  color: #1c1c1e;
+  text-transform: none;
+  letter-spacing: 0;
 }
-
 
 .special-meta {
   margin-bottom: 10px;
@@ -884,43 +897,45 @@ body {
   display: inline-block;
   padding: 4px 10px;
   border-radius: 999px;
-  background: #e7f1ff;
-  color: #0a58ca;
-  font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 0.4px;
-  text-transform: uppercase;
+  background: #eef5ff;
+  color: #007aff;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
 }
+
 .special-report-section {
-  margin-top: 16px;
+  margin-top: 14px;
   background: #fff;
-  border-radius: 12px;
-  padding: 12px;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+  border-radius: 14px;
+  padding: 14px;
+  border: 1px solid #e5e5ea;
 }
 
 .special-report-section h3 {
   margin: 0 0 8px;
-  text-transform: uppercase;
-  font-size: 0.85rem;
-  color: #555;
+  font-size: 0.92rem;
+  color: #1c1c1e;
+  font-weight: 700;
+  text-transform: none;
 }
 
 .special-report-copy {
   margin: 0;
-  font-size: 0.88rem;
-  color: #666;
+  font-size: 0.86rem;
+  color: #636366;
   line-height: 1.4;
 }
 
 .special-report-toggle {
   margin-top: 12px;
   width: 100%;
-  border: 1px solid #007bff;
-  background: #f0f7ff;
-  color: #007bff;
+  border: none;
+  background: #007aff;
+  color: #fff;
   font-weight: 600;
-  font-size: 0.9rem;
+  font-size: 0.92rem;
   border-radius: 10px;
   padding: 10px 12px;
   cursor: pointer;
@@ -936,26 +951,42 @@ body {
 .special-report-label {
   font-size: 0.78rem;
   font-weight: 600;
-  letter-spacing: 0.3px;
-  text-transform: uppercase;
-  color: #777;
+  letter-spacing: 0;
+  text-transform: none;
+  color: #636366;
 }
 
 .special-report-select {
-  border: 1px solid #d3dae6;
+  border: 1px solid #d1d1d6;
   border-radius: 10px;
   padding: 10px;
-  font-size: 0.9rem;
+  font-size: 0.92rem;
   background: #fff;
+  color: #1c1c1e;
 }
 
 .special-report-submit {
   border: none;
   border-radius: 10px;
-  background: #007bff;
+  background: #34c759;
   color: #fff;
-  font-size: 0.9rem;
+  font-size: 0.92rem;
   font-weight: 700;
   padding: 10px 12px;
   cursor: pointer;
+}
+
+#special-screen .special-item-embedded {
+  background-color: transparent;
+  border: none;
+  box-shadow: none;
+  border-top: 1px solid #e5e5ea;
+  border-radius: 0;
+  padding: 12px 0 0;
+  min-height: 0;
+}
+
+#special-screen .special-item-embedded .special-description {
+  margin-left: 8px;
+  color: #1c1c1e;
 }

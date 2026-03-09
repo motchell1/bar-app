@@ -399,7 +399,7 @@ function showDetail(bar, previousScreen = currentTab) {
   previousScreenState = { type: previousScreen };
   document.getElementById('home-screen').style.display = 'none';
   document.getElementById('bars-screen').style.display = 'none';
-  document.getElementById('special-screen').style.display = 'none';
+  hideSpecialScreen();
   document.getElementById('detail-screen').style.display = 'block';
   setScreenLayout(false);
 
@@ -501,14 +501,17 @@ function showSpecialDetail(bar, special, { previousScreen = 'specials', returnTo
   document.getElementById('home-screen').style.display = 'none';
   document.getElementById('bars-screen').style.display = 'none';
   document.getElementById('detail-screen').style.display = 'none';
-  document.getElementById('special-screen').style.display = 'block';
+
+  const specialScreen = document.getElementById('special-screen');
+  specialScreen.style.display = 'block';
+  requestAnimationFrame(() => specialScreen.classList.add('is-active'));
   setScreenLayout(false);
 
   const barImage = document.getElementById('special-bar-image');
   barImage.src = (bar.image_url && bar.image_url !== 'null') ? bar.image_url : 'https://placehold.co/640x360?text=Bar';
 
-  const specialCard = document.getElementById('special-card');
-  specialCard.innerHTML = '';
+  const specialCardBody = document.getElementById('special-card-body');
+  specialCardBody.innerHTML = '';
 
   const barName = document.createElement('div');
   barName.className = 'special-bar-name';
@@ -523,10 +526,11 @@ function showSpecialDetail(bar, special, { previousScreen = 'specials', returnTo
   specialMeta.appendChild(specialDay);
 
   const specialRow = buildSpecialItem(special);
+  specialRow.classList.add('special-item-embedded');
 
-  specialCard.appendChild(barName);
-  specialCard.appendChild(specialMeta);
-  specialCard.appendChild(specialRow);
+  specialCardBody.appendChild(barName);
+  specialCardBody.appendChild(specialMeta);
+  specialCardBody.appendChild(specialRow);
 
   resetSpecialReportForm();
   lucide.createIcons();
@@ -540,7 +544,7 @@ function showPreviousScreen() {
     return;
   }
 
-  document.getElementById('special-screen').style.display = 'none';
+  hideSpecialScreen();
   document.getElementById('detail-screen').style.display = 'none';
   showTab(previousType);
   setScreenLayout(true);
@@ -587,9 +591,17 @@ function setScreenLayout(isHome) {
   if (appContainer) appContainer.classList.toggle('detail-mode', !isHome);
 }
 
+function hideSpecialScreen() {
+  const specialScreen = document.getElementById('special-screen');
+  if (!specialScreen) return;
+
+  specialScreen.classList.remove('is-active');
+  specialScreen.style.display = 'none';
+}
+
 function showHome() {
   document.getElementById('detail-screen').style.display = 'none';
-  document.getElementById('special-screen').style.display = 'none';
+  hideSpecialScreen();
   const fallbackTab = previousScreenState?.type && previousScreenState.type !== 'detail' ? previousScreenState.type : currentTab;
   showTab(fallbackTab);
   setScreenLayout(true);
@@ -620,7 +632,7 @@ function initTaskbar() {
     tab.addEventListener('click', () => {
       const tabName = tab.dataset.tab;
       document.getElementById('detail-screen').style.display = 'none';
-      document.getElementById('special-screen').style.display = 'none';
+      hideSpecialScreen();
       showTab(tabName);
       setScreenLayout(true);
     });
