@@ -207,8 +207,8 @@ function renderBarsWeek(bars) {
      date.setDate(date.getDate() + offset);
      const dayIndex = date.getDay();
      const dayKey = DAYS_FULL[dayIndex].slice(0,3).toUpperCase();
-     const formatted = date.toLocaleDateString(undefined, { month: 'long', day: 'numeric' });
-     const label = offset === 0 ? `Today – ${formatted}` : `${DAYS_FULL[dayIndex]} – ${formatted}`;
+     const dayName = DAYS_FULL[dayIndex];
+     const label = offset === 0 ? `${dayName} (Today)` : dayName;
      const isToday = offset === 0;
      const barsWithSpecials = bars.filter(bar => (bar.specials_by_day[dayKey] || []).length > 0);
      
@@ -775,12 +775,9 @@ function initHomeScrollCapture() {
     const homeScreen = document.getElementById('home-screen');
     const detailScreen = document.getElementById('detail-screen');
     const specialScreen = document.getElementById('special-screen');
-    const appContainer = document.querySelector('.app-container');
 
-    if (!homeScreen || !detailScreen || !specialScreen || !appContainer) return;
+    if (!homeScreen || !detailScreen || !specialScreen) return;
     if (homeScreen.style.display === 'none' || detailScreen.style.display !== 'none' || specialScreen.style.display !== 'none') return;
-
-    if (appContainer.contains(event.target)) return;
 
     const maxScroll = homeScreen.scrollHeight - homeScreen.clientHeight;
     if (maxScroll <= 0) return;
