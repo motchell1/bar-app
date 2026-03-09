@@ -86,6 +86,10 @@ let barsSearchQuery = '';
 let previousScreenState = null;
 let favorites = [];
 let currentSpecialContext = null;
+const activeFilters = {
+  types: [],
+  neighborhoods: []
+};
 
 // ===== Helpers =====
 
@@ -334,9 +338,12 @@ function renderBarsWeek(bars) {
 // Bars list logic: filter by bar name query, then sort by neighborhood and bar name.
 function getSortedFilteredBars(bars) {
   const query = barsSearchQuery.trim().toLowerCase();
+  const selectedNeighborhoods = activeFilters.neighborhoods;
 
   return bars
     .filter(bar => {
+      const neighborhoodPass = selectedNeighborhoods.length === 0 || selectedNeighborhoods.includes(bar.neighborhood);
+      if (!neighborhoodPass) return false;
       if (!query) return true;
       const name = (bar.name || '').toLowerCase();
       return name.includes(query);
@@ -545,23 +552,25 @@ function updateSpecialFavoriteButton(isFavorited) {
   button.setAttribute('aria-pressed', isFavorited ? 'true' : 'false');
 }
 
-function renderFavorites() {
+function renderFavorites(items = favorites) {
   const favoritesScreen = document.getElementById('favorites-screen');
   const favoritesList = document.getElementById('favorites-list');
   if (!favoritesScreen || !favoritesList) return;
 
   favoritesList.innerHTML = '';
 
-  if (favorites.length === 0) {
+  if (items.length === 0) {
     const emptyState = document.createElement('div');
     emptyState.className = 'no-specials-line';
     emptyState.style.padding = '12px';
-    emptyState.textContent = 'No favorites yet. Tap the star on a special to save it here.';
+    emptyState.textContent = favorites.length === 0
+      ? 'No favorites yet. Tap the star on a special to save it here.'
+      : 'No favorites match your current filters.';
     favoritesList.appendChild(emptyState);
     return;
   }
 
-  favorites.forEach(item => {
+  items.forEach(item => {
     const card = document.createElement('div');
     card.className = 'bar-card';
     card.onclick = () => showSpecialDetail(item.bar, item.special, { previousScreen: 'favorites', dayLabel: item.dayLabel });
@@ -609,7 +618,9 @@ function initSpecialFavoriteButton() {
     );
 
     updateSpecialFavoriteButton(nowFavorited);
-    renderFavorites();
+    if (currentTab === 'favorites') {
+      renderCurrentTabData();
+    }
     lucide.createIcons();
   });
 }
@@ -722,20 +733,103 @@ function showTab(tabName) {
   const homeScreen = document.getElementById('home-screen');
   const barsScreen = document.getElementById('bars-screen');
   const favoritesScreen = document.getElementById('favorites-screen');
+  const previousTab = currentTab;
 
   currentTab = tabName;
+
+  if (previousTab !== tabName) {
+    resetFilters();
+  }
+
+  updateFilterSectionVisibility();
 
   if (homeScreen) homeScreen.style.display = tabName === 'specials' ? 'flex' : 'none';
   if (barsScreen) barsScreen.style.display = tabName === 'bars' ? 'flex' : 'none';
   if (favoritesScreen) favoritesScreen.style.display = tabName === 'favorites' ? 'flex' : 'none';
 
-  if (tabName === 'favorites') {
-    renderFavorites();
-  }
+  renderCurrentTabData();
 
   document.querySelectorAll('.taskbar-tab').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.tab === tabName);
   });
+}
+
+function getSelectedTypesFromFilters() {
+  const typeRows = Array.from(document.querySelectorAll('#special-type-filters .filter-row'));
+  return typeRows
+    .filter(row => row.querySelector('input[type="checkbox"]').checked)
+    .map(row => row.querySelector('input[type="checkbox"]').id.replace('Filter', '').toLowerCase());
+}
+
+function getSelectedNeighborhoodsFromFilters() {
+  const neighborhoodRows = Array.from(document.querySelectorAll('#neighborhood-filters .filter-row'));
+  return neighborhoodRows
+    .filter(row => row.querySelector('input[type="checkbox"]').checked)
+    .map(row => row.querySelector('input[type="checkbox"]').dataset.name);
+}
+
+function resetFilterInputs() {
+  document.querySelectorAll('#side-menu .filter-row').forEach(row => {
+    const checkbox = row.querySelector('input[type="checkbox"]');
+    if (!checkbox) return;
+    checkbox.checked = false;
+    row.classList.remove('selected');
+  });
+}
+
+function resetFilters() {
+  activeFilters.types = [];
+  activeFilters.neighborhoods = [];
+  resetFilterInputs();
+}
+
+function updateFilterSectionVisibility() {
+  const typeSection = document.getElementById('special-type-filters');
+  if (!typeSection) return;
+
+  const showTypeFilters = currentTab !== 'bars';
+  typeSection.style.display = showTypeFilters ? '' : 'none';
+}
+
+function getFilteredBarsForSpecials() {
+  return barsData.map(bar => {
+    const specials_by_day = Object.fromEntries(
+      Object.entries(bar.specials_by_day).map(([day, specials]) => [
+        day,
+        specials.filter(special => {
+          const typePass = activeFilters.types.length === 0 || activeFilters.types.includes(special.type);
+          const neighborhoodPass = activeFilters.neighborhoods.length === 0 || activeFilters.neighborhoods.includes(bar.neighborhood);
+          return typePass && neighborhoodPass;
+        })
+      ])
+    );
+
+    return { ...bar, specials_by_day };
+  });
+}
+
+function getFilteredFavorites() {
+  return favorites.filter(item => {
+    const typePass = activeFilters.types.length === 0 || activeFilters.types.includes(item.special.type);
+    const neighborhoodPass = activeFilters.neighborhoods.length === 0 || activeFilters.neighborhoods.includes(item.bar.neighborhood);
+    return typePass && neighborhoodPass;
+  });
+}
+
+function renderCurrentTabData() {
+  if (currentTab === 'specials') {
+    renderBarsWeek(getFilteredBarsForSpecials());
+    return;
+  }
+
+  if (currentTab === 'bars') {
+    renderBarsList(barsData);
+    return;
+  }
+
+  if (currentTab === 'favorites') {
+    renderFavorites(getFilteredFavorites());
+  }
 }
 
 function initTaskbar() {
@@ -797,7 +891,7 @@ function initSidebarFilters() {
  const menuOverlay = document.getElementById('side-menu-overlay');
  const applyButton = document.getElementById('applyFiltersBtn');
  // ===== Special Type Rows =====
- const typeRows = document.querySelectorAll('.filter-section:nth-child(1) .filter-row');
+ const typeRows = document.querySelectorAll('#special-type-filters .filter-row');
  typeRows.forEach(row => {
    const checkbox = row.querySelector('input[type="checkbox"]');
    checkbox.checked = false; // default = show all
@@ -819,31 +913,9 @@ function initSidebarFilters() {
  });
  // ===== Apply Filters Button =====
  applyButton.addEventListener('click', () => {
-   // Special Types
-   const selectedTypes = Array.from(typeRows)
-     .filter(r => r.querySelector('input[type="checkbox"]').checked)
-     .map(r => r.querySelector('input[type="checkbox"]').id.replace('Filter', '').toLowerCase());
-   // Neighborhoods
-   const neighborhoodSection = document.getElementById('neighborhood-filters');
-   const neighborhoodRows = Array.from(neighborhoodSection.querySelectorAll('.filter-row'));
-   const selectedNeighborhoods = neighborhoodRows
-     .filter(r => r.querySelector('input[type="checkbox"]').checked)
-     .map(r => r.querySelector('input[type="checkbox"]').dataset.name);
-   // Filter bars
-   const filteredBars = barsData.map(bar => {
-     const specials_by_day = Object.fromEntries(
-       Object.entries(bar.specials_by_day).map(([day, specials]) => [
-         day,
-         specials.filter(s => {
-           const typePass = selectedTypes.length === 0 || selectedTypes.includes(s.type);
-           const neighPass = selectedNeighborhoods.length === 0 || selectedNeighborhoods.includes(bar.neighborhood);
-           return typePass && neighPass;
-         })
-       ])
-     );
-     return { ...bar, specials_by_day };
-   });
-   renderBarsWeek(filteredBars);
+   activeFilters.types = currentTab === 'bars' ? [] : getSelectedTypesFromFilters();
+   activeFilters.neighborhoods = getSelectedNeighborhoodsFromFilters();
+   renderCurrentTabData();
    sideMenu.classList.remove('open');
    menuOverlay.classList.remove('active');
  });
@@ -885,8 +957,7 @@ async function loadBars() {
    const data = await response.json();
    const parsed = typeof data.body === "string" ? JSON.parse(data.body) : data;
    barsData = parsed.bars || [];
-   renderBarsWeek(barsData);
-   renderBarsList(barsData);
+   renderCurrentTabData();
    // Generate neighborhoods AFTER barsData is loaded
    generateNeighborhoodFilters();
  } catch (err) {
