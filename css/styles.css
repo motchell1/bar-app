@@ -966,14 +966,16 @@ body {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 8px 0;
+  flex-direction: column;
+  padding: 16px;
+  box-sizing: border-box;
 }
 
 #favorites-list {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding: 0 10px 12px;
+  width: 100%;
 }
 
 .special-favorite-button.active {

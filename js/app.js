@@ -401,6 +401,7 @@ function showDetail(bar, previousScreen = currentTab) {
   previousScreenState = { type: previousScreen };
   document.getElementById('home-screen').style.display = 'none';
   document.getElementById('bars-screen').style.display = 'none';
+  document.getElementById('favorites-screen').style.display = 'none';
   document.getElementById('special-screen').style.display = 'none';
   document.getElementById('detail-screen').style.display = 'block';
   setScreenLayout(false);
@@ -626,6 +627,7 @@ function showSpecialDetail(bar, special, { previousScreen = 'specials', returnTo
 
   document.getElementById('home-screen').style.display = 'none';
   document.getElementById('bars-screen').style.display = 'none';
+  document.getElementById('favorites-screen').style.display = 'none';
   document.getElementById('detail-screen').style.display = 'none';
   document.getElementById('special-screen').style.display = 'block';
   setScreenLayout(false);
