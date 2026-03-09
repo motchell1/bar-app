@@ -17,9 +17,14 @@
 </div>
 <div class="app-container">
   <div id="home-screen">
-
-    
     <div id="home-bars"></div>
+  </div>
+
+  <div id="bars-screen" style="display:none;">
+    <div class="bars-search-wrap">
+      <input id="bars-search-input" class="bars-search-input" type="search" placeholder="Search bars or neighborhoods" aria-label="Search bars" />
+    </div>
+    <div id="bars-list"></div>
   </div>
   
   <div id="side-menu-overlay" class="side-menu-overlay"></div>
@@ -76,6 +81,21 @@
     </div>
   </div>
 </div>
+
+<nav class="bottom-taskbar" aria-label="Primary">
+  <button class="taskbar-tab active" type="button" aria-label="Specials" data-tab="specials">
+    <span class="taskbar-icon" data-lucide="star"></span>
+    <span class="taskbar-label">Specials</span>
+  </button>
+  <button class="taskbar-tab" type="button" aria-label="Bars" data-tab="bars">
+    <span class="taskbar-icon" data-lucide="beer"></span>
+    <span class="taskbar-label">Bars</span>
+  </button>
+  <button class="taskbar-tab" type="button" aria-label="Favorites" data-tab="favorites">
+    <span class="taskbar-icon" data-lucide="heart"></span>
+    <span class="taskbar-label">Favorites</span>
+  </button>
+</nav>
 <script src="https://cdn.jsdelivr.net/npm/lucide@0.575.0/dist/umd/lucide.js"></script>
 <script> lucide.createIcons();</script>
 <!-- Link to external JS -->

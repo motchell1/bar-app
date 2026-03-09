@@ -81,6 +81,8 @@ function getOpenStatus(hours) {
 // ===== Home Screen State =====
 let barsData = [];
 const DAYS_FULL = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+let currentTab = 'specials';
+let barsSearchQuery = '';
 
 // ===== Helpers =====
 
@@ -309,9 +311,75 @@ function renderBarsWeek(bars) {
  });
 }
 
+// Bars list logic: filter by bar name query, then sort by neighborhood and bar name.
+function getSortedFilteredBars(bars) {
+  const query = barsSearchQuery.trim().toLowerCase();
+
+  return bars
+    .filter(bar => {
+      if (!query) return true;
+      const name = (bar.name || '').toLowerCase();
+      return name.includes(query);
+    })
+    .sort((a, b) => {
+      const neighborhoodCompare = (a.neighborhood || '').localeCompare(b.neighborhood || '', undefined, { sensitivity: 'base' });
+      if (neighborhoodCompare !== 0) return neighborhoodCompare;
+      return (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' });
+    });
+}
+
+function renderBarsList(bars) {
+  const list = document.getElementById('bars-list');
+  if (!list) return;
+
+  list.innerHTML = '';
+
+  // Keep rendering deterministic so the list stays stable as users search.
+  const sortedBars = getSortedFilteredBars(bars);
+
+  sortedBars.forEach(bar => {
+    const card = document.createElement('div');
+    card.className = 'bars-list-card';
+    card.onclick = () => showDetail(bar);
+
+    const img = document.createElement('img');
+    img.className = 'bars-list-thumb';
+    img.src = (bar.image_url && bar.image_url !== 'null')
+      ? bar.image_url
+      : 'https://placehold.co/144x144?text=Bar';
+    img.alt = bar.name;
+
+    const content = document.createElement('div');
+    content.className = 'bars-list-content';
+
+    const name = document.createElement('div');
+    name.className = 'bars-list-name';
+    name.textContent = bar.name || '';
+
+    const neighborhood = document.createElement('div');
+    neighborhood.className = 'bars-list-neighborhood';
+    neighborhood.textContent = bar.neighborhood || '';
+
+    content.appendChild(name);
+    content.appendChild(neighborhood);
+
+    const chevron = document.createElement('span');
+    chevron.className = 'bars-list-chevron';
+    chevron.setAttribute('data-lucide', 'chevron-right');
+
+    card.appendChild(img);
+    card.appendChild(content);
+    card.appendChild(chevron);
+    list.appendChild(card);
+  });
+
+  lucide.createIcons();
+}
+
 // ===== Detail Screen =====
 function showDetail(bar) {
   document.getElementById('home-screen').style.display = 'none';
+  document.getElementById('bars-screen').style.display = 'none';
   document.getElementById('detail-screen').style.display = 'block';
   setScreenLayout(false);
 
@@ -441,9 +509,51 @@ function setScreenLayout(isHome) {
 }
 
 function showHome() {
-  document.getElementById('home-screen').style.display = 'flex';
   document.getElementById('detail-screen').style.display = 'none';
+  showTab(currentTab);
   setScreenLayout(true);
+}
+
+function showTab(tabName) {
+  const homeScreen = document.getElementById('home-screen');
+  const barsScreen = document.getElementById('bars-screen');
+
+  currentTab = tabName;
+
+  if (homeScreen) homeScreen.style.display = tabName === 'specials' ? 'flex' : 'none';
+  if (barsScreen) barsScreen.style.display = tabName === 'bars' ? 'flex' : 'none';
+
+  if (tabName === 'favorites') {
+    if (homeScreen) homeScreen.style.display = 'none';
+    if (barsScreen) barsScreen.style.display = 'none';
+  }
+
+  document.querySelectorAll('.taskbar-tab').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.tab === tabName);
+  });
+}
+
+function initTaskbar() {
+  const tabs = document.querySelectorAll('.taskbar-tab');
+  tabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      const tabName = tab.dataset.tab;
+      document.getElementById('detail-screen').style.display = 'none';
+      showTab(tabName);
+      setScreenLayout(true);
+    });
+  });
+}
+
+// Bars search is intentionally scoped to bar names; neighborhood filtering is handled by filters.
+function initBarsSearch() {
+  const searchInput = document.getElementById('bars-search-input');
+  if (!searchInput) return;
+
+  searchInput.addEventListener('input', () => {
+    barsSearchQuery = searchInput.value || '';
+    renderBarsList(barsData);
+  });
 }
 
 function initHomeScrollCapture() {
@@ -467,20 +577,6 @@ function initHomeScrollCapture() {
     event.preventDefault();
   }, { passive: false });
 }
-
-// ===== Load Bars =====
-async function loadBars() {
-  try {
-    const response = await fetch('https://qz5rs9i9ya.execute-api.us-east-2.amazonaws.com/default/getStartupData');
-    const data = await response.json();
-    const parsed = typeof data.body === "string" ? JSON.parse(data.body) : data;
-    barsData = parsed.bars || [];
-    renderBarsWeek(barsData);
-  } catch (err) {
-    console.error('Failed to load bars:', err);
-  }
-}
-
 
 // ===== Sidebar and Filters Initialization =====
 // ===== Initialize Sidebar Filters =====
@@ -579,6 +675,7 @@ async function loadBars() {
    const parsed = typeof data.body === "string" ? JSON.parse(data.body) : data;
    barsData = parsed.bars || [];
    renderBarsWeek(barsData);
+   renderBarsList(barsData);
    // Generate neighborhoods AFTER barsData is loaded
    generateNeighborhoodFilters();
  } catch (err) {
@@ -587,6 +684,9 @@ async function loadBars() {
 }
 // ===== Initialize =====
 initSidebarFilters();
+initTaskbar();
+initBarsSearch();
 initHomeScrollCapture();
+showTab(currentTab);
 setScreenLayout(true);
 loadBars();

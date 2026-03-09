@@ -63,13 +63,13 @@ body {
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  height: calc(100vh - 48px);
+  height: calc(100vh - 116px);
 }
 
 
 .app-container.detail-mode {
   margin-top: 0;
-  height: 100vh;
+  height: calc(100vh - 68px);
 }
 
 
@@ -98,6 +98,101 @@ body {
   padding: 16px;
   -webkit-overflow-scrolling: touch;
   transition: opacity 0.4s ease;
+}
+
+#bars-screen {
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+#bars-screen::-webkit-scrollbar {
+  display: none;
+}
+
+
+.bars-search-wrap {
+  padding: 0 16px 8px;
+}
+
+.bars-search-input {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #e1e1e6;
+  background: #fff;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  padding: 10px 12px;
+  outline: none;
+}
+
+.bars-search-input:focus {
+  border-color: #007aff;
+  box-shadow: 0 0 0 2px rgba(0, 122, 255, 0.15);
+}
+
+#bars-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+}
+
+
+.bars-list-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+  padding: 8px 10px;
+  cursor: pointer;
+}
+
+.bars-list-thumb {
+  width: 58px;
+  height: 58px;
+  border-radius: 10px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.bars-list-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.bars-list-name {
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.bars-list-neighborhood {
+  font-size: 0.7rem;
+  color: #777;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+}
+
+.bars-list-chevron {
+  margin-left: auto;
+  width: 16px;
+  height: 16px;
+  color: #b0b0b7;
+  display: inline-flex;
+}
+
+.bars-list-chevron svg {
+  width: 16px;
+  height: 16px;
+  stroke-width: 2.25;
 }
 
 /* ===== Bar Cards ===== */
@@ -648,4 +743,61 @@ body {
 .side-menu-overlay.active {
 	opacity: 1;
 	pointer-events: all;
+}
+
+
+/* ===== Bottom Taskbar ===== */
+.bottom-taskbar {
+  position: fixed;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 480px;
+  height: 68px;
+  padding-bottom: env(safe-area-inset-bottom, 0);
+  background: rgba(248, 248, 248, 0.92);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-top: 1px solid rgba(60, 60, 67, 0.2);
+  display: flex;
+  justify-content: space-around;
+  align-items: flex-start;
+  z-index: 120;
+  box-sizing: border-box;
+}
+
+.taskbar-tab {
+  flex: 1;
+  border: none;
+  background: transparent;
+  color: #8e8e93;
+  font-size: 0.65rem;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  height: 100%;
+  padding-top: 4px;
+}
+
+.taskbar-icon {
+  width: 20px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.taskbar-icon svg {
+  width: 20px;
+  height: 20px;
+  stroke-width: 1.8;
+}
+
+.taskbar-tab.active {
+  color: #007aff;
 }
