@@ -311,6 +311,7 @@ function renderBarsWeek(bars) {
  });
 }
 
+// Bars list logic: filter by bar name query, then sort by neighborhood and bar name.
 function getSortedFilteredBars(bars) {
   const query = barsSearchQuery.trim().toLowerCase();
 
@@ -333,6 +334,7 @@ function renderBarsList(bars) {
 
   list.innerHTML = '';
 
+  // Keep rendering deterministic so the list stays stable as users search.
   const sortedBars = getSortedFilteredBars(bars);
 
   sortedBars.forEach(bar => {
@@ -543,6 +545,7 @@ function initTaskbar() {
   });
 }
 
+// Bars search is intentionally scoped to bar names; neighborhood filtering is handled by filters.
 function initBarsSearch() {
   const searchInput = document.getElementById('bars-search-input');
   if (!searchInput) return;
