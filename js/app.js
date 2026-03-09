@@ -318,8 +318,7 @@ function getSortedFilteredBars(bars) {
     .filter(bar => {
       if (!query) return true;
       const name = (bar.name || '').toLowerCase();
-      const neighborhood = (bar.neighborhood || '').toLowerCase();
-      return name.includes(query) || neighborhood.includes(query);
+      return name.includes(query);
     })
     .sort((a, b) => {
       const neighborhoodCompare = (a.neighborhood || '').localeCompare(b.neighborhood || '', undefined, { sensitivity: 'base' });
