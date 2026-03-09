@@ -967,7 +967,6 @@ body {
   min-height: 0;
   overflow-y: auto;
   flex-direction: column;
-  padding: 16px;
   box-sizing: border-box;
 }
 
@@ -976,6 +975,12 @@ body {
   flex-direction: column;
   gap: 10px;
   width: 100%;
+  padding: 16px;
+  box-sizing: border-box;
+}
+
+#favorites-list .special-day-badge {
+  margin: 8px 0 14px;
 }
 
 .special-favorite-button.active {

@@ -566,14 +566,6 @@ function renderFavorites() {
     card.className = 'bar-card';
     card.onclick = () => showSpecialDetail(item.bar, item.special, { previousScreen: 'favorites', dayLabel: item.dayLabel });
 
-    if (item.bar.image_url && item.bar.image_url !== 'null') {
-      const img = document.createElement('img');
-      img.className = 'card-image';
-      img.src = item.bar.image_url;
-      img.alt = item.bar.name;
-      card.appendChild(img);
-    }
-
     const content = document.createElement('div');
     content.className = 'card-content';
 
