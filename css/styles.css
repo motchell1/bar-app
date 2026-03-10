@@ -468,7 +468,7 @@ body {
 }
 
 .detail-section h3 {
-  margin-bottom: 8px;
+  margin: 0;
   font-size: 1em;
   text-transform: uppercase;
   color: #555;
@@ -834,7 +834,7 @@ body {
 }
 
 .special-back-button,
-.special-favorite-button {
+.special-toolbar-spacer {
   width: 36px;
   height: 36px;
   border: none;
@@ -868,13 +868,47 @@ body {
 
 .special-bar-name {
   font-weight: 700;
-  margin-bottom: 8px;
+  margin: 0;
   text-transform: uppercase;
   color: #555;
   font-size: 0.8rem;
   letter-spacing: 0.8px;
 }
 
+
+.special-card-header-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.special-card .special-favorite-button {
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 16px;
+  background: #f4f6fb;
+  color: #7c8ca3;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
+}
+
+.special-card .special-favorite-button.active {
+  color: #f4c542;
+}
+
+.special-card .special-favorite-button.active svg {
+  fill: currentColor;
+}
+
+.special-card .special-favorite-button:active {
+  transform: scale(0.95);
+}
 
 .special-meta {
   margin-bottom: 10px;
@@ -979,14 +1013,16 @@ body {
   box-sizing: border-box;
 }
 
+#favorites-list .bar-card {
+  transition: transform 0.25s ease, opacity 0.25s ease;
+}
+
+#favorites-list .bar-card.is-removing {
+  opacity: 0;
+  transform: translateY(-10px) scale(0.98);
+}
+
 #favorites-list .special-day-badge {
   margin: 8px 0 14px;
 }
 
-.special-favorite-button.active {
-  color: #f4c542;
-}
-
-.special-favorite-button.active svg {
-  fill: currentColor;
-}

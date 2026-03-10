@@ -558,6 +558,44 @@ function updateSpecialFavoriteButton(isFavorited) {
   button.setAttribute('aria-pressed', isFavorited ? 'true' : 'false');
 }
 
+function createFavoriteButton(bar, special, dayLabel, { onUnfavorite } = {}) {
+  const favoriteButton = document.createElement('button');
+  favoriteButton.className = 'special-favorite-button';
+  favoriteButton.type = 'button';
+  favoriteButton.setAttribute('aria-label', 'Favorite special');
+  favoriteButton.innerHTML = '<span data-lucide="star"></span>';
+
+  const syncFavoriteState = () => {
+    const favoriteState = isFavoriteSpecial(bar, special, dayLabel);
+    favoriteButton.classList.toggle('active', favoriteState);
+    favoriteButton.setAttribute('aria-pressed', favoriteState ? 'true' : 'false');
+  };
+
+  favoriteButton.addEventListener('click', (event) => {
+    event.stopPropagation();
+    const nowFavorited = toggleFavoriteSpecial(bar, special, dayLabel);
+    favoriteButton.classList.toggle('active', nowFavorited);
+    favoriteButton.setAttribute('aria-pressed', nowFavorited ? 'true' : 'false');
+
+    if (!nowFavorited && typeof onUnfavorite === 'function') {
+      onUnfavorite();
+    }
+
+    if (currentTab === 'favorites') {
+      renderCurrentTabData();
+    }
+
+    if (currentSpecialContext && getSpecialId(currentSpecialContext.bar, currentSpecialContext.special, currentSpecialContext.dayLabel) === getSpecialId(bar, special, dayLabel)) {
+      updateSpecialFavoriteButton(nowFavorited);
+    }
+
+    lucide.createIcons();
+  });
+
+  syncFavoriteState();
+  return favoriteButton;
+}
+
 function renderFavorites(items = favorites) {
   const favoritesScreen = document.getElementById('favorites-screen');
   const favoritesList = document.getElementById('favorites-list');
@@ -588,9 +626,14 @@ function renderFavorites(items = favorites) {
     name.className = 'bar-name';
     name.textContent = item.bar.name;
 
-    const neighborhood = document.createElement('div');
-    neighborhood.className = 'bar-neighborhood';
-    neighborhood.textContent = item.bar.neighborhood || '';
+    const headerRow = document.createElement('div');
+    headerRow.className = 'special-card-header-row';
+
+    const favoriteButton = createFavoriteButton(item.bar, item.special, item.dayLabel, {
+      onUnfavorite: () => {
+        card.classList.add('is-removing');
+      }
+    });
 
     const dayBadge = document.createElement('div');
     dayBadge.className = 'special-day-badge';
@@ -598,8 +641,10 @@ function renderFavorites(items = favorites) {
 
     const specialItem = buildSpecialItem(item.special);
 
-    content.appendChild(name);
-    content.appendChild(neighborhood);
+    headerRow.appendChild(name);
+    headerRow.appendChild(favoriteButton);
+
+    content.appendChild(headerRow);
     content.appendChild(dayBadge);
     content.appendChild(specialItem);
 
@@ -611,24 +656,7 @@ function renderFavorites(items = favorites) {
 }
 
 function initSpecialFavoriteButton() {
-  const favoriteButton = document.querySelector('.special-favorite-button');
-  if (!favoriteButton) return;
-
-  favoriteButton.addEventListener('click', () => {
-    if (!currentSpecialContext) return;
-
-    const nowFavorited = toggleFavoriteSpecial(
-      currentSpecialContext.bar,
-      currentSpecialContext.special,
-      currentSpecialContext.dayLabel
-    );
-
-    updateSpecialFavoriteButton(nowFavorited);
-    if (currentTab === 'favorites') {
-      renderCurrentTabData();
-    }
-    lucide.createIcons();
-  });
+  // Favorite buttons are rendered per-card so no static toolbar listener is required.
 }
 
 function showSpecialDetail(bar, special, { previousScreen = 'specials', returnTo = 'specials', dayLabel = '' } = {}) {
@@ -647,9 +675,17 @@ function showSpecialDetail(bar, special, { previousScreen = 'specials', returnTo
   const specialCard = document.getElementById('special-card');
   specialCard.innerHTML = '';
 
+  const specialHeader = document.createElement('div');
+  specialHeader.className = 'special-card-header-row';
+
   const barName = document.createElement('div');
   barName.className = 'special-bar-name';
   barName.textContent = bar.name;
+
+  const cardFavoriteButton = createFavoriteButton(bar, special, dayLabel || 'Day unavailable');
+
+  specialHeader.appendChild(barName);
+  specialHeader.appendChild(cardFavoriteButton);
 
   const specialMeta = document.createElement('div');
   specialMeta.className = 'special-meta';
@@ -663,7 +699,7 @@ function showSpecialDetail(bar, special, { previousScreen = 'specials', returnTo
 
   const specialRow = buildSpecialItem(special);
 
-  specialCard.appendChild(barName);
+  specialCard.appendChild(specialHeader);
   specialCard.appendChild(specialMeta);
   specialCard.appendChild(specialRow);
 
