@@ -1027,12 +1027,21 @@ body {
 }
 
 #favorites-list .bar-card {
-  transition: transform 0.42s ease, opacity 0.42s ease;
+  transition: opacity 0.22s ease, transform 0.22s ease, height 0.48s ease, margin 0.48s ease, padding 0.48s ease;
 }
 
 #favorites-list .bar-card.is-removing {
   opacity: 0;
-  transform: translateY(-10px) scale(0.98);
+  transform: scale(0.98);
+}
+
+#favorites-list .bar-card.is-collapsing {
+  height: 0 !important;
+  margin-top: 0;
+  margin-bottom: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  border-width: 0;
 }
 
 #favorites-list .special-day-badge {

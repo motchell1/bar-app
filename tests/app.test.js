@@ -153,6 +153,7 @@ function loadAppWithoutBoot(document) {
     fetch: async () => ({ json: async () => ({ bars: [] }) }),
     setTimeout,
     clearTimeout,
+    requestAnimationFrame: (cb) => setTimeout(cb, 0),
   };
   vm.createContext(context);
   vm.runInContext(trimmed, context);
@@ -237,7 +238,7 @@ test('clicking favorites star unfavorites and removes card from list', async () 
 
   favoriteButton.click();
 
-  await new Promise((resolve) => setTimeout(resolve, 480));
+  await new Promise((resolve) => setTimeout(resolve, 760));
 
   const favoriteCount = vm.runInContext('favorites.length', ctx);
   assert.equal(favoriteCount, 0, 'favorite removed from store');

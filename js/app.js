@@ -635,11 +635,22 @@ function renderFavorites(items = favorites) {
 
     const favoriteButton = createFavoriteButton(item.bar, item.special, item.dayLabel, {
       onUnfavorite: (onDone) => {
-        card.classList.add('is-removing');
         card.style.pointerEvents = 'none';
+        const cardHeight = card.offsetHeight;
+        card.style.height = `${cardHeight}px`;
+        card.style.overflow = 'hidden';
+
+        requestAnimationFrame(() => {
+          card.classList.add('is-removing');
+        });
+
+        setTimeout(() => {
+          card.classList.add('is-collapsing');
+        }, 220);
+
         setTimeout(() => {
           if (typeof onDone === 'function') onDone();
-        }, 420);
+        }, 700);
       }
     });
 
