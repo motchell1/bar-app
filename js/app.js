@@ -198,9 +198,12 @@ function buildSpecialItem(special, { isToday = false, clickable = false, onClick
 // ===== Render Home Screen for next 7 days =====
 function renderBarsWeek(bars) {
  const container = document.getElementById('home-bars');
+ if (!container) return;
+
+ const previousOpacity = container.style.opacity;
  container.style.opacity = 0;
- container.addEventListener('transitionend', function handler() {
-   container.removeEventListener('transitionend', handler);
+
+ const renderContent = () => {
    container.innerHTML = '';
    
    const now = new Date();
@@ -332,7 +335,26 @@ function renderBarsWeek(bars) {
      container.style.opacity = 1;
      lucide.createIcons();
    });
- });
+ };
+
+ // Transition events can be skipped when the element is hidden (for example,
+ // navigating back from special detail). Render immediately in that case.
+ if (previousOpacity === '0' || getComputedStyle(container).display === 'none') {
+   renderContent();
+   return;
+ }
+
+ container.addEventListener('transitionend', function handler(event) {
+   if (event.propertyName !== 'opacity') return;
+   container.removeEventListener('transitionend', handler);
+   renderContent();
+ }, { once: true });
+
+ // Safety fallback in case no transitionend event is fired.
+ setTimeout(() => {
+   if (container.style.opacity !== '0' || container.children.length > 0) return;
+   renderContent();
+ }, 450);
 }
 
 // Bars list logic: filter by bar name query, then sort by neighborhood and bar name.
