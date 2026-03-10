@@ -198,9 +198,11 @@ function buildSpecialItem(special, { isToday = false, clickable = false, onClick
 // ===== Render Home Screen for next 7 days =====
 function renderBarsWeek(bars) {
  const container = document.getElementById('home-bars');
+ if (!container) return;
+
  container.style.opacity = 0;
- container.addEventListener('transitionend', function handler() {
-   container.removeEventListener('transitionend', handler);
+
+ const renderContent = () => {
    container.innerHTML = '';
    
    const now = new Date();
@@ -332,7 +334,11 @@ function renderBarsWeek(bars) {
      container.style.opacity = 1;
      lucide.createIcons();
    });
- });
+ };
+
+ // Always render immediately. Relying on transitionend can defer painting until
+ // unrelated pointer movement in some browsers after navigating back.
+ renderContent();
 }
 
 // Bars list logic: filter by bar name query, then sort by neighborhood and bar name.
