@@ -200,7 +200,6 @@ function renderBarsWeek(bars) {
  const container = document.getElementById('home-bars');
  if (!container) return;
 
- const previousOpacity = container.style.opacity;
  container.style.opacity = 0;
 
  const renderContent = () => {
@@ -337,24 +336,9 @@ function renderBarsWeek(bars) {
    });
  };
 
- // Transition events can be skipped when the element is hidden (for example,
- // navigating back from special detail). Render immediately in that case.
- if (previousOpacity === '0' || getComputedStyle(container).display === 'none') {
-   renderContent();
-   return;
- }
-
- container.addEventListener('transitionend', function handler(event) {
-   if (event.propertyName !== 'opacity') return;
-   container.removeEventListener('transitionend', handler);
-   renderContent();
- }, { once: true });
-
- // Safety fallback in case no transitionend event is fired.
- setTimeout(() => {
-   if (container.style.opacity !== '0' || container.children.length > 0) return;
-   renderContent();
- }, 450);
+ // Always render immediately. Relying on transitionend can defer painting until
+ // unrelated pointer movement in some browsers after navigating back.
+ renderContent();
 }
 
 // Bars list logic: filter by bar name query, then sort by neighborhood and bar name.
