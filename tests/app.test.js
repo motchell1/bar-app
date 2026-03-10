@@ -211,7 +211,7 @@ test('favorites cards render star in header and omit neighborhood label', () => 
   assert.equal(card.querySelector('.bar-neighborhood'), null, 'does not render neighborhood label');
 });
 
-test('clicking favorites star unfavorites and removes card from list', () => {
+test('clicking favorites star unfavorites and removes card from list', async () => {
   const document = new DocumentMock();
   mountBaseNodes(document);
   const ctx = loadAppWithoutBoot(document);
@@ -236,6 +236,8 @@ test('clicking favorites star unfavorites and removes card from list', () => {
   assert.ok(favoriteButton, 'favorite button exists before click');
 
   favoriteButton.click();
+
+  await new Promise((resolve) => setTimeout(resolve, 300));
 
   const favoriteCount = vm.runInContext('favorites.length', ctx);
   assert.equal(favoriteCount, 0, 'favorite removed from store');

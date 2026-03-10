@@ -892,7 +892,8 @@ body {
   gap: 10px;
 }
 
-.special-card .special-favorite-button {
+.special-card .special-favorite-button,
+#favorites-list .special-favorite-button {
   width: 32px;
   height: 32px;
   border: none;
@@ -907,15 +908,18 @@ body {
   transition: background-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
 }
 
-.special-card .special-favorite-button.active {
+.special-card .special-favorite-button.active,
+#favorites-list .special-favorite-button.active {
   color: #f4c542;
 }
 
-.special-card .special-favorite-button.active svg {
+.special-card .special-favorite-button.active svg,
+#favorites-list .special-favorite-button.active svg {
   fill: currentColor;
 }
 
-.special-card .special-favorite-button:active {
+.special-card .special-favorite-button:active,
+#favorites-list .special-favorite-button:active {
   transform: scale(0.95);
 }
 

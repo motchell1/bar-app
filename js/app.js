@@ -577,11 +577,15 @@ function createFavoriteButton(bar, special, dayLabel, { onUnfavorite } = {}) {
     favoriteButton.classList.toggle('active', nowFavorited);
     favoriteButton.setAttribute('aria-pressed', nowFavorited ? 'true' : 'false');
 
+    let shouldRenderFavoritesImmediately = true;
     if (!nowFavorited && typeof onUnfavorite === 'function') {
-      onUnfavorite();
+      shouldRenderFavoritesImmediately = false;
+      onUnfavorite(() => {
+        renderCurrentTabData();
+      });
     }
 
-    if (currentTab === 'favorites') {
+    if (currentTab === 'favorites' && shouldRenderFavoritesImmediately) {
       renderCurrentTabData();
     }
 
@@ -630,8 +634,12 @@ function renderFavorites(items = favorites) {
     headerRow.className = 'special-card-header-row';
 
     const favoriteButton = createFavoriteButton(item.bar, item.special, item.dayLabel, {
-      onUnfavorite: () => {
+      onUnfavorite: (onDone) => {
         card.classList.add('is-removing');
+        card.style.pointerEvents = 'none';
+        setTimeout(() => {
+          if (typeof onDone === 'function') onDone();
+        }, 260);
       }
     });
 
