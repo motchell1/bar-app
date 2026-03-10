@@ -1027,7 +1027,7 @@ body {
 }
 
 #favorites-list .bar-card {
-  transition: transform 0.25s ease, opacity 0.25s ease;
+  transition: transform 0.42s ease, opacity 0.42s ease;
 }
 
 #favorites-list .bar-card.is-removing {

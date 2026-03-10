@@ -237,7 +237,7 @@ test('clicking favorites star unfavorites and removes card from list', async () 
 
   favoriteButton.click();
 
-  await new Promise((resolve) => setTimeout(resolve, 300));
+  await new Promise((resolve) => setTimeout(resolve, 480));
 
   const favoriteCount = vm.runInContext('favorites.length', ctx);
   assert.equal(favoriteCount, 0, 'favorite removed from store');

@@ -639,7 +639,7 @@ function renderFavorites(items = favorites) {
         card.style.pointerEvents = 'none';
         setTimeout(() => {
           if (typeof onDone === 'function') onDone();
-        }, 260);
+        }, 420);
       }
     });
 
