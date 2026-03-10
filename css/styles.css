@@ -802,15 +802,6 @@ body {
   color: #007aff;
 }
 
-.taskbar-tab[data-tab="favorites"] .taskbar-icon {
-  color: #f4c542;
-}
-
-.taskbar-tab[data-tab="favorites"] .taskbar-icon svg {
-  fill: currentColor;
-  stroke: currentColor;
-}
-
 .clickable-special {
   cursor: pointer;
 }
