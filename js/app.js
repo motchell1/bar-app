@@ -86,6 +86,8 @@ let barsSearchQuery = '';
 let previousScreenState = null;
 let favorites = [];
 let currentSpecialContext = null;
+const STARTUP_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaws.com/default/getStartupData';
+const SPECIAL_REPORT_API_URL = 'https://3kz7x6tvvi.execute-api.us-east-2.amazonaws.com/default/insertUserReport';
 const activeFilters = {
   types: [],
   neighborhoods: []
@@ -745,10 +747,12 @@ function showPreviousScreen() {
 function resetSpecialReportForm() {
   const form = document.getElementById('special-report-form');
   const reasonSelect = document.getElementById('special-report-reason');
+  const commentInput = document.getElementById('special-report-comment');
   if (!form || !reasonSelect) return;
 
   form.style.display = 'none';
   reasonSelect.value = '';
+  if (commentInput) commentInput.value = '';
 }
 
 function initSpecialReport() {
@@ -763,13 +767,38 @@ function initSpecialReport() {
   });
 }
 
-function submitSpecialReport(event) {
+async function submitSpecialReport(event) {
   event.preventDefault();
 
   const reasonSelect = document.getElementById('special-report-reason');
-  if (!reasonSelect || !reasonSelect.value) return;
+  const commentInput = document.getElementById('special-report-comment');
+  if (!reasonSelect || !reasonSelect.value || !currentSpecialContext) return;
 
-  // Placeholder only for now. Future iteration will post this reason to an API.
+  const specialId = getSpecialId(
+    currentSpecialContext.bar,
+    currentSpecialContext.special,
+    currentSpecialContext.dayLabel || ''
+  );
+
+  const commentText = commentInput?.value.trim() || '';
+  const payload = {
+    special_id: specialId,
+    reason: reasonSelect.value,
+    comment: commentText === '' ? null : commentText
+  };
+
+  try {
+    await fetch(SPECIAL_REPORT_API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+  } catch (err) {
+    console.error('Failed to submit special report:', err);
+  }
+
   resetSpecialReportForm();
 }
 
@@ -1014,7 +1043,7 @@ checkbox.id = `neigh-${name.replace(/\s+/g, '')}`;
 // ===== Load Bars and Initialize Filters =====
 async function loadBars() {
  try {
-   const response = await fetch('https://qz5rs9i9ya.execute-api.us-east-2.amazonaws.com/default/getStartupData');
+   const response = await fetch(STARTUP_API_URL);
    const data = await response.json();
    const parsed = typeof data.body === "string" ? JSON.parse(data.body) : data;
    barsData = parsed.bars || [];

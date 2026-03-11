@@ -112,12 +112,13 @@
           <label for="special-report-reason" class="special-report-label">Reason for review</label>
           <select id="special-report-reason" class="special-report-select" required>
             <option value="" selected disabled>Select a reason</option>
-            <option value="inaccurate">Special details are inaccurate</option>
-            <option value="expired">Special is no longer available</option>
-            <option value="not-found">Special could not be found</option>
-            <option value="other">Other issue</option>
+            <option value="Special is no longer active">Special is no longer active</option>
+            <option value="Special details are inaccurate">Special details are inaccurate</option>
+            <option value="Other">Other</option>
           </select>
-          <button class="special-report-submit" type="submit">Submit report</button>
+          <label for="special-report-comment" class="special-report-label">Comments (optional)</label>
+          <textarea id="special-report-comment" class="special-report-comment" rows="3" placeholder="Add any details here"></textarea>
+          <button class="special-report-submit" type="submit">Submit</button>
         </form>
       </div>
     </div>
