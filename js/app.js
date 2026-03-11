@@ -92,6 +92,11 @@ const activeFilters = {
   types: [],
   neighborhoods: []
 };
+let userIdentifier = localStorage.getItem('userIdentifier');
+if (!userIdentifier) {
+	userIdentifier = Math.random().toString(26).substring(2, 10);
+	localStorage.setItem('userIdentifier', userIdentifier);
+}
 
 // ===== Helpers =====
 
@@ -515,17 +520,7 @@ function showDetail(bar, previousScreen = currentTab) {
 
 
 function getSpecialId(bar, special, dayLabel = '') {
-  const barId = bar.id || bar.name || '';
-  const parts = [
-    barId,
-    special.day || dayLabel || '',
-    special.start_time || '',
-    special.end_time || '',
-    special.description || '',
-    special.type || '',
-    special.all_day ? 'all_day' : 'timed'
-  ];
-  return parts.join('|');
+  return special.special_id;
 }
 
 function isFavoriteSpecial(bar, special, dayLabel = '') {
@@ -782,16 +777,17 @@ async function submitSpecialReport(event) {
 
   const commentText = commentInput?.value.trim() || '';
   const payload = {
-    special_id: specialId,
-    reason: reasonSelect.value,
-    comment: commentText === '' ? null : commentText
+		special_id: specialId,
+		reason: reasonSelect.value,
+		comment: commentText === '' ? null : commentText,
+		user_identifier: userIdentifier
   };
 
   try {
     await fetch(SPECIAL_REPORT_API_URL, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'text/plain'
       },
       body: JSON.stringify(payload)
     });
