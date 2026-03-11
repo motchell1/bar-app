@@ -747,7 +747,7 @@ function resetSpecialReportForm() {
   if (!form || !reasonSelect) return;
   
   if (reportButton) {
-	  reportButton.textContent = "Mark for review";
+	  reportButton.textContent = "Report this special";
 	  reportButton.disabled = false;
 	  reportButton.classList.remove('reported');
   }

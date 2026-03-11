@@ -145,10 +145,21 @@ class DocumentMock {
 function loadAppWithoutBoot(document) {
   const source = fs.readFileSync('js/app.js', 'utf8');
   const trimmed = source.split('// ===== Initialize =====')[0];
+  const storage = new Map();
+  const localStorage = {
+    getItem(key) {
+      return storage.has(key) ? storage.get(key) : null;
+    },
+    setItem(key, value) {
+      storage.set(key, String(value));
+    }
+  };
+
   const context = {
     console,
     document,
-    window: { document },
+    window: { document, localStorage },
+    localStorage,
     lucide: { createIcons() {} },
     fetch: async () => ({ json: async () => ({ bars: [] }) }),
     setTimeout,
@@ -191,6 +202,11 @@ function mountBaseNodes(document) {
 }
 
 function mountSpecialReportNodes(document) {
+  const toggle = document.createElement('button');
+  toggle.setAttribute('id', 'special-report-toggle');
+  toggle.textContent = 'Report this special';
+  document.body.appendChild(toggle);
+
   const form = document.createElement('form');
   form.setAttribute('id', 'special-report-form');
   form.style.display = 'flex';
@@ -279,7 +295,7 @@ test('submitSpecialReport posts special report payload and resets form', async (
   };
 
   const bar = { id: 12, name: 'Sample Bar' };
-  const special = { day: 'MON', start_time: '16:00', end_time: '18:00', description: 'Half off', type: 'drink', all_day: false };
+  const special = { special_id: 'sp-123', day: 'MON', start_time: '16:00', end_time: '18:00', description: 'Half off', type: 'drink', all_day: false };
   vm.runInContext(`currentSpecialContext = ${JSON.stringify({ bar, special, dayLabel: 'Monday' })};`, ctx);
 
   document.getElementById('special-report-reason').value = 'Special details are inaccurate';
@@ -298,6 +314,34 @@ test('submitSpecialReport posts special report payload and resets form', async (
   assert.equal(document.getElementById('special-report-form').style.display, 'none', 'form is closed after submit');
   assert.equal(document.getElementById('special-report-reason').value, '', 'reason reset');
   assert.equal(document.getElementById('special-report-comment').value, '', 'comment reset');
+  assert.equal(document.getElementById('special-report-toggle').textContent, 'Thanks for your feedback!', 'report button shows success state');
+  assert.equal(document.getElementById('special-report-toggle').disabled, true, 'report button disabled after submit');
+  assert.equal(document.getElementById('special-report-toggle').classList.contains('reported'), true, 'reported style applied');
+});
+
+test('resetSpecialReportForm clears success mode for the next special', () => {
+  const document = new DocumentMock();
+  mountBaseNodes(document);
+  mountSpecialReportNodes(document);
+  const ctx = loadAppWithoutBoot(document);
+
+  const reportButton = document.getElementById('special-report-toggle');
+  reportButton.textContent = 'Thanks for your feedback!';
+  reportButton.disabled = true;
+  reportButton.classList.add('reported');
+
+  document.getElementById('special-report-form').style.display = 'flex';
+  document.getElementById('special-report-reason').value = 'Other';
+  document.getElementById('special-report-comment').value = 'Some comment';
+
+  ctx.resetSpecialReportForm();
+
+  assert.equal(reportButton.textContent, 'Report this special');
+  assert.equal(reportButton.disabled, false);
+  assert.equal(reportButton.classList.contains('reported'), false);
+  assert.equal(document.getElementById('special-report-form').style.display, 'none');
+  assert.equal(document.getElementById('special-report-reason').value, '');
+  assert.equal(document.getElementById('special-report-comment').value, '');
 });
 
 test('submitSpecialReport sends null comment when left blank', async () => {
@@ -313,7 +357,7 @@ test('submitSpecialReport sends null comment when left blank', async () => {
   };
 
   const bar = { id: 12, name: 'Sample Bar' };
-  const special = { day: 'MON', start_time: '16:00', end_time: '18:00', description: 'Half off', type: 'drink', all_day: false };
+  const special = { special_id: 'sp-456', day: 'MON', start_time: '16:00', end_time: '18:00', description: 'Half off', type: 'drink', all_day: false };
   vm.runInContext(`currentSpecialContext = ${JSON.stringify({ bar, special, dayLabel: 'Monday' })};`, ctx);
 
   document.getElementById('special-report-reason').value = 'Other';

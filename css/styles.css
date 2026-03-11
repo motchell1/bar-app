@@ -819,6 +819,10 @@ body {
   position: sticky;
   top: 0;
   z-index: 8;
+  width: 100vw;
+  margin-left: calc(50% - 50vw);
+  margin-right: calc(50% - 50vw);
+  box-sizing: border-box;
   background-color: #007bff;
   color: #fff;
   height: 48px;
@@ -962,6 +966,13 @@ body {
   border-radius: 10px;
   padding: 10px 12px;
   cursor: pointer;
+}
+
+.special-report-toggle.reported {
+  border-color: #c5c9d3;
+  background: #e9ecf2;
+  color: #5f6673;
+  cursor: default;
 }
 
 .special-report-form {
