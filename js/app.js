@@ -731,7 +731,7 @@ function showPreviousScreen() {
     showDetail(previousScreenState.bar, previousScreenState.returnTo || 'specials');
     return;
   }
-
+  resetSpecialReportForm();
   document.getElementById('special-screen').style.display = 'none';
   document.getElementById('detail-screen').style.display = 'none';
   showTab(previousType);
@@ -743,7 +743,13 @@ function resetSpecialReportForm() {
   const form = document.getElementById('special-report-form');
   const reasonSelect = document.getElementById('special-report-reason');
   const commentInput = document.getElementById('special-report-comment');
+  const reportButton = document.getElementById('special-report-toggle');
   if (!form || !reasonSelect) return;
+  
+  if (reportButton) {
+	  reportButton.textContext = "Mark for review";
+	  reportButton.disabled = false;
+  }
 
   form.style.display = 'none';
   reasonSelect.value = '';
@@ -794,8 +800,18 @@ async function submitSpecialReport(event) {
   } catch (err) {
     console.error('Failed to submit special report:', err);
   }
-
   resetSpecialReportForm();
+  showReportSuccess();
+  
+}
+
+function showReportSuccess() {
+	const reportButton = document.getElementById('special-report-toggle');
+	if (reportButton) {
+		reportButton.textContent = "Thanks for your feedback!";
+		reportButton.disabled = true;
+		reportButton.classList.add('reported');
+	}
 }
 
 // ===== Navigation =====
