@@ -987,6 +987,16 @@ body {
   background: #fff;
 }
 
+.special-report-comment {
+  border: 1px solid #d3dae6;
+  border-radius: 10px;
+  padding: 10px;
+  font-size: 0.9rem;
+  font-family: inherit;
+  resize: vertical;
+  min-height: 82px;
+}
+
 .special-report-submit {
   border: none;
   border-radius: 10px;
@@ -1038,4 +1048,3 @@ body {
 #favorites-list .special-day-badge {
   margin: 8px 0 14px;
 }
-

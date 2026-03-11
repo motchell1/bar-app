@@ -190,6 +190,22 @@ function mountBaseNodes(document) {
   document.body.appendChild(special);
 }
 
+function mountSpecialReportNodes(document) {
+  const form = document.createElement('form');
+  form.setAttribute('id', 'special-report-form');
+  form.style.display = 'flex';
+
+  const reason = document.createElement('select');
+  reason.setAttribute('id', 'special-report-reason');
+  form.appendChild(reason);
+
+  const comment = document.createElement('textarea');
+  comment.setAttribute('id', 'special-report-comment');
+  form.appendChild(comment);
+
+  document.body.appendChild(form);
+}
+
 test('favorites cards render star in header and omit neighborhood label', () => {
   const document = new DocumentMock();
   mountBaseNodes(document);
@@ -248,4 +264,63 @@ test('clicking favorites star unfavorites and removes card from list', async () 
 
   const emptyState = document.querySelector('.no-specials-line');
   assert.ok(emptyState, 'empty state shown after removing last favorite');
+});
+
+test('submitSpecialReport posts special report payload and resets form', async () => {
+  const document = new DocumentMock();
+  mountBaseNodes(document);
+  mountSpecialReportNodes(document);
+
+  const fetchCalls = [];
+  const ctx = loadAppWithoutBoot(document);
+  ctx.fetch = async (url, options) => {
+    fetchCalls.push({ url, options });
+    return { json: async () => ({ ok: true }) };
+  };
+
+  const bar = { id: 12, name: 'Sample Bar' };
+  const special = { day: 'MON', start_time: '16:00', end_time: '18:00', description: 'Half off', type: 'drink', all_day: false };
+  vm.runInContext(`currentSpecialContext = ${JSON.stringify({ bar, special, dayLabel: 'Monday' })};`, ctx);
+
+  document.getElementById('special-report-reason').value = 'Special details are inaccurate';
+  document.getElementById('special-report-comment').value = 'Menu says different price';
+
+  await ctx.submitSpecialReport({ preventDefault() {} });
+
+  assert.equal(fetchCalls.length, 1, 'calls fetch once');
+  assert.equal(fetchCalls[0].url, 'https://3kz7x6tvvi.execute-api.us-east-2.amazonaws.com/default/insertUserReport');
+  assert.equal(fetchCalls[0].options.method, 'POST');
+
+  const body = JSON.parse(fetchCalls[0].options.body);
+  assert.equal(body.reason, 'Special details are inaccurate');
+  assert.equal(body.comment, 'Menu says different price');
+  assert.equal(typeof body.special_id, 'string');
+  assert.equal(document.getElementById('special-report-form').style.display, 'none', 'form is closed after submit');
+  assert.equal(document.getElementById('special-report-reason').value, '', 'reason reset');
+  assert.equal(document.getElementById('special-report-comment').value, '', 'comment reset');
+});
+
+test('submitSpecialReport sends null comment when left blank', async () => {
+  const document = new DocumentMock();
+  mountBaseNodes(document);
+  mountSpecialReportNodes(document);
+
+  const fetchCalls = [];
+  const ctx = loadAppWithoutBoot(document);
+  ctx.fetch = async (url, options) => {
+    fetchCalls.push({ url, options });
+    return { json: async () => ({ ok: true }) };
+  };
+
+  const bar = { id: 12, name: 'Sample Bar' };
+  const special = { day: 'MON', start_time: '16:00', end_time: '18:00', description: 'Half off', type: 'drink', all_day: false };
+  vm.runInContext(`currentSpecialContext = ${JSON.stringify({ bar, special, dayLabel: 'Monday' })};`, ctx);
+
+  document.getElementById('special-report-reason').value = 'Other';
+  document.getElementById('special-report-comment').value = '    ';
+
+  await ctx.submitSpecialReport({ preventDefault() {} });
+
+  const body = JSON.parse(fetchCalls[0].options.body);
+  assert.equal(body.comment, null);
 });
