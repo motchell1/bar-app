@@ -855,7 +855,7 @@ body {
 }
 
 .special-content {
-  padding: 62px 14px 14px;
+  padding: 62px 14px calc(14px + 68px + env(safe-area-inset-bottom, 0px));
 }
 
 .special-bar-image {
