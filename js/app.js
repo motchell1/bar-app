@@ -766,6 +766,15 @@ function initSpecialReport() {
   toggleButton.addEventListener('click', () => {
     const isOpen = reportForm.style.display !== 'none';
     reportForm.style.display = isOpen ? 'none' : 'flex';
+    if (!isOpen) {
+      requestAnimationFrame(() => {
+        const submitButton = reportForm.querySelector('.special-report-submit');
+        const scrollTarget = submitButton || reportForm;
+        if (scrollTarget && typeof scrollTarget.scrollIntoView === 'function') {
+          scrollTarget.scrollIntoView({ block: 'nearest' });
+        }
+      });
+    }
   });
 }
 

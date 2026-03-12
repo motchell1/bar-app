@@ -219,8 +219,35 @@ function mountSpecialReportNodes(document) {
   comment.setAttribute('id', 'special-report-comment');
   form.appendChild(comment);
 
+  const submit = document.createElement('button');
+  submit.className = 'special-report-submit';
+  submit.textContent = 'Submit';
+  form.appendChild(submit);
+
   document.body.appendChild(form);
 }
+
+test('initSpecialReport scrolls submit button into view when report form opens', async () => {
+  const document = new DocumentMock();
+  mountBaseNodes(document);
+  mountSpecialReportNodes(document);
+  const ctx = loadAppWithoutBoot(document);
+
+  const submitButton = document.querySelector('.special-report-submit');
+  let scrolled = false;
+  submitButton.scrollIntoView = () => {
+    scrolled = true;
+  };
+
+  document.getElementById('special-report-form').style.display = 'none';
+  ctx.initSpecialReport();
+  document.getElementById('special-report-toggle').click();
+
+  await new Promise((resolve) => setTimeout(resolve, 5));
+
+  assert.equal(document.getElementById('special-report-form').style.display, 'flex');
+  assert.equal(scrolled, true, 'scrolls the submit button into view when opening');
+});
 
 test('favorites cards render star in header and omit neighborhood label', () => {
   const document = new DocumentMock();
