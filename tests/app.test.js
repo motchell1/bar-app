@@ -204,12 +204,11 @@ function mountBaseNodes(document) {
 function mountSpecialReportNodes(document) {
   const toggle = document.createElement('button');
   toggle.setAttribute('id', 'special-report-toggle');
-  toggle.textContent = 'Report this special';
+  toggle.textContent = 'Mark for review';
   document.body.appendChild(toggle);
 
   const form = document.createElement('form');
   form.setAttribute('id', 'special-report-form');
-  form.style.display = 'flex';
 
   const reason = document.createElement('select');
   reason.setAttribute('id', 'special-report-reason');
@@ -219,8 +218,35 @@ function mountSpecialReportNodes(document) {
   comment.setAttribute('id', 'special-report-comment');
   form.appendChild(comment);
 
+  const submit = document.createElement('button');
+  submit.className = 'special-report-submit';
+  submit.textContent = 'Submit';
+  form.appendChild(submit);
+
   document.body.appendChild(form);
 }
+
+test('initSpecialReport scrolls submit button into view when report form opens', async () => {
+  const document = new DocumentMock();
+  mountBaseNodes(document);
+  mountSpecialReportNodes(document);
+  const ctx = loadAppWithoutBoot(document);
+
+  const submitButton = document.querySelector('.special-report-submit');
+  let scrolled = false;
+  submitButton.scrollIntoView = () => {
+    scrolled = true;
+  };
+
+  document.getElementById('special-report-form').classList.remove('open');
+  ctx.initSpecialReport();
+  document.getElementById('special-report-toggle').click();
+
+  await new Promise((resolve) => setTimeout(resolve, 5));
+
+  assert.equal(document.getElementById('special-report-form').classList.contains('open'), true);
+  assert.equal(scrolled, true, 'scrolls the submit button into view when opening');
+});
 
 test('favorites cards render star in header and omit neighborhood label', () => {
   const document = new DocumentMock();
@@ -311,7 +337,7 @@ test('submitSpecialReport posts special report payload and resets form', async (
   assert.equal(body.reason, 'Special details are inaccurate');
   assert.equal(body.comment, 'Menu says different price');
   assert.equal(typeof body.special_id, 'string');
-  assert.equal(document.getElementById('special-report-form').style.display, 'none', 'form is closed after submit');
+  assert.equal(document.getElementById('special-report-form').classList.contains('open'), false, 'form is closed after submit');
   assert.equal(document.getElementById('special-report-reason').value, '', 'reason reset');
   assert.equal(document.getElementById('special-report-comment').value, '', 'comment reset');
   assert.equal(document.getElementById('special-report-toggle').textContent, 'Thanks for your feedback!', 'report button shows success state');
@@ -330,16 +356,16 @@ test('resetSpecialReportForm clears success mode for the next special', () => {
   reportButton.disabled = true;
   reportButton.classList.add('reported');
 
-  document.getElementById('special-report-form').style.display = 'flex';
+  document.getElementById('special-report-form').classList.add('open');
   document.getElementById('special-report-reason').value = 'Other';
   document.getElementById('special-report-comment').value = 'Some comment';
 
   ctx.resetSpecialReportForm();
 
-  assert.equal(reportButton.textContent, 'Report this special');
+  assert.equal(reportButton.textContent, 'Mark for review');
   assert.equal(reportButton.disabled, false);
   assert.equal(reportButton.classList.contains('reported'), false);
-  assert.equal(document.getElementById('special-report-form').style.display, 'none');
+  assert.equal(document.getElementById('special-report-form').classList.contains('open'), false);
   assert.equal(document.getElementById('special-report-reason').value, '');
   assert.equal(document.getElementById('special-report-comment').value, '');
 });
