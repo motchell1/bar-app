@@ -747,12 +747,12 @@ function resetSpecialReportForm() {
   if (!form || !reasonSelect) return;
   
   if (reportButton) {
-	  reportButton.textContent = "Report this special";
+	  reportButton.textContent = "Mark for review";
 	  reportButton.disabled = false;
 	  reportButton.classList.remove('reported');
   }
 
-  form.style.display = 'none';
+  form.classList.remove('open');
   reasonSelect.value = '';
   if (commentInput) commentInput.value = '';
 }
@@ -764,8 +764,8 @@ function initSpecialReport() {
   if (!toggleButton || !reportForm) return;
 
   toggleButton.addEventListener('click', () => {
-    const isOpen = reportForm.style.display !== 'none';
-    reportForm.style.display = isOpen ? 'none' : 'flex';
+    const isOpen = reportForm.classList.contains('open');
+    reportForm.classList.toggle('open', !isOpen);
     if (!isOpen) {
       requestAnimationFrame(() => {
         const submitButton = reportForm.querySelector('.special-report-submit');
