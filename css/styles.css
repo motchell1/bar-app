@@ -64,12 +64,14 @@ body {
   display: flex;
   flex-direction: column;
   height: calc(100vh - 116px);
+  height: calc(100dvh - 116px);
 }
 
 
 .app-container.detail-mode {
   margin-top: 0;
   height: calc(100vh - 68px);
+  height: calc(100dvh - 68px);
 }
 
 
@@ -855,7 +857,7 @@ body {
 }
 
 .special-content {
-  padding: 62px 14px calc(14px + 68px + env(safe-area-inset-bottom, 0px));
+  padding: 62px 14px calc(14px + env(safe-area-inset-bottom, 0px));
 }
 
 .special-bar-image {
