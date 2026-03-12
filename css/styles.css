@@ -8,6 +8,20 @@ body {
   color: #333;
 }
 
+.initial-loading-overlay {
+  position: fixed;
+  inset: 0;
+  background: #fff;
+  opacity: 1;
+  pointer-events: none;
+  z-index: 9999;
+  transition: opacity 280ms ease;
+}
+
+.initial-loading-overlay.hidden {
+  opacity: 0;
+}
+
 /* ===== Home Toolbar ===== */
 .home-toolbar {
   position: fixed;

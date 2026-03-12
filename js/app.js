@@ -86,6 +86,7 @@ let barsSearchQuery = '';
 let previousScreenState = null;
 let favorites = [];
 let currentSpecialContext = null;
+let isInitialDataLoading = true;
 const STARTUP_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaws.com/default/getStartupData';
 const SPECIAL_REPORT_API_URL = 'https://3kz7x6tvvi.execute-api.us-east-2.amazonaws.com/default/insertUserReport';
 const activeFilters = {
@@ -929,6 +930,8 @@ function getFilteredFavorites() {
 }
 
 function renderCurrentTabData() {
+  if (isInitialDataLoading) return;
+
   if (currentTab === 'specials') {
     renderBarsWeek(getFilteredBarsForSpecials());
     return;
@@ -1062,6 +1065,18 @@ checkbox.id = `neigh-${name.replace(/\s+/g, '')}`;
    neighborhoodSection.appendChild(row);
  });
 }
+function hideInitialLoadingOverlay() {
+  const loadingOverlay = document.getElementById('initial-loading-overlay');
+  if (!loadingOverlay) return;
+
+  requestAnimationFrame(() => {
+    loadingOverlay.classList.add('hidden');
+    setTimeout(() => {
+      loadingOverlay.remove();
+    }, 320);
+  });
+}
+
 // ===== Load Bars and Initialize Filters =====
 async function loadBars() {
  try {
@@ -1069,11 +1084,14 @@ async function loadBars() {
    const data = await response.json();
    const parsed = typeof data.body === "string" ? JSON.parse(data.body) : data;
    barsData = parsed.bars || [];
-   renderCurrentTabData();
    // Generate neighborhoods AFTER barsData is loaded
    generateNeighborhoodFilters();
  } catch (err) {
    console.error('Failed to load bars:', err);
+ } finally {
+   isInitialDataLoading = false;
+   renderCurrentTabData();
+   hideInitialLoadingOverlay();
  }
 }
 // ===== Initialize =====
