@@ -954,6 +954,11 @@ body {
   color: #555;
 }
 
+#special-screen .special-bar-name {
+  font-size: 0.85rem;
+  letter-spacing: 0;
+}
+
 .special-report-copy {
   margin: 0;
   font-size: 0.88rem;
