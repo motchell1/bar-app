@@ -143,8 +143,16 @@ class DocumentMock {
 }
 
 function loadAppWithoutBoot(document) {
-  const source = fs.readFileSync('js/app.js', 'utf8');
-  const trimmed = source.split('// ===== Initialize =====')[0];
+  const scriptFiles = [
+    'js/state.js',
+    'js/utils.js',
+    'js/render-home.js',
+    'js/render-bar-detail.js',
+    'js/render-favorites.js',
+    'js/render-special-detail.js',
+    'js/api.js',
+    'js/app.js'
+  ];
   const storage = new Map();
   const localStorage = {
     getItem(key) {
@@ -167,7 +175,14 @@ function loadAppWithoutBoot(document) {
     requestAnimationFrame: (cb) => setTimeout(cb, 0),
   };
   vm.createContext(context);
-  vm.runInContext(trimmed, context);
+  scriptFiles.forEach((file) => {
+    const source = fs.readFileSync(file, 'utf8');
+    const executable = file === 'js/app.js'
+      ? source.split('// ===== Initialize =====')[0]
+      : source;
+    vm.runInContext(executable, context);
+  });
+  vm.runInContext('isInitialDataLoading = false;', context);
   return context;
 }
 
