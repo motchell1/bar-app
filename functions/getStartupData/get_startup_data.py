@@ -1,7 +1,7 @@
 import pymysql
 import json
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 
 # Environment variables
 RDS_HOST = os.environ['RDS_HOST']
@@ -38,12 +38,36 @@ def to_time_string(value):
         return None
     return str(value)
 
+
+
+def get_hour_minute(time_value):
+    if time_value is None:
+        return None, None
+
+    if isinstance(time_value, timedelta):
+        total_minutes = int(time_value.total_seconds() // 60)
+        hour = (total_minutes // 60) % 24
+        minute = total_minutes % 60
+        return hour, minute
+
+    if hasattr(time_value, 'hour') and hasattr(time_value, 'minute'):
+        return time_value.hour, time_value.minute
+
+    if isinstance(time_value, str) and ':' in time_value:
+        try:
+            hour_str, minute_str = time_value.split(':', 1)
+            return int(hour_str), int(minute_str)
+        except ValueError:
+            return None, None
+
+    return None, None
 def format_display_time(time_value):
     if time_value is None:
         return None
 
-    hour = time_value.hour
-    minute = time_value.minute
+    hour, minute = get_hour_minute(time_value)
+    if hour is None or minute is None:
+        return None
     ampm = 'AM' if hour < 12 else 'PM'
     hour = hour % 12
     if hour == 0:
@@ -65,8 +89,9 @@ def build_hours_display_text(open_time, close_time, is_closed):
 def to_minutes(time_value):
     if time_value is None:
         return None
-    hour = time_value.hour
-    minute = time_value.minute
+    hour, minute = get_hour_minute(time_value)
+    if hour is None or minute is None:
+        return None
     if hour == 0 and minute == 0:
         return 24 * 60
     return (hour * 60) + minute
