@@ -273,7 +273,7 @@ test('favorites cards render star in header and omit neighborhood label', () => 
       bars: { '1': { name: 'Test Bar', neighborhood: 'Downtown' } },
       open_hours: { '1': {} },
       specials: {
-        '11': { bar_id: 1, description: '$5 Beer', special_type: 'drink', all_day: true, favorite: true, day: 'MON' }
+        '11': { bar_id: 1, description: '$5 Beer', special_type: 'drink', all_day: false, start_time: '16:00', end_time: '18:00', current_status: 'past', favorite: true, day: 'MON' }
       }
     };
     currentTab = 'favorites';
@@ -288,6 +288,12 @@ test('favorites cards render star in header and omit neighborhood label', () => 
   assert.ok(card.querySelector('.special-card-header-row'), 'renders header row');
   assert.ok(card.querySelector('.special-favorite-button'), 'renders favorite button');
   assert.equal(card.querySelector('.bar-neighborhood'), null, 'does not render neighborhood label');
+
+  const timeBadge = card.querySelector('.time-badge');
+  assert.ok(timeBadge, 'renders time badge');
+  assert.equal(timeBadge.classList.contains('past'), false, 'favorites uses neutral upcoming time badge style');
+  const specialItem = card.querySelector('.special-item');
+  assert.equal(specialItem.classList.contains('live'), false, 'favorites card should not render live styling');
 });
 
 test('clicking favorites star unfavorites and removes card from list', async () => {

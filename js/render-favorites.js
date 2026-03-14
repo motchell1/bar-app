@@ -161,7 +161,7 @@ function renderFavorites(items = getFavoriteSpecialEntries()) {
     dayBadge.className = 'special-day-badge';
     dayBadge.textContent = item.dayLabel || 'Day unavailable';
 
-    const specialItem = buildSpecialItem(item.special);
+    const specialItem = buildSpecialItem(item.special, { neutralTimeBadgeStyle: true });
 
     headerRow.appendChild(name);
     headerRow.appendChild(favoriteButton);
