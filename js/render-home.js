@@ -1,136 +1,138 @@
-function renderBarsWeek(bars) {
+function buildHomeBarSpecials(bar, specialIds, dayKey, dayLabel) {
+  const specialsLookup = startupPayload?.specials || {};
+  const content = document.createElement('div');
+  content.className = 'card-content';
+
+  const name = document.createElement('div');
+  name.className = 'bar-name';
+  name.textContent = bar.name;
+
+  const neighborhood = document.createElement('div');
+  neighborhood.className = 'bar-neighborhood';
+  neighborhood.textContent = bar.neighborhood;
+
+  content.appendChild(name);
+  content.appendChild(neighborhood);
+
+  const specialsList = document.createElement('ul');
+  specialsList.className = 'specials-list';
+
+  let renderedSpecials = 0;
+
+  specialIds.forEach((specialId) => {
+    const special = specialsLookup[specialId];
+    if (!special) return;
+
+    const typePass = activeFilters.types.length === 0 || activeFilters.types.includes(special.special_type);
+    if (!typePass) return;
+
+    const li = buildSpecialItem(special, {
+      isToday: true,
+      clickable: true,
+      status: special.current_status,
+      onClick: (event) => {
+        event.stopPropagation();
+        showSpecialDetail(bar, special, { previousScreen: currentTab, dayLabel });
+      }
+    });
+    specialsList.appendChild(li);
+    renderedSpecials += 1;
+  });
+
+  if (renderedSpecials === 0) return null;
+
+  content.appendChild(specialsList);
+
+  const hoursDiv = document.createElement('div');
+  hoursDiv.className = 'open-hours';
+  const displayText = startupPayload?.open_hours?.[bar.bar_id]?.[dayKey]?.display_text;
+  hoursDiv.textContent = displayText ? `Hours: ${displayText}` : 'Hours unavailable';
+  if (!displayText) {
+    hoursDiv.classList.add('future');
+  }
+
+  content.appendChild(hoursDiv);
+  return content;
+}
+
+function renderBarsWeek() {
   const container = document.getElementById('home-bars');
   if (!container) return;
 
   container.style.opacity = 0;
+  container.innerHTML = '';
 
-  const renderContent = () => {
-    container.innerHTML = '';
+  const currentDay = startupPayload?.general_data?.current_day;
+  const barsForDay = startupPayload?.specials_by_day?.[currentDay] || [];
+  const dayIndex = DAYS_FULL.findIndex((day) => day.slice(0, 3).toUpperCase() === currentDay);
+  const dayName = dayIndex >= 0 ? DAYS_FULL[dayIndex] : currentDay;
+  const dayLabel = `${dayName} (Today)`;
 
-    for (let offset = 0; offset < 7; offset++) {
-      const date = new Date();
-      date.setDate(date.getDate() + offset);
-      const dayIndex = date.getDay();
-      const dayKey = DAYS_FULL[dayIndex].slice(0, 3).toUpperCase();
-      const dayName = DAYS_FULL[dayIndex];
-      const label = offset === 0 ? `${dayName} (Today)` : dayName;
-      const isToday = offset === 0;
-      const barsWithSpecials = bars.filter((bar) => (bar.specials_by_day[dayKey] || []).length > 0);
+  const dayHeader = document.createElement('div');
+  dayHeader.className = 'day-header-week';
+  dayHeader.textContent = dayLabel;
+  container.appendChild(dayHeader);
 
-      const dayHeader = document.createElement('div');
-      dayHeader.className = 'day-header-week';
-      dayHeader.textContent = label;
-      container.appendChild(dayHeader);
-      if (barsWithSpecials.length === 0) {
-        const noSpecialsLine = document.createElement('div');
-        noSpecialsLine.className = 'no-specials-line';
-        noSpecialsLine.textContent = 'No specials available for today.';
-        noSpecialsLine.style.padding = '12px';
-        noSpecialsLine.style.fontStyle = 'italic';
-        container.appendChild(noSpecialsLine);
-        continue;
-      }
+  let renderedCardCount = 0;
 
-      const sortedBars = sortBarsBySpecials(barsWithSpecials, dayKey, isToday);
+  if (barsForDay.length === 0) {
+    const noSpecialsLine = document.createElement('div');
+    noSpecialsLine.className = 'no-specials-line';
+    noSpecialsLine.textContent = 'No specials available for today.';
+    noSpecialsLine.style.padding = '12px';
+    noSpecialsLine.style.fontStyle = 'italic';
+    container.appendChild(noSpecialsLine);
+  }
 
-      let dividerInserted = false;
-      const todayDivider = document.createElement('div');
-      todayDivider.className = 'today-divider';
-      todayDivider.textContent = 'Current + Upcoming Specials';
+  barsForDay.forEach((entry) => {
+    const barId = String(entry.bar_id);
+    const barInfo = startupPayload?.bars?.[barId];
+    if (!barInfo) return;
 
-      sortedBars.forEach((bar) => {
-        const card = document.createElement('div');
-        card.className = 'bar-card';
-        card.onclick = () => showDetail(bar, currentTab);
+    if (activeFilters.neighborhoods.length > 0 && !activeFilters.neighborhoods.includes(barInfo.neighborhood)) return;
 
-        if (bar.image_url && bar.image_url !== 'null') {
-          const img = document.createElement('img');
-          img.className = 'card-image';
-          img.src = bar.image_url;
-          img.alt = bar.name;
-          card.appendChild(img);
-        }
+    const bar = {
+      bar_id: Number(barId),
+      name: barInfo.name,
+      neighborhood: barInfo.neighborhood,
+      image_url: barInfo.image_url,
+      is_open_now: barInfo.is_open_now,
+      has_special_this_week: barInfo.has_special_this_week
+    };
 
-        const content = document.createElement('div');
-        content.className = 'card-content';
+    const card = document.createElement('div');
+    card.className = 'bar-card';
+    card.onclick = () => showDetail(bar, currentTab);
 
-        const name = document.createElement('div');
-        name.className = 'bar-name';
-        name.textContent = bar.name;
-
-        const neighborhood = document.createElement('div');
-        neighborhood.className = 'bar-neighborhood';
-        neighborhood.textContent = bar.neighborhood;
-
-        content.appendChild(name);
-        content.appendChild(neighborhood);
-
-        const specialsList = document.createElement('ul');
-        specialsList.className = 'specials-list';
-        const daySpecials = bar.specials_by_day[dayKey];
-
-        daySpecials.forEach((special) => {
-          const li = buildSpecialItem(special, {
-            isToday,
-            clickable: true,
-            onClick: (event) => {
-              event.stopPropagation();
-              showSpecialDetail(bar, special, { previousScreen: currentTab, dayLabel: label });
-            }
-          });
-          specialsList.appendChild(li);
-        });
-
-        content.appendChild(specialsList);
-
-        const hours = bar.hours_by_day ? bar.hours_by_day[dayKey] : null;
-        const hoursDiv = document.createElement('div');
-        hoursDiv.className = 'open-hours';
-        if (hours) {
-          if (offset === 0) {
-            const status = getOpenStatus(hours);
-            hoursDiv.innerHTML = '';
-            const labelSpan = document.createElement('span');
-            labelSpan.textContent = status.label;
-            labelSpan.classList.add(status.status);
-            hoursDiv.appendChild(labelSpan);
-            const textNode = document.createTextNode(
-              status.status === 'open'
-                ? ` - Closes ${format12Hour(status.time)}`
-                : ` - Opens ${format12Hour(status.time)}`
-            );
-            hoursDiv.appendChild(textNode);
-          } else {
-            hoursDiv.textContent = `Hours: ${format12Hour(hours.open_time)} – ${format12Hour(hours.close_time)}`;
-          }
-        } else {
-          hoursDiv.textContent = 'Hours unavailable';
-          hoursDiv.classList.add('future');
-        }
-
-        content.appendChild(hoursDiv);
-        card.appendChild(content);
-        container.appendChild(card);
-
-        if (isToday && !dividerInserted) {
-          const currentDaySpecials = bar.specials_by_day[dayKey] || [];
-          const hasExpiredTimedSpecial = currentDaySpecials.some((s) => !s.all_day && isSpecialPast(s, true));
-          const hasAllDaySpecial = currentDaySpecials.some((s) => s.all_day);
-          if (hasExpiredTimedSpecial && !hasAllDaySpecial) {
-            container.appendChild(todayDivider);
-            dividerInserted = true;
-          }
-        }
-      });
+    if (bar.image_url && bar.image_url !== 'null') {
+      const img = document.createElement('img');
+      img.className = 'card-image';
+      img.src = bar.image_url;
+      img.alt = bar.name;
+      card.appendChild(img);
     }
 
-    requestAnimationFrame(() => {
-      container.style.opacity = 1;
-      lucide.createIcons();
-    });
-  };
+    const homeContent = buildHomeBarSpecials(bar, entry.specials || [], currentDay, dayLabel);
+    if (!homeContent) return;
 
-  renderContent();
+    card.appendChild(homeContent);
+    container.appendChild(card);
+    renderedCardCount += 1;
+  });
+
+  if (renderedCardCount === 0 && barsForDay.length > 0) {
+    const noSpecialsLine = document.createElement('div');
+    noSpecialsLine.className = 'no-specials-line';
+    noSpecialsLine.textContent = 'No specials match your current filters.';
+    noSpecialsLine.style.padding = '12px';
+    noSpecialsLine.style.fontStyle = 'italic';
+    container.appendChild(noSpecialsLine);
+  }
+
+  requestAnimationFrame(() => {
+    container.style.opacity = 1;
+    lucide.createIcons();
+  });
 }
 
 function getSortedFilteredBars(bars) {

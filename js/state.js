@@ -1,4 +1,5 @@
 let barsData = [];
+let startupPayload = null;
 const DAYS_FULL = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 let currentTab = 'specials';
 let barsSearchQuery = '';
