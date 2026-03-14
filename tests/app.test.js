@@ -204,6 +204,10 @@ function mountBaseNodes(document) {
 
   const home = document.createElement('div');
   home.setAttribute('id', 'home-screen');
+  const homeBars = document.createElement('div');
+  homeBars.setAttribute('id', 'home-bars');
+  home.appendChild(homeBars);
+
   const bars = document.createElement('div');
   bars.setAttribute('id', 'bars-screen');
   const detail = document.createElement('div');
@@ -428,4 +432,58 @@ test('submitSpecialReport sends null comment when left blank', async () => {
 
   const body = JSON.parse(fetchCalls[0].options.body);
   assert.equal(body.comment, null);
+});
+
+
+test('renderBarsWeek shows today through next 6 days and open status only for today', () => {
+  const document = new DocumentMock();
+  mountBaseNodes(document);
+  const ctx = loadAppWithoutBoot(document);
+
+  vm.runInContext(`
+    startupPayload = {
+      general_data: { current_day: 'MON' },
+      bars: {
+        '1': { name: 'Today Bar', neighborhood: 'Downtown', image_url: null, currently_open: true },
+        '2': { name: 'Tomorrow Bar', neighborhood: 'Midtown', image_url: null, currently_open: false }
+      },
+      open_hours: {
+        '1': { MON: { display_text: '4:00 PM - 2:00 AM' } },
+        '2': { TUE: { display_text: '5:00 PM - 1:00 AM' } }
+      },
+      specials: {
+        '11': { bar_id: 1, description: '$5 Beer', special_type: 'drink', all_day: false, start_time: '16:00', end_time: '18:00', current_status: 'active' },
+        '22': { bar_id: 2, description: '$4 Wells', special_type: 'drink', all_day: false, start_time: '17:00', end_time: '19:00', current_status: 'upcoming' }
+      },
+      specials_by_day: {
+        MON: [{ bar_id: 1, specials: ['11'] }],
+        TUE: [{ bar_id: 2, specials: ['22'] }],
+        WED: [],
+        THU: [],
+        FRI: [],
+        SAT: [],
+        SUN: []
+      }
+    };
+    currentTab = 'specials';
+    activeFilters.types = [];
+    activeFilters.neighborhoods = [];
+  `, ctx);
+
+  ctx.renderBarsWeek();
+
+  const dayHeaders = document.querySelectorAll('.day-header-week');
+  assert.equal(dayHeaders.length, 7, 'renders all 7 day sections');
+  assert.equal(dayHeaders[0].textContent, 'Monday (Today)');
+  assert.equal(dayHeaders[1].textContent, 'Tuesday');
+
+  const openHours = document.querySelectorAll('.open-hours');
+  assert.equal(openHours.length, 2, 'renders hours for cards in multiple days');
+
+  const todayStatus = openHours[0].querySelector('.open');
+  assert.ok(todayStatus, 'today card shows open/closed status label');
+  assert.equal(todayStatus.textContent, 'Open');
+
+  const futureStatus = openHours[1].querySelector('.open') || openHours[1].querySelector('.closed');
+  assert.equal(futureStatus, null, 'future day card does not render open/closed status label');
 });
