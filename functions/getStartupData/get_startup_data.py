@@ -33,6 +33,16 @@ def query_specials(cursor):
     """)
     return cursor.fetchall()
 
+def query_device_favorite_special_ids(cursor, device_id):
+    if not device_id:
+        return set()
+
+    cursor.execute(
+        "SELECT special_id FROM device_favorite WHERE device_id = %s",
+        (device_id,)
+    )
+    return {str(row['special_id']) for row in cursor.fetchall()}
+
 def to_time_string(value):
     if value is None:
         return None
@@ -116,13 +126,14 @@ def get_special_status(special_day, all_day, start_time, end_time, current_day_k
     return 'active'
 
 #Payload builder
-def build_startup_payload():
+def build_startup_payload(device_id=None):
     conn = get_connection()
     try:
         with conn.cursor(pymysql.cursors.DictCursor) as cursor:
             bars = query_bars(cursor)
             hours = query_open_hours(cursor)
             specials = query_specials(cursor)
+            favorite_special_ids = query_device_favorite_special_ids(cursor, device_id)
 
         now = datetime.now()
         current_day_key = now.strftime('%a').upper()
@@ -179,7 +190,7 @@ def build_startup_payload():
                 'start_time': to_time_string(row['start_time']),
                 'end_time': to_time_string(row['end_time']),
                 'current_status': current_status,
-                'favorite': False
+                'favorite': special_id in favorite_special_ids
             }
 
             if bar_id in bars_lookup:
@@ -218,7 +229,9 @@ def build_startup_payload():
 
 # lambda handler
 def lambda_handler(event, context):
-    payload = build_startup_payload()
+    query_params = (event or {}).get('queryStringParameters') or {}
+    device_id = query_params.get('device_id')
+    payload = build_startup_payload(device_id=device_id)
     return {
         'statusCode': 200,
         'body': json.dumps(payload)

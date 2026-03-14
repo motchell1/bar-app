@@ -36,9 +36,17 @@ function buildLegacyBarsData(payload) {
   });
 }
 
+function buildStartupUrl() {
+  const url = new URL(STARTUP_API_URL);
+  if (deviceId) {
+    url.searchParams.set('device_id', deviceId);
+  }
+  return url.toString();
+}
+
 async function loadBars() {
   try {
-    const response = await fetch(STARTUP_API_URL);
+    const response = await fetch(buildStartupUrl());
     const data = await response.json();
     const parsed = typeof data.body === 'string' ? JSON.parse(data.body) : data;
     startupPayload = parsed.startup_payload || null;
@@ -52,6 +60,13 @@ async function loadBars() {
     renderCurrentTabData();
     hideInitialLoadingOverlay();
   }
+}
+
+async function persistFavoriteChangeInBackground(specialId, isFavorited) {
+  // Placeholder for future backend persistence to device_favorite.
+  // Intentionally left unimplemented until the write endpoint is available.
+  void specialId;
+  void isFavorited;
 }
 
 async function submitSpecialReport(event) {
