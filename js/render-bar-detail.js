@@ -1,4 +1,30 @@
-function showDetail(bar, previousScreen = currentTab) {
+function getDayKeyFromName(dayName) {
+  const dayIndex = DAYS_FULL.findIndex((name) => name === dayName);
+  if (dayIndex < 0) return '';
+  return DAYS_FULL[dayIndex].slice(0, 3).toUpperCase();
+}
+
+function getOrderedDaysForDetail(todayKey) {
+  const todayIndex = DAYS_FULL.findIndex((day) => day.slice(0, 3).toUpperCase() === todayKey);
+  if (todayIndex < 0) return DAYS_FULL.slice();
+  return DAYS_FULL.slice(todayIndex).concat(DAYS_FULL.slice(0, todayIndex));
+}
+
+function getBarFromPayload(barOrId) {
+  const barId = String(typeof barOrId === 'object' ? barOrId?.bar_id : barOrId);
+  const barData = startupPayload?.bars?.[barId];
+  if (!barData) return null;
+
+  return {
+    bar_id: Number(barId),
+    ...barData
+  };
+}
+
+function showDetail(barOrId, previousScreen = currentTab) {
+  const selectedBar = getBarFromPayload(barOrId) || (typeof barOrId === 'object' ? barOrId : null);
+  if (!selectedBar) return;
+
   previousScreenState = { type: previousScreen };
   document.getElementById('home-screen').style.display = 'none';
   document.getElementById('bars-screen').style.display = 'none';
@@ -7,23 +33,29 @@ function showDetail(bar, previousScreen = currentTab) {
   document.getElementById('detail-screen').style.display = 'block';
   setScreenLayout(false);
 
-  document.getElementById('detail-image').src = bar.image_url || '';
-  document.getElementById('detail-name').textContent = bar.name.toUpperCase();
+  document.getElementById('detail-image').src = selectedBar.image_url || '';
+  document.getElementById('detail-name').textContent = (selectedBar.name || '').toUpperCase();
+
+  const todayKey = startupPayload?.general_data?.current_day || getDayKeyFromName(DAYS_FULL[new Date().getDay()]);
+  const orderedDays = getOrderedDaysForDetail(todayKey);
+  const openHoursForBar = startupPayload?.open_hours?.[String(selectedBar.bar_id)] || {};
 
   const hoursEl = document.getElementById('detail-hours');
   hoursEl.innerHTML = '';
 
-  const todayIndex = new Date().getDay();
-  const DAYS_ORDERED = DAYS_FULL.slice(todayIndex).concat(DAYS_FULL.slice(0, todayIndex));
+  orderedDays.forEach((day) => {
+    const dayKey = getDayKeyFromName(day);
+    const hours = openHoursForBar[dayKey] || null;
 
-  DAYS_ORDERED.forEach((day) => {
-    const h = bar.hours_by_day ? bar.hours_by_day[day.slice(0, 3).toUpperCase()] : null;
     const row = document.createElement('tr');
-    if (day === DAYS_FULL[todayIndex]) row.classList.add('today');
+    if (dayKey === todayKey) row.classList.add('today');
+
     const dayCell = document.createElement('td');
     dayCell.textContent = day;
+
     const hoursCell = document.createElement('td');
-    hoursCell.textContent = h ? (h.closed ? 'Closed' : `${format12Hour(h.open_time)} – ${format12Hour(h.close_time)}`) : '';
+    hoursCell.textContent = hours?.display_text || '';
+
     row.appendChild(dayCell);
     row.appendChild(hoursCell);
     hoursEl.appendChild(row);
@@ -31,19 +63,22 @@ function showDetail(bar, previousScreen = currentTab) {
 
   const specialsContainer = document.getElementById('detail-specials');
   specialsContainer.innerHTML = '';
-  DAYS_ORDERED.forEach((day) => {
-    const key = day.slice(0, 3).toUpperCase();
-    const specials = (bar.specials_by_day && bar.specials_by_day[key]) || [];
+
+  orderedDays.forEach((day) => {
+    const dayKey = getDayKeyFromName(day);
+    const dayEntries = startupPayload?.specials_by_day?.[dayKey] || [];
+    const barEntry = dayEntries.find((entry) => String(entry.bar_id) === String(selectedBar.bar_id));
+    const specialIds = barEntry?.specials || [];
 
     const wrapper = document.createElement('div');
     wrapper.className = 'day-group';
 
     const header = document.createElement('div');
     header.className = 'day-header';
-    if (day === DAYS_FULL[todayIndex]) header.classList.add('today');
+    if (dayKey === todayKey) header.classList.add('today');
 
     const label = document.createElement('span');
-    label.textContent = day === DAYS_FULL[todayIndex] ? `${day} (Today)` : day;
+    label.textContent = dayKey === todayKey ? `${day} (Today)` : day;
 
     const arrow = document.createElement('span');
     arrow.className = 'arrow rotate';
@@ -55,15 +90,30 @@ function showDetail(bar, previousScreen = currentTab) {
     const content = document.createElement('div');
     content.className = 'day-content expanded';
 
-    if (specials.length > 0) {
-      specials.forEach((special) => {
+    if (specialIds.length > 0) {
+      specialIds.forEach((specialId) => {
+        const specialData = startupPayload?.specials?.[String(specialId)];
+        if (!specialData) return;
+
+        const special = {
+          special_id: String(specialId),
+          ...specialData
+        };
+
         const div = buildSpecialItem(special, {
+          neutralTimeBadgeStyle: true,
           clickable: true,
-          onClick: () => showSpecialDetail(bar, special, { previousScreen: 'detail', returnTo: previousScreenState?.type || currentTab, dayLabel: day === DAYS_FULL[todayIndex] ? `${day} (Today)` : day })
+          onClick: () => showSpecialDetail(selectedBar, special, {
+            previousScreen: 'detail',
+            returnTo: previousScreenState?.type || currentTab,
+            dayLabel: dayKey === todayKey ? `${day} (Today)` : day
+          })
         });
         content.appendChild(div);
       });
-    } else {
+    }
+
+    if (content.children.length === 0) {
       const noSpecials = document.createElement('div');
       noSpecials.className = 'special-item no-specials-item';
 

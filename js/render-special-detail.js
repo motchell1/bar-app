@@ -1,5 +1,40 @@
+function resolveSpecialId(special, bar) {
+  if (special?.special_id !== undefined && special?.special_id !== null) return String(special.special_id);
+
+  const barId = special?.bar_id ?? bar?.bar_id;
+  if (!startupPayload?.specials || barId === undefined || barId === null) return null;
+
+  const matched = Object.entries(startupPayload.specials).find(([, candidate]) => {
+    if (String(candidate.bar_id) !== String(barId)) return false;
+    return candidate.day === special?.day
+      && candidate.description === special?.description
+      && candidate.special_type === (special?.special_type || special?.type)
+      && candidate.start_time === special?.start_time
+      && candidate.end_time === special?.end_time
+      && Boolean(candidate.all_day) === Boolean(special?.all_day);
+  });
+
+  return matched ? String(matched[0]) : null;
+}
+
 function showSpecialDetail(bar, special, { previousScreen = 'specials', returnTo = 'specials', dayLabel = '' } = {}) {
-  previousScreenState = { type: previousScreen, bar, returnTo };
+  const specialId = resolveSpecialId(special, bar);
+  const payloadSpecial = specialId ? startupPayload?.specials?.[specialId] : null;
+  const selectedSpecial = payloadSpecial
+    ? { special_id: specialId, ...payloadSpecial }
+    : special;
+
+  const barId = selectedSpecial?.bar_id ?? bar?.bar_id;
+  const payloadBar = barId !== undefined && barId !== null
+    ? startupPayload?.bars?.[String(barId)]
+    : null;
+  const selectedBar = payloadBar
+    ? { bar_id: Number(barId), ...payloadBar }
+    : bar;
+
+  if (!selectedSpecial || !selectedBar) return;
+
+  previousScreenState = { type: previousScreen, bar: selectedBar, returnTo };
 
   document.getElementById('home-screen').style.display = 'none';
   document.getElementById('bars-screen').style.display = 'none';
@@ -9,7 +44,7 @@ function showSpecialDetail(bar, special, { previousScreen = 'specials', returnTo
   setScreenLayout(false);
 
   const barImage = document.getElementById('special-bar-image');
-  barImage.src = (bar.image_url && bar.image_url !== 'null') ? bar.image_url : 'https://placehold.co/640x360?text=Bar';
+  barImage.src = (selectedBar.image_url && selectedBar.image_url !== 'null') ? selectedBar.image_url : 'https://placehold.co/640x360?text=Bar';
 
   const specialCard = document.getElementById('special-card');
   specialCard.innerHTML = '';
@@ -19,9 +54,9 @@ function showSpecialDetail(bar, special, { previousScreen = 'specials', returnTo
 
   const barName = document.createElement('div');
   barName.className = 'special-bar-name';
-  barName.textContent = bar.name;
+  barName.textContent = selectedBar.name;
 
-  const cardFavoriteButton = createFavoriteButton(bar, special, dayLabel || 'Day unavailable');
+  const cardFavoriteButton = createFavoriteButton(selectedBar, selectedSpecial, dayLabel || 'Day unavailable');
 
   specialHeader.appendChild(barName);
   specialHeader.appendChild(cardFavoriteButton);
@@ -34,16 +69,16 @@ function showSpecialDetail(bar, special, { previousScreen = 'specials', returnTo
   specialDay.textContent = dayLabel || 'Day unavailable';
   specialMeta.appendChild(specialDay);
 
-  currentSpecialContext = { bar, special, dayLabel: dayLabel || 'Day unavailable' };
+  currentSpecialContext = { bar: selectedBar, special: selectedSpecial, dayLabel: dayLabel || 'Day unavailable' };
 
-  const specialRow = buildSpecialItem(special);
+  const specialRow = buildSpecialItem(selectedSpecial, { neutralTimeBadgeStyle: true });
 
   specialCard.appendChild(specialHeader);
   specialCard.appendChild(specialMeta);
   specialCard.appendChild(specialRow);
 
   resetSpecialReportForm();
-  updateSpecialFavoriteButton(isFavoriteSpecial(bar, special, dayLabel || 'Day unavailable'));
+  updateSpecialFavoriteButton(isFavoriteSpecial(selectedBar, selectedSpecial, dayLabel || 'Day unavailable'));
   lucide.createIcons();
 }
 

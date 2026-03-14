@@ -114,7 +114,7 @@ function sortBarsBySpecials(bars, dayKey, isToday) {
   });
 }
 
-function buildSpecialItem(special, { isToday = false, clickable = false, onClick = null } = {}) {
+function buildSpecialItem(special, { isToday = false, clickable = false, onClick = null, neutralTimeBadgeStyle = false } = {}) {
   const item = document.createElement('div');
   item.className = 'special-item';
 
@@ -129,15 +129,15 @@ function buildSpecialItem(special, { isToday = false, clickable = false, onClick
   }
 
   const currentStatus = special.current_status || null;
-  if (currentStatus === 'past') {
+  if (!neutralTimeBadgeStyle && currentStatus === 'past') {
     timeBadge.classList.add('past');
-  } else if (!special.all_day && isToday && isSpecialPast(special, true)) {
+  } else if (!neutralTimeBadgeStyle && !special.all_day && isToday && isSpecialPast(special, true)) {
     timeBadge.classList.add('past');
   }
 
-  if (currentStatus === 'active' || currentStatus === 'live') {
+  if (!neutralTimeBadgeStyle && (currentStatus === 'active' || currentStatus === 'live')) {
     item.classList.add('live');
-  } else if (isToday && isSpecialActive(special)) {
+  } else if (!neutralTimeBadgeStyle && isToday && isSpecialActive(special)) {
     item.classList.add('live');
   }
 
@@ -155,7 +155,7 @@ function buildSpecialItem(special, { isToday = false, clickable = false, onClick
   item.appendChild(desc);
   item.appendChild(typeIcon);
 
-  if (currentStatus === 'active' || currentStatus === 'live' || (isToday && isSpecialActive(special))) {
+  if (!neutralTimeBadgeStyle && (currentStatus === 'active' || currentStatus === 'live' || (isToday && isSpecialActive(special)))) {
     const dot = document.createElement('span');
     dot.className = 'active-dot';
     item.appendChild(dot);
