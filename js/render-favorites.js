@@ -1,29 +1,54 @@
 function getSpecialId(bar, special, dayLabel = '') {
-  return special.special_id;
+  if (special?.special_id !== undefined && special?.special_id !== null) return String(special.special_id);
+  if (typeof resolveSpecialId === 'function') {
+    return resolveSpecialId(special, bar);
+  }
+  void dayLabel;
+  return null;
 }
 
 function isFavoriteSpecial(bar, special, dayLabel = '') {
   const specialId = getSpecialId(bar, special, dayLabel);
-  return favorites.some((item) => item.id === specialId);
+  if (!specialId) return false;
+  return startupPayload?.specials?.[String(specialId)]?.favorite === true;
 }
 
 function toggleFavoriteSpecial(bar, special, dayLabel = 'Day unavailable') {
   const specialId = getSpecialId(bar, special, dayLabel);
-  const existingIndex = favorites.findIndex((item) => item.id === specialId);
+  if (!specialId || !startupPayload?.specials?.[String(specialId)]) return false;
 
-  if (existingIndex >= 0) {
-    favorites.splice(existingIndex, 1);
-    return false;
-  }
+  const specialRecord = startupPayload.specials[String(specialId)];
+  const nowFavorited = !specialRecord.favorite;
+  specialRecord.favorite = nowFavorited;
 
-  favorites.push({
-    id: specialId,
-    bar,
-    special,
-    dayLabel
-  });
+  void persistFavoriteChangeInBackground(specialId, nowFavorited);
 
-  return true;
+  return nowFavorited;
+}
+
+function getFavoriteSpecialEntries() {
+  const specialsLookup = startupPayload?.specials || {};
+  const barsLookup = startupPayload?.bars || {};
+  const openHoursLookup = startupPayload?.open_hours || {};
+
+  return Object.entries(specialsLookup)
+    .filter(([, special]) => special.favorite === true)
+    .map(([specialId, special]) => {
+      const barId = String(special.bar_id);
+      const barData = barsLookup[barId];
+      if (!barData) return null;
+
+      const dayLabel = DAYS_FULL.find((day) => day.slice(0, 3).toUpperCase() === special.day) || 'Day unavailable';
+
+      return {
+        id: String(specialId),
+        special: { special_id: String(specialId), ...special },
+        bar: { bar_id: Number(barId), ...barData },
+        openHours: openHoursLookup[barId] || {},
+        dayLabel
+      };
+    })
+    .filter(Boolean);
 }
 
 function updateSpecialFavoriteButton(isFavorited) {
@@ -76,20 +101,22 @@ function createFavoriteButton(bar, special, dayLabel, { onUnfavorite } = {}) {
   return favoriteButton;
 }
 
-function renderFavorites(items = favorites) {
+function renderFavorites(items = getFavoriteSpecialEntries()) {
   const favoritesScreen = document.getElementById('favorites-screen');
   const favoritesList = document.getElementById('favorites-list');
   if (!favoritesScreen || !favoritesList) return;
 
   favoritesList.innerHTML = '';
 
+  const hasAnyFavorites = getFavoriteSpecialEntries().length > 0;
+
   if (items.length === 0) {
     const emptyState = document.createElement('div');
     emptyState.className = 'no-specials-line';
     emptyState.style.padding = '12px';
-    emptyState.textContent = favorites.length === 0
-      ? 'No favorites yet. Tap the star on a special to save it here.'
-      : 'No favorites match your current filters.';
+    emptyState.textContent = hasAnyFavorites
+      ? 'No favorites match your current filters.'
+      : 'No favorites yet. Tap the star on a special to save it here.';
     favoritesList.appendChild(emptyState);
     return;
   }

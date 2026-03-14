@@ -77,7 +77,7 @@ function updateFilterSectionVisibility() {
 }
 
 function getFilteredFavorites() {
-  return favorites.filter((item) => {
+  return getFavoriteSpecialEntries().filter((item) => {
     const specialType = item.special.special_type || item.special.type;
     const typePass = activeFilters.types.length === 0 || activeFilters.types.includes(specialType);
     const neighborhoodPass = activeFilters.neighborhoods.length === 0 || activeFilters.neighborhoods.includes(item.bar.neighborhood);

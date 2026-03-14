@@ -268,15 +268,20 @@ test('favorites cards render star in header and omit neighborhood label', () => 
   mountBaseNodes(document);
   const ctx = loadAppWithoutBoot(document);
 
-  const item = {
-    id: '1',
-    bar: { id: 1, name: 'Test Bar', neighborhood: 'Downtown' },
-    special: { description: '$5 Beer', type: 'drink', all_day: true },
-    dayLabel: 'Monday'
-  };
+  vm.runInContext(`
+    startupPayload = {
+      bars: { '1': { name: 'Test Bar', neighborhood: 'Downtown' } },
+      open_hours: { '1': {} },
+      specials: {
+        '11': { bar_id: 1, description: '$5 Beer', special_type: 'drink', all_day: true, favorite: true, day: 'MON' }
+      }
+    };
+    currentTab = 'favorites';
+    activeFilters.types = [];
+    activeFilters.neighborhoods = [];
+  `, ctx);
 
-  vm.runInContext(`favorites = [${JSON.stringify(item)}]; currentTab = 'favorites'; activeFilters.types = []; activeFilters.neighborhoods = [];`, ctx);
-  ctx.renderFavorites([item]);
+  ctx.renderFavorites(ctx.getFavoriteSpecialEntries());
 
   const card = document.querySelector('.bar-card');
   assert.ok(card, 'renders a favorites card');
@@ -290,21 +295,30 @@ test('clicking favorites star unfavorites and removes card from list', async () 
   mountBaseNodes(document);
   const ctx = loadAppWithoutBoot(document);
 
-  const bar = { id: 1, name: 'Test Bar', neighborhood: 'Downtown' };
-  const special = {
-    description: '$5 Beer',
-    type: 'drink',
-    day: 'MON',
-    all_day: false,
-    start_time: '16:00',
-    end_time: '18:00'
-  };
-  const dayLabel = 'Monday';
-  const id = ctx.getSpecialId(bar, special, dayLabel);
-  const item = { id, bar, special, dayLabel };
+  vm.runInContext(`
+    startupPayload = {
+      bars: { '1': { name: 'Test Bar', neighborhood: 'Downtown' } },
+      open_hours: { '1': {} },
+      specials: {
+        '11': {
+          special_id: '11',
+          bar_id: 1,
+          description: '$5 Beer',
+          special_type: 'drink',
+          day: 'MON',
+          all_day: false,
+          start_time: '16:00',
+          end_time: '18:00',
+          favorite: true
+        }
+      }
+    };
+    currentTab = 'favorites';
+    activeFilters.types = [];
+    activeFilters.neighborhoods = [];
+  `, ctx);
 
-  vm.runInContext(`favorites = [${JSON.stringify(item)}]; currentTab = 'favorites'; activeFilters.types = []; activeFilters.neighborhoods = [];`, ctx);
-  ctx.renderFavorites([item]);
+  ctx.renderFavorites(ctx.getFavoriteSpecialEntries());
 
   const favoriteButton = document.querySelector('.special-favorite-button');
   assert.ok(favoriteButton, 'favorite button exists before click');
@@ -313,8 +327,8 @@ test('clicking favorites star unfavorites and removes card from list', async () 
 
   await new Promise((resolve) => setTimeout(resolve, 760));
 
-  const favoriteCount = vm.runInContext('favorites.length', ctx);
-  assert.equal(favoriteCount, 0, 'favorite removed from store');
+  const isFavorite = vm.runInContext("startupPayload.specials['11'].favorite", ctx);
+  assert.equal(isFavorite, false, 'favorite flag updated in startup payload');
 
   const cards = document.querySelectorAll('.bar-card');
   assert.equal(cards.length, 0, 'favorite card removed after rerender');
