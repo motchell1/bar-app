@@ -128,16 +128,24 @@ function buildSpecialItem(special, { isToday = false, clickable = false, onClick
     timeBadge.innerHTML = `${startFormatted}<br>${endFormatted}`;
   }
 
-  if (!special.all_day && isToday && isSpecialPast(special, true)) {
+  const currentStatus = special.current_status || null;
+  if (currentStatus === 'past') {
+    timeBadge.classList.add('past');
+  } else if (!special.all_day && isToday && isSpecialPast(special, true)) {
     timeBadge.classList.add('past');
   }
 
-  if (isToday && isSpecialActive(special)) item.classList.add('live');
+  if (currentStatus === 'active' || currentStatus === 'live') {
+    item.classList.add('live');
+  } else if (isToday && isSpecialActive(special)) {
+    item.classList.add('live');
+  }
 
+  const specialType = special.special_type || special.type || '';
   const typeIcon = document.createElement('span');
-  typeIcon.className = `type-icon ${special.type || ''}`;
-  if (special.type === 'food') typeIcon.setAttribute('data-lucide', 'utensils');
-  else if (special.type === 'drink') typeIcon.setAttribute('data-lucide', 'beer');
+  typeIcon.className = `type-icon ${specialType}`;
+  if (specialType === 'food') typeIcon.setAttribute('data-lucide', 'utensils');
+  else if (specialType === 'drink') typeIcon.setAttribute('data-lucide', 'beer');
 
   const desc = document.createElement('span');
   desc.className = 'special-description';
@@ -147,7 +155,7 @@ function buildSpecialItem(special, { isToday = false, clickable = false, onClick
   item.appendChild(desc);
   item.appendChild(typeIcon);
 
-  if (isToday && isSpecialActive(special)) {
+  if (currentStatus === 'active' || currentStatus === 'live' || (isToday && isSpecialActive(special))) {
     const dot = document.createElement('span');
     dot.className = 'active-dot';
     item.appendChild(dot);

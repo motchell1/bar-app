@@ -76,26 +76,10 @@ function updateFilterSectionVisibility() {
   typeSection.style.display = showTypeFilters ? '' : 'none';
 }
 
-function getFilteredBarsForSpecials() {
-  return barsData.map((bar) => {
-    const specials_by_day = Object.fromEntries(
-      Object.entries(bar.specials_by_day).map(([day, specials]) => [
-        day,
-        specials.filter((special) => {
-          const typePass = activeFilters.types.length === 0 || activeFilters.types.includes(special.type);
-          const neighborhoodPass = activeFilters.neighborhoods.length === 0 || activeFilters.neighborhoods.includes(bar.neighborhood);
-          return typePass && neighborhoodPass;
-        })
-      ])
-    );
-
-    return { ...bar, specials_by_day };
-  });
-}
-
 function getFilteredFavorites() {
   return favorites.filter((item) => {
-    const typePass = activeFilters.types.length === 0 || activeFilters.types.includes(item.special.type);
+    const specialType = item.special.special_type || item.special.type;
+    const typePass = activeFilters.types.length === 0 || activeFilters.types.includes(specialType);
     const neighborhoodPass = activeFilters.neighborhoods.length === 0 || activeFilters.neighborhoods.includes(item.bar.neighborhood);
     return typePass && neighborhoodPass;
   });
@@ -105,7 +89,7 @@ function renderCurrentTabData() {
   if (isInitialDataLoading) return;
 
   if (currentTab === 'specials') {
-    renderBarsWeek(getFilteredBarsForSpecials());
+    renderBarsWeek();
     return;
   }
 

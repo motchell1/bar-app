@@ -1,12 +1,49 @@
 const STARTUP_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaws.com/default/getStartupData';
 const SPECIAL_REPORT_API_URL = 'https://3kz7x6tvvi.execute-api.us-east-2.amazonaws.com/default/insertUserReport';
 
+function buildLegacyBarsData(payload) {
+  const barsLookup = payload?.bars || {};
+  const openHoursLookup = payload?.open_hours || {};
+  const specialsLookup = payload?.specials || {};
+
+  return Object.entries(barsLookup).map(([barId, bar]) => {
+    const barSpecialsByDay = {};
+
+    Object.entries(specialsLookup).forEach(([specialId, special]) => {
+      if (String(special.bar_id) !== String(barId)) return;
+      const day = special.day;
+      if (!barSpecialsByDay[day]) barSpecialsByDay[day] = [];
+      barSpecialsByDay[day].push({
+        special_id: Number(specialId),
+        all_day: special.all_day,
+        start_time: special.start_time,
+        end_time: special.end_time,
+        description: special.description,
+        type: special.special_type,
+        current_status: special.current_status,
+        favorite: special.favorite
+      });
+    });
+
+    return {
+      bar_id: Number(barId),
+      name: bar.name,
+      neighborhood: bar.neighborhood,
+      image_url: bar.image_url,
+      hours_by_day: openHoursLookup[barId] || {},
+      specials_by_day: barSpecialsByDay
+    };
+  });
+}
+
 async function loadBars() {
   try {
     const response = await fetch(STARTUP_API_URL);
     const data = await response.json();
     const parsed = typeof data.body === 'string' ? JSON.parse(data.body) : data;
-    barsData = parsed.bars || [];
+    startupPayload = parsed.startup_payload || null;
+
+    barsData = startupPayload ? buildLegacyBarsData(startupPayload) : [];
     generateNeighborhoodFilters();
   } catch (err) {
     console.error('Failed to load bars:', err);
