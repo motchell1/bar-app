@@ -139,9 +139,17 @@ def get_special_status(special_day, all_day, start_time, end_time, current_day_k
     if start_minutes is None or end_minutes is None:
         return 'upcoming'
 
-    if current_minutes < start_minutes:
+    adjusted_current_minutes = current_minutes
+    adjusted_end_minutes = end_minutes
+
+    if end_minutes < start_minutes:
+        adjusted_end_minutes = end_minutes + (24 * 60)
+        if adjusted_current_minutes < start_minutes:
+            adjusted_current_minutes += 24 * 60
+
+    if adjusted_current_minutes < start_minutes:
         return 'upcoming'
-    if current_minutes > end_minutes:
+    if adjusted_current_minutes > adjusted_end_minutes:
         return 'past'
     return 'active'
 
@@ -173,6 +181,8 @@ def build_startup_payload(device_id=None):
         effective_now = get_effective_now(now)
         current_day_key = effective_now.strftime('%a').upper()
         current_minutes = (effective_now.hour * 60) + effective_now.minute
+        if now.hour < 2:
+            current_minutes += 24 * 60
         ordered_day_keys = get_ordered_day_keys(current_day_key)
 
         specials = sorted(
