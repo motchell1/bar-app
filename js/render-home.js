@@ -50,14 +50,26 @@ function buildHomeBarSpecials(bar, specialIds, dayKey, dayLabel) {
   const isCurrentlyOpen = bar.currently_open ?? bar.is_open_now;
 
   if (displayText) {
-    if (isToday) {
+    if (isToday && isCurrentlyOpen) {
+      const closeTime = startupPayload?.open_hours?.[bar.bar_id]?.[dayKey]?.close_time;
+      const closeTimeText = format12Hour(closeTime);
       const statusSpan = document.createElement('span');
-      statusSpan.className = isCurrentlyOpen ? 'open' : 'closed';
-      statusSpan.textContent = isCurrentlyOpen ? 'Open' : 'Closed';
+      statusSpan.className = 'open';
+      statusSpan.textContent = 'Open';
       hoursDiv.appendChild(statusSpan);
-      const hoursText = document.createElement('span');
-      hoursText.textContent = ` • Hours: ${displayText}`;
-      hoursDiv.appendChild(hoursText);
+      const openSuffix = document.createElement('span');
+      openSuffix.textContent = closeTimeText ? ` • Closes ${closeTimeText}` : 'Open now';
+      hoursDiv.appendChild(openSuffix);
+    } else if (isToday) {
+      const openTime = startupPayload?.open_hours?.[bar.bar_id]?.[dayKey]?.open_time;
+      const openTimeText = format12Hour(openTime);
+      const statusSpan = document.createElement('span');
+      statusSpan.className = 'closed';
+      statusSpan.textContent = 'Closed';
+      hoursDiv.appendChild(statusSpan);
+      const closeSuffix = document.createElement('span');
+      closeSuffix.textContent = openTimeText ? ` • Opens ${openTimeText}` : 'Closed';
+      hoursDiv.appendChild(closeSuffix);
     } else {
       hoursDiv.textContent = `Hours: ${displayText}`;
     }
