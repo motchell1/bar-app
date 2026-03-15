@@ -109,6 +109,23 @@ def to_minutes(time_value):
         return 24 * 60
     return (hour * 60) + minute
 
+def is_open_for_day(open_time, close_time, current_minutes):
+    open_minutes = to_minutes(open_time)
+    close_minutes = to_minutes(close_time)
+
+    if open_minutes is None or close_minutes is None:
+        return False
+
+    adjusted_current_minutes = current_minutes
+    adjusted_close_minutes = close_minutes
+
+    if close_minutes < open_minutes:
+        adjusted_close_minutes = close_minutes + (24 * 60)
+        if adjusted_current_minutes < open_minutes:
+            adjusted_current_minutes += 24 * 60
+
+    return open_minutes <= adjusted_current_minutes <= adjusted_close_minutes
+
 def get_special_status(special_day, all_day, start_time, end_time, current_day_key, current_minutes):
     if special_day != current_day_key:
         return 'upcoming'
@@ -196,9 +213,7 @@ def build_startup_payload(device_id=None):
             }
 
             if day_key == current_day_key and row['is_closed'] != 'Y':
-                open_minutes = to_minutes(open_time)
-                close_minutes = to_minutes(close_time)
-                if open_minutes is not None and close_minutes is not None and open_minutes <= current_minutes <= close_minutes:
+                if is_open_for_day(open_time, close_time, current_minutes):
                     bars_lookup.get(bar_id, {})['is_open_now'] = True
 
         specials_lookup = {}
