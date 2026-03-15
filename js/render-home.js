@@ -50,10 +50,14 @@ function buildHomeBarSpecials(bar, specialIds, dayKey, dayLabel) {
   const isCurrentlyOpen = bar.currently_open ?? bar.is_open_now;
 
   if (displayText) {
-    if (isToday) {
+    if (isToday && isCurrentlyOpen) {
+      const closeTime = startupPayload?.open_hours?.[bar.bar_id]?.[dayKey]?.close_time;
+      const closeTimeText = format12Hour(closeTime);
+      hoursDiv.textContent = closeTimeText ? `Open till ${closeTimeText}` : 'Open now'
+    } else if (isToday) {
       const statusSpan = document.createElement('span');
-      statusSpan.className = isCurrentlyOpen ? 'open' : 'closed';
-      statusSpan.textContent = isCurrentlyOpen ? 'Open' : 'Closed';
+      statusSpan.className = 'closed';
+      statusSpan.textContent = 'Closed';
       hoursDiv.appendChild(statusSpan);
       const hoursText = document.createElement('span');
       hoursText.textContent = ` • Hours: ${displayText}`;
