@@ -442,7 +442,7 @@ test('renderBarsWeek shows today through next 6 days and open status only for to
 
   vm.runInContext(`
     startupPayload = {
-      general_data: { current_day: 'MON' },
+      general_data: { current_day: '  Monday  ' },
       bars: {
         '1': { name: 'Today Bar', neighborhood: 'Downtown', image_url: null, currently_open: true },
         '2': { name: 'Tomorrow Bar', neighborhood: 'Midtown', image_url: null, currently_open: false }

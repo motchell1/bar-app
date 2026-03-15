@@ -1,7 +1,5 @@
 function getDayKeyFromName(dayName) {
-  const dayIndex = DAYS_FULL.findIndex((name) => name === dayName);
-  if (dayIndex < 0) return '';
-  return DAYS_FULL[dayIndex].slice(0, 3).toUpperCase();
+  return normalizeDayKey(dayName);
 }
 
 function getOrderedDaysForDetail(todayKey) {
@@ -36,7 +34,7 @@ function showDetail(barOrId, previousScreen = currentTab) {
   document.getElementById('detail-image').src = selectedBar.image_url || '';
   document.getElementById('detail-name').textContent = (selectedBar.name || '').toUpperCase();
 
-  const todayKey = startupPayload?.general_data?.current_day || getDayKeyFromName(DAYS_FULL[new Date().getDay()]);
+  const todayKey = normalizeDayKey(startupPayload?.general_data?.current_day) || getDayKeyFromName(DAYS_FULL[new Date().getDay()]);
   const orderedDays = getOrderedDaysForDetail(todayKey);
   const openHoursForBar = startupPayload?.open_hours?.[String(selectedBar.bar_id)] || {};
 

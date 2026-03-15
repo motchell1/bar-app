@@ -46,7 +46,7 @@ function buildHomeBarSpecials(bar, specialIds, dayKey, dayLabel) {
   const hoursDiv = document.createElement('div');
   hoursDiv.className = 'open-hours';
   const displayText = startupPayload?.open_hours?.[bar.bar_id]?.[dayKey]?.display_text;
-  const isToday = dayKey === startupPayload?.general_data?.current_day;
+  const isToday = dayKey === normalizeDayKey(startupPayload?.general_data?.current_day);
   const isCurrentlyOpen = bar.currently_open ?? bar.is_open_now;
 
   if (displayText) {
@@ -80,8 +80,8 @@ function renderBarsWeek() {
   container.style.opacity = 0;
   container.innerHTML = '';
 
-  const currentDay = startupPayload?.general_data?.current_day;
-  const configuredStartIndex = DAYS_FULL.findIndex((day) => day.slice(0, 3).toUpperCase() === currentDay);
+  const currentDayKey = normalizeDayKey(startupPayload?.general_data?.current_day);
+  const configuredStartIndex = DAYS_FULL.findIndex((day) => day.slice(0, 3).toUpperCase() === currentDayKey);
   const startIndex = configuredStartIndex >= 0 ? configuredStartIndex : new Date().getDay();
   const orderedDays = Array.from({ length: 7 }, (_, offset) => {
     const dayName = DAYS_FULL[(startIndex + offset + 7) % 7];

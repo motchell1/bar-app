@@ -11,6 +11,21 @@ function format12Hour(timeStr) {
   return `${hour}:${minuteStr} ${ampm}`;
 }
 
+function normalizeDayKey(dayValue) {
+  if (typeof dayValue !== 'string') return '';
+
+  const normalized = dayValue.trim().toUpperCase();
+  if (!normalized) return '';
+
+  const dayByShortName = DAYS_FULL.find((day) => day.slice(0, 3).toUpperCase() === normalized);
+  if (dayByShortName) return dayByShortName.slice(0, 3).toUpperCase();
+
+  const dayByFullName = DAYS_FULL.find((day) => day.toUpperCase() === normalized);
+  if (dayByFullName) return dayByFullName.slice(0, 3).toUpperCase();
+
+  return '';
+}
+
 function formatSpecialTime(startTime, endTime) {
   if (!startTime || !endTime) return '';
 
