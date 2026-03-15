@@ -34,7 +34,7 @@ function showDetail(barOrId, previousScreen = currentTab) {
   document.getElementById('detail-image').src = selectedBar.image_url || '';
   document.getElementById('detail-name').textContent = (selectedBar.name || '').toUpperCase();
 
-  const todayKey = normalizeDayKey(startupPayload?.general_data?.current_day) || getDayKeyFromName(DAYS_FULL[new Date().getDay()]);
+  const todayKey = normalizeDayKey(startupPayload?.general_data?.current_day);
   const orderedDays = getOrderedDaysForDetail(todayKey);
   const openHoursForBar = startupPayload?.open_hours?.[String(selectedBar.bar_id)] || {};
 

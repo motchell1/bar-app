@@ -1,4 +1,4 @@
-function buildHomeBarSpecials(bar, specialIds, dayKey, dayLabel) {
+function buildHomeBarSpecials(bar, specialIds, dayKey, dayLabel, currentDayKey = '') {
   const specialsLookup = startupPayload?.specials || {};
   const content = document.createElement('div');
   content.className = 'card-content';
@@ -46,7 +46,7 @@ function buildHomeBarSpecials(bar, specialIds, dayKey, dayLabel) {
   const hoursDiv = document.createElement('div');
   hoursDiv.className = 'open-hours';
   const displayText = startupPayload?.open_hours?.[bar.bar_id]?.[dayKey]?.display_text;
-  const isToday = dayKey === normalizeDayKey(startupPayload?.general_data?.current_day);
+  const isToday = currentDayKey !== '' && dayKey === currentDayKey;
   const isCurrentlyOpen = bar.currently_open ?? bar.is_open_now;
 
   if (displayText) {
@@ -82,12 +82,13 @@ function renderBarsWeek() {
 
   const currentDayKey = normalizeDayKey(startupPayload?.general_data?.current_day);
   const configuredStartIndex = DAYS_FULL.findIndex((day) => day.slice(0, 3).toUpperCase() === currentDayKey);
-  const startIndex = configuredStartIndex >= 0 ? configuredStartIndex : new Date().getDay();
-  const orderedDays = Array.from({ length: 7 }, (_, offset) => {
+  const startIndex = configuredStartIndex >= 0 ? configuredStartIndex : 0;
+  const orderedDays = Array.from({ length: 7 }, (_,offset) => {
     const dayName = DAYS_FULL[(startIndex + offset + 7) % 7];
+    const dayKey = dayName.slice(0, 3).toUpperCase();
     return {
-      dayKey: dayName.slice(0, 3).toUpperCase(),
-      dayLabel: offset === 0 ? `${dayName} (Today)` : dayName
+      dayKey,
+      dayLabel: dayKey === currentDayKey ? `${dayName} (Today)` : dayName
     };
   });
 
@@ -131,7 +132,7 @@ function renderBarsWeek() {
         card.appendChild(img);
       }
 
-      const homeContent = buildHomeBarSpecials(bar, entry.specials || [], dayKey, dayLabel);
+      const homeContent = buildHomeBarSpecials(bar, entry.specials || [], dayKey, dayLabel, currentDayKey);
       if (!homeContent) return;
 
       card.appendChild(homeContent);

@@ -487,3 +487,45 @@ test('renderBarsWeek shows today through next 6 days and open status only for to
   const futureStatus = openHours[1].querySelector('.open') || openHours[1].querySelector('.closed');
   assert.equal(futureStatus, null, 'future day card does not render open/closed status label');
 });
+
+test('renderBarsWeek does not use client date fallback when payload current_day is invalid', () => {
+  const document = new DocumentMock();
+  mountBaseNodes(document);
+  const ctx = loadAppWithoutBoot(document);
+
+  vm.runInContext(`
+    startupPayload = {
+      general_data: { current_day: 'invalid-day' },
+      bars: {
+        '1': { name: 'Test Bar', neighborhood: 'Downtown', image_url: null, currently_open: true }
+      },
+      open_hours: {
+        '1': { SUN: { display_text: '4:00 PM - 2:00 AM' } }
+      },
+      specials: {
+        '11': { bar_id: 1, description: '$5 Beer', special_type: 'drink', all_day: false, start_time: '16:00', end_time: '18:00', current_status: 'active' }
+      },
+      specials_by_day: {
+        SUN: [{ bar_id: 1, specials: ['11'] }],
+        MON: [],
+        TUE: [],
+        WED: [],
+        THU: [],
+        FRI: [],
+        SAT: []
+      }
+    };
+    currentTab = 'specials';
+    activeFilters.types = [];
+    activeFilters.neighborhoods = [];
+  `, ctx);
+
+  ctx.renderBarsWeek();
+
+  const dayHeaders = document.querySelectorAll('.day-header-week');
+  assert.equal(dayHeaders[0].textContent.includes('(Today)'), false, 'does not infer Today from local client date');
+
+  const hasStatusLabel = document.querySelector('.open-hours .open, .open-hours .closed');
+  assert.equal(hasStatusLabel, null, 'does not render open/closed status without a valid payload current_day');
+});
+
