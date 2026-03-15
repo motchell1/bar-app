@@ -128,7 +128,8 @@ function buildSpecialItem(special, { isToday = false, clickable = false, onClick
     timeBadge.innerHTML = `${startFormatted}<br>${endFormatted}`;
   }
 
-  const currentStatus = special.current_status || null;
+  const rawStatus = special.current_status ?? special.status ?? null;
+  const currentStatus = typeof rawStatus === 'string' ? rawStatus.trim().toLowerCase() : null;
   if (!neutralTimeBadgeStyle && currentStatus === 'past') {
     timeBadge.classList.add('past');
   } else if (!neutralTimeBadgeStyle && !special.all_day && isToday && isSpecialPast(special, true)) {
