@@ -242,6 +242,8 @@ def build_startup_payload(device_id=None):
             'startup_payload': {
                 'general_data': {
                     'current_day': current_day_key,
+                    'current_time': now.strftime('%H:%M:%S'),
+                    'effective_current_time': effective_now.strftime('%H:%M:%S'),
                     'generated_at': now.isoformat()
                 },
                 'bars': bars_lookup,
