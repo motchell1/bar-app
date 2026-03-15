@@ -19,6 +19,8 @@ function buildHomeBarSpecials(bar, specialIds, dayKey, dayLabel) {
 
   let renderedSpecials = 0;
 
+  const isToday = dayKey === startupPayload?.general_data?.current_day;
+
   specialIds.forEach((specialId) => {
     const special = specialsLookup[specialId];
     if (!special) return;
@@ -27,7 +29,7 @@ function buildHomeBarSpecials(bar, specialIds, dayKey, dayLabel) {
     if (!typePass) return;
 
     const li = buildSpecialItem(special, {
-      isToday: true,
+      isToday,
       clickable: true,
       status: special.current_status,
       onClick: (event) => {
@@ -46,7 +48,6 @@ function buildHomeBarSpecials(bar, specialIds, dayKey, dayLabel) {
   const hoursDiv = document.createElement('div');
   hoursDiv.className = 'open-hours';
   const displayText = startupPayload?.open_hours?.[bar.bar_id]?.[dayKey]?.display_text;
-  const isToday = dayKey === startupPayload?.general_data?.current_day;
   const isCurrentlyOpen = bar.currently_open ?? bar.is_open_now;
 
   if (displayText) {

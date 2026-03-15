@@ -190,7 +190,7 @@ def build_startup_payload(device_id=None):
             key=lambda row: (
                 (DAY_INDEX.get(row['day_of_week'], 0) - DAY_INDEX.get(current_day_key, 0)) % 7,
                 row['bar_id'],
-                0 if row['all_day'] == 'Y' else 1,
+                1 if row['all_day'] == 'Y' else 0,
                 to_minutes(row['start_time']) if to_minutes(row['start_time']) is not None else 10 ** 9,
                 row['special_id']
             )
