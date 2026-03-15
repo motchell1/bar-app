@@ -453,7 +453,7 @@ test('renderBarsWeek shows today through next 6 days and open status only for to
       },
       specials: {
         '11': { bar_id: 1, description: '$5 Beer', special_type: 'drink', all_day: false, start_time: '16:00', end_time: '18:00', current_status: 'active' },
-        '22': { bar_id: 2, description: '$4 Wells', special_type: 'drink', all_day: false, start_time: '17:00', end_time: '19:00', current_status: 'upcoming' }
+        '22': { bar_id: 2, description: '$4 Wells', special_type: 'drink', all_day: true, start_time: null, end_time: null, current_status: 'upcoming' }
       },
       specials_by_day: {
         MON: [{ bar_id: 1, specials: ['11'] }],
@@ -486,4 +486,9 @@ test('renderBarsWeek shows today through next 6 days and open status only for to
 
   const futureStatus = openHours[1].querySelector('.open') || openHours[1].querySelector('.closed');
   assert.equal(futureStatus, null, 'future day card does not render open/closed status label');
+
+  const cards = document.querySelectorAll('.bar-card');
+  const futureSpecialItem = cards[1].querySelector('.special-item');
+  assert.equal(futureSpecialItem.classList.contains('live'), false, 'future all-day special should not render live styling');
+  assert.equal(cards[1].querySelector('.active-dot'), null, 'future all-day special should not render active dot');
 });
