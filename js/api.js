@@ -1,5 +1,6 @@
 const STARTUP_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaws.com/default/getStartupData';
 const SPECIAL_REPORT_API_URL = 'https://3kz7x6tvvi.execute-api.us-east-2.amazonaws.com/default/insertUserReport';
+const UPDATE_DEVICE_FAVORITE_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaws.com/default/updateDeviceFavorite';
 
 function buildLegacyBarsData(payload) {
   const barsLookup = payload?.bars || {};
@@ -63,10 +64,29 @@ async function loadBars() {
 }
 
 async function persistFavoriteChangeInBackground(specialId, isFavorited) {
-  // Placeholder for future backend persistence to device_favorite.
-  // Intentionally left unimplemented until the write endpoint is available.
-  void specialId;
-  void isFavorited;
+  if (!deviceId || specialId === null || specialId === undefined) return;
+
+  const payload = {
+    device_id: deviceId,
+    special_id: Number(specialId),
+    is_favorite: Boolean(isFavorited)
+  };
+
+  try {
+    const response = await fetch(UPDATE_DEVICE_FAVORITE_API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'text/plain'
+      },
+      body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+      console.error('Failed to persist favorite change:', response.status);
+    }
+  } catch (err) {
+    console.error('Failed to persist favorite change:', err);
+  }
 }
 
 async function submitSpecialReport(event) {
