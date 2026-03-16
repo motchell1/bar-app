@@ -37,26 +37,35 @@ def parse_csv_from_s3(bucket, key):
     csv_content = response['Body'].read().decode('utf-8-sig')
     rows = list(csv.reader(io.StringIO(csv_content)))
 
-    if len(rows) < 2:
-        raise ValueError('CSV must include metadata row and header row.')
+    if len(rows) < 3:
+        raise ValueError('CSV must include table row, transaction row, and header row.')
 
-    metadata_row = rows[0]
-    if len(metadata_row) < 2:
-        raise ValueError('Metadata row must include table name and transaction type.')
+    table_row = rows[0]
+    if not table_row:
+        raise ValueError('Row 1 must include table name.')
 
-    table_name = metadata_row[0].strip()
-    transaction_type = metadata_row[1].strip().upper()
+    table_name = table_row[0].strip()
+    if not table_name:
+        raise ValueError('Row 1 table name cannot be empty.')
 
-    headers = [header.strip() for header in rows[1] if header is not None]
+    transaction_row = rows[1]
+    if not transaction_row:
+        raise ValueError('Row 2 must include transaction type.')
+
+    transaction_type = transaction_row[0].strip().upper()
+    if not transaction_type:
+        raise ValueError('Row 2 transaction type cannot be empty.')
+
+    headers = [header.strip() for header in rows[2] if header is not None]
     if not headers or all(not header for header in headers):
-        raise ValueError('Header row is required and cannot be empty.')
+        raise ValueError('Row 3 header row is required and cannot be empty.')
 
     clean_headers = [header for header in headers if header]
     if len(clean_headers) != len(headers):
         raise ValueError('Header row contains empty column names.')
 
     data_rows = []
-    for row in rows[2:]:
+    for row in rows[3:]:
         if not row or all(not str(value).strip() for value in row):
             continue
 

@@ -14,7 +14,7 @@ The folders inside `functions/` each correspond to an AWS Lambda function.
   Used on the special details view. When a user marks a special for review, this function is called to insert a report record in the database.
 
 - **`loadCsvToMysql`**  
-  Loads CSV files from S3 into MySQL in RDS. This Lambda reads `S3_BUCKET` and `S3_DATA_FOLDER` from required environment variables, reads metadata from row 1 (`table_name`, `transaction_type`), uses row 2 as headers, and processes rows 3+ with batch SQL operations via `executemany()`. If no `key` is provided in the event, it automatically selects the oldest file in `${S3_DATA_FOLDER}/input/`.
+  Loads CSV files from S3 into MySQL in RDS. This Lambda reads `S3_BUCKET` and `S3_DATA_FOLDER` from required environment variables, reads table name from row 1, transaction type from row 2, uses row 3 as headers, and processes rows 4+ with batch SQL operations via `executemany()`. If no `key` is provided in the event, it automatically selects the oldest file in `${S3_DATA_FOLDER}/input/`.
 
   Supported tables:
   - `bar`
@@ -42,7 +42,8 @@ The folders inside `functions/` each correspond to an AWS Lambda function.
   CSV format:
 
   ```csv
-  bar,IU
+  bar
+  IU
   bar_id,name,address,neighborhood,image_url
   1,Mike's Beer Bar,123 North Shore Dr,North Shore,https://example.com/mike.jpg
   2,Cinderlands,456 Butler St,Lawrenceville,https://example.com/cinderlands.jpg
@@ -51,7 +52,8 @@ The folders inside `functions/` each correspond to an AWS Lambda function.
   Delete file format (`D` transaction only supports one key column):
 
   ```csv
-  special,D
+  special
+  D
   special_id
   55
   56
