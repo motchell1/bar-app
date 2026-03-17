@@ -15,7 +15,7 @@ S3_DATA_FOLDER = os.environ['S3_DATA_FOLDER']
 GOOGLE_TEXT_SEARCH_URL = 'https://maps.googleapis.com/maps/api/place/textsearch/json'
 BAR_TABLE_NAME = 'bar'
 TRANSACTION_TYPE = 'IU'
-CSV_HEADERS = ['name', 'google_place_id', 'address', 'neighborhood']
+CSV_HEADERS = ['name', 'google_place_id', 'address', 'neighborhood', 'is_active']
 BAR_KEYWORDS = {'bar', 'pub', 'tavern', 'lounge', 'saloon', 'cocktail', 'taproom', 'alehouse'}
 BAR_TYPES = {'bar', 'night_club'}
 RESTAURANT_TYPES = {'restaurant', 'food'}
@@ -186,7 +186,8 @@ def build_csv_records(places, neighborhood_name):
             'name': name.strip(),
             'google_place_id': place_id.strip(),
             'address': address.strip(),
-            'neighborhood': neighborhood_name
+            'neighborhood': neighborhood_name,
+            'is_active': 'Y'
         })
 
     records.sort(key=lambda row: (row['name'].lower(), row['google_place_id']))
@@ -206,7 +207,8 @@ def build_csv_content(records):
             record['name'],
             record['google_place_id'],
             record['address'],
-            record['neighborhood']
+            record['neighborhood'],
+            record['is_active']
         ])
 
     return output.getvalue()

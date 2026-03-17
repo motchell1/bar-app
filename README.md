@@ -131,7 +131,7 @@ The folders inside `functions/` each correspond to an AWS Lambda function.
   ```csv
   bar
   IU
-  name,google_place_id,address,neighborhood
+  name,google_place_id,address,neighborhood,is_active
   ```
 
   S3 destination pattern:
