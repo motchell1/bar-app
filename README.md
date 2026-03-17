@@ -87,6 +87,43 @@ The folders inside `functions/` each correspond to an AWS Lambda function.
   }
   ```
 
+- **`importNeighborhoodBars`**  
+  Imports new bars for a target neighborhood using Google Places text search and inserts only new rows into `bar`.
+
+  Supported input:
+  - `neighborhood` (string key; currently supports `downtown`)
+
+  Example event payload:
+
+  ```json
+  {
+    "neighborhood": "downtown"
+  }
+  ```
+
+  Required environment variables:
+  - `RDS_HOST`
+  - `DB_USER`
+  - `DB_PASSWORD`
+  - `DB_NAME`
+  - `GOOGLE_API_KEY`
+
+  Notes:
+  - DB environment variable pattern and DB connection style are copied from `insertUserReport`.
+  - Google API key environment variable naming is copied from `fetchGoogleAPIHours`.
+
+  High-level flow:
+  1. load neighborhood config
+  2. run Google Places searches
+  3. dedupe
+  4. query existing bars for the same neighborhood
+  5. remove already-known `google_place_id` values
+  6. polygon filter
+  7. restaurant-with-bar filter
+  8. insert new rows
+
+  The neighborhood config is reusable so additional neighborhoods (for example North Shore, Strip District, Lawrenceville, and Shadyside) can be added later without changing the core pipeline.
+
 ## Front-end integration
 
 - Favorites are now persisted in the background whenever a user favorites/unfavorites a special.
