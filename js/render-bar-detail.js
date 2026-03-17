@@ -41,25 +41,39 @@ function showDetail(barOrId, previousScreen = currentTab) {
   const openHoursForBar = startupPayload?.open_hours?.[String(selectedBar.bar_id)] || {};
 
   const hoursEl = document.getElementById('detail-hours');
+  const hoursEmptyEl = document.getElementById('detail-hours-empty');
   hoursEl.innerHTML = '';
 
-  orderedDays.forEach((day) => {
+  const hasAnyHours = orderedDays.some((day) => {
     const dayKey = getDayKeyFromName(day);
-    const hours = openHoursForBar[dayKey] || null;
-
-    const row = document.createElement('tr');
-    if (dayKey === todayKey) row.classList.add('today');
-
-    const dayCell = document.createElement('td');
-    dayCell.textContent = day;
-
-    const hoursCell = document.createElement('td');
-    hoursCell.textContent = hours?.display_text || '';
-
-    row.appendChild(dayCell);
-    row.appendChild(hoursCell);
-    hoursEl.appendChild(row);
+    return Boolean(openHoursForBar[dayKey]?.display_text);
   });
+
+  if (hasAnyHours) {
+    hoursEl.style.display = '';
+    hoursEmptyEl.style.display = 'none';
+
+    orderedDays.forEach((day) => {
+      const dayKey = getDayKeyFromName(day);
+      const hours = openHoursForBar[dayKey] || null;
+
+      const row = document.createElement('tr');
+      if (dayKey === todayKey) row.classList.add('today');
+
+      const dayCell = document.createElement('td');
+      dayCell.textContent = day;
+
+      const hoursCell = document.createElement('td');
+      hoursCell.textContent = hours?.display_text || '';
+
+      row.appendChild(dayCell);
+      row.appendChild(hoursCell);
+      hoursEl.appendChild(row);
+    });
+  } else {
+    hoursEl.style.display = 'none';
+    hoursEmptyEl.style.display = 'block';
+  }
 
   const specialsContainer = document.getElementById('detail-specials');
   specialsContainer.innerHTML = '';

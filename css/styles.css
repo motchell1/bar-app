@@ -485,7 +485,7 @@ body {
 }
 
 .detail-section h3 {
-  margin: 0;
+  margin: 0 0 12px;
   font-size: 1em;
   text-transform: uppercase;
   color: #555;
@@ -508,6 +508,16 @@ body {
 .open-hours-table tr.today {
   font-weight: bold;
   color: #007bff;
+}
+
+.detail-empty-state {
+  margin: 0;
+  font-size: 0.9em;
+  color: #666;
+}
+
+.detail-specials {
+  margin-top: 12px;
 }
 
 /* ===== Collapsible Specials by Day ===== */
@@ -573,6 +583,11 @@ body {
   background-color: transparent;
   border-radius: 0;
   min-height: 30px;
+  box-shadow: none;
+}
+
+#detail-screen .special-item.live {
+  box-shadow: none;
 }
 
 #detail-screen .special-item:last-child {
