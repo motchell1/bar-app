@@ -49,7 +49,9 @@ The folders inside `functions/` each correspond to an AWS Lambda function.
   2,Cinderlands,456 Butler St,Lawrenceville,https://example.com/cinderlands.jpg
   ```
 
-  Delete file format (`D` transaction only supports one key column):
+  Delete file format (`D` transaction):
+
+  Option 1 — provide primary key column(s) directly (fastest):
 
   ```csv
   special
@@ -59,6 +61,20 @@ The folders inside `functions/` each correspond to an AWS Lambda function.
   56
   57
   ```
+
+  Option 2 — provide non-primary-key lookup columns. The Lambda will run a `SELECT` using the provided header columns to find the matching row, resolve its primary key, and then delete by primary key:
+
+  ```csv
+  bar
+  D
+  name,google_place_id,neighborhood
+  Some Bar,ChIJ123,North Shore
+  ```
+
+  Notes for `D` transactions:
+  - If the CSV includes all primary key column(s), delete runs directly by primary key.
+  - If the CSV omits primary key column(s), each row must match exactly one database row; zero or multiple matches return an error.
+  - Composite primary keys are supported.
 
   Required environment variables:
   - `RDS_HOST`

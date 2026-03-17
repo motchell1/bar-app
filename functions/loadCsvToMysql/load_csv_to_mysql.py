@@ -90,10 +90,53 @@ def build_upsert_sql(table_name, columns):
     return f'{insert_sql} ON DUPLICATE KEY UPDATE {update_clause}'
 
 
+def build_where_clause(columns):
+    return ' AND '.join([f'{column} = %s' for column in columns])
+
+
 def build_delete_sql(table_name, columns):
-    if len(columns) != 1:
-        raise ValueError('Delete transaction requires exactly one key column in the header row.')
-    return f'DELETE FROM {table_name} WHERE {columns[0]} = %s'
+    return f'DELETE FROM {table_name} WHERE {build_where_clause(columns)}'
+
+
+def get_primary_key_columns(cursor, table_name):
+    cursor.execute(
+        """
+        SELECT COLUMN_NAME
+        FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE
+        WHERE TABLE_SCHEMA = %s
+          AND TABLE_NAME = %s
+          AND CONSTRAINT_NAME = 'PRIMARY'
+        ORDER BY ORDINAL_POSITION
+        """,
+        (DB_NAME, table_name)
+    )
+    rows = cursor.fetchall()
+    primary_keys = [row['COLUMN_NAME'] for row in rows]
+
+    if not primary_keys:
+        raise ValueError(f'Table {table_name} does not have a primary key, so delete cannot safely resolve rows.')
+
+    return primary_keys
+
+
+def resolve_primary_key_values(cursor, table_name, row_dict, match_columns, primary_key_columns):
+    lookup_sql = (
+        f"SELECT {', '.join(primary_key_columns)} "
+        f"FROM {table_name} "
+        f"WHERE {build_where_clause(match_columns)}"
+    )
+    lookup_values = tuple(row_dict[column] for column in match_columns)
+    cursor.execute(lookup_sql, lookup_values)
+    matches = cursor.fetchall()
+
+    if not matches:
+        raise ValueError(f'No row found in {table_name} for delete criteria: {row_dict}')
+
+    if len(matches) > 1:
+        raise ValueError(f'Delete criteria matched multiple rows in {table_name}: {row_dict}')
+
+    match = matches[0]
+    return tuple(match[column] for column in primary_key_columns)
 
 
 def move_file(bucket, source_key, destination_prefix):
@@ -152,9 +195,6 @@ def lambda_handler(event, context):
         if transaction_type not in ALLOWED_TRANSACTION_TYPES:
             raise ValueError(f'Unsupported transaction type: {transaction_type}')
 
-        if transaction_type == 'D' and len(columns) != 1:
-            raise ValueError('Delete transaction requires exactly one header column.')
-
         connection = get_connection()
         rows_processed = len(data_rows)
         rows_deleted = 0
@@ -174,9 +214,28 @@ def lambda_handler(event, context):
                     rows_updated = max(0, affected_rows - rows_processed)
                     rows_inserted = max(0, rows_processed - rows_updated)
                 else:
-                    sql = build_delete_sql(table_name, columns)
-                    cursor.executemany(sql, data_rows)
-                    rows_deleted = cursor.rowcount
+                    primary_key_columns = get_primary_key_columns(cursor, table_name)
+                    delete_sql = build_delete_sql(table_name, primary_key_columns)
+                    has_primary_key_in_csv = all(column in columns for column in primary_key_columns)
+
+                    delete_params = []
+                    for row in data_rows:
+                        row_dict = dict(zip(columns, row))
+                        if has_primary_key_in_csv:
+                            pk_values = tuple(row_dict[column] for column in primary_key_columns)
+                        else:
+                            pk_values = resolve_primary_key_values(
+                                cursor,
+                                table_name,
+                                row_dict,
+                                columns,
+                                primary_key_columns
+                            )
+                        delete_params.append(pk_values)
+
+                    if delete_params:
+                        cursor.executemany(delete_sql, delete_params)
+                        rows_deleted = cursor.rowcount
 
         connection.commit()
 
