@@ -1,10 +1,10 @@
-import pymysql
 import json
 import os
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
-# Environment variables
+import pymysql
+
 RDS_HOST = os.environ['RDS_HOST']
 DB_USER = os.environ['DB_USER']
 DB_PASSWORD = os.environ['DB_PASSWORD']
@@ -14,39 +14,43 @@ DAY_KEYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']
 DAY_INDEX = {day: idx for idx, day in enumerate(DAY_KEYS)}
 EASTERN_TZ = ZoneInfo('America/New_York')
 
-# Database connection helper
+
 def get_connection():
     return pymysql.connect(host=RDS_HOST, user=DB_USER, passwd=DB_PASSWORD, db=DB_NAME, connect_timeout=5)
 
-# Query helpers
-def query_bars(cursor):
-    cursor.execute("""
+
+def query_bar(cursor, bar_id):
+    cursor.execute(
+        """
         SELECT bar_id, name, neighborhood, image_url
         FROM bar
-        WHERE is_active = 'Y'
-        ORDER BY neighborhood, name
-    """)
+        WHERE bar_id = %s AND is_active = 'Y'
+        """,
+        (bar_id,)
+    )
+    return cursor.fetchone()
+
+
+def query_open_hours(cursor, bar_id):
+    cursor.execute(
+        "SELECT bar_id, day_of_week, open_time, close_time, is_closed FROM open_hours WHERE bar_id = %s",
+        (bar_id,)
+    )
     return cursor.fetchall()
 
-def query_open_hours(cursor, bar_ids=None):
-    if bar_ids:
-        placeholders = ', '.join(['%s'] * len(bar_ids))
-        cursor.execute(
-            f"SELECT bar_id, day_of_week, open_time, close_time, is_closed FROM open_hours WHERE bar_id IN ({placeholders})",
-            tuple(bar_ids)
-        )
-    else:
-        cursor.execute("SELECT bar_id, day_of_week, open_time, close_time, is_closed FROM open_hours")
-    return cursor.fetchall()
 
-def query_specials(cursor):
-    cursor.execute("""
+def query_specials(cursor, bar_id):
+    cursor.execute(
+        """
         SELECT special_id, bar_id, day_of_week, all_day, start_time, end_time, description, type
         FROM special
-        WHERE is_active = 'Y'
-        ORDER BY day_of_week, bar_id, all_day DESC, start_time, special_id
-    """)
+        WHERE bar_id = %s AND is_active = 'Y'
+        ORDER BY day_of_week, all_day DESC, start_time, special_id
+        """,
+        (bar_id,)
+    )
     return cursor.fetchall()
+
 
 def query_device_favorite_special_ids(cursor, device_id):
     if not device_id:
@@ -58,11 +62,9 @@ def query_device_favorite_special_ids(cursor, device_id):
     )
     return {str(row['special_id']) for row in cursor.fetchall()}
 
-def to_time_string(value):
-    if value is None:
-        return None
-    return str(value)
 
+def to_time_string(value):
+    return None if value is None else str(value)
 
 
 def get_hour_minute(time_value):
@@ -71,9 +73,7 @@ def get_hour_minute(time_value):
 
     if isinstance(time_value, timedelta):
         total_minutes = int(time_value.total_seconds() // 60)
-        hour = (total_minutes // 60) % 24
-        minute = total_minutes % 60
-        return hour, minute
+        return (total_minutes // 60) % 24, total_minutes % 60
 
     if hasattr(time_value, 'hour') and hasattr(time_value, 'minute'):
         return time_value.hour, time_value.minute
@@ -86,6 +86,8 @@ def get_hour_minute(time_value):
             return None, None
 
     return None, None
+
+
 def format_display_time(time_value):
     if time_value is None:
         return None
@@ -93,11 +95,13 @@ def format_display_time(time_value):
     hour, minute = get_hour_minute(time_value)
     if hour is None or minute is None:
         return None
+
     ampm = 'AM' if hour < 12 else 'PM'
     hour = hour % 12
     if hour == 0:
         hour = 12
     return f"{hour}:{minute:02d} {ampm}"
+
 
 def build_hours_display_text(open_time, close_time, is_closed):
     if is_closed == 'Y':
@@ -105,15 +109,16 @@ def build_hours_display_text(open_time, close_time, is_closed):
 
     open_text = format_display_time(open_time)
     close_text = format_display_time(close_time)
-
     if not open_text or not close_text:
         return 'Hours unavailable'
 
     return f"{open_text} – {close_text}"
 
+
 def to_minutes(time_value):
     if time_value is None:
         return None
+
     hour, minute = get_hour_minute(time_value)
     if hour is None or minute is None:
         return None
@@ -121,22 +126,13 @@ def to_minutes(time_value):
         return 24 * 60
     return (hour * 60) + minute
 
-def is_open_for_day(open_time, close_time, current_minutes):
-    open_minutes = to_minutes(open_time)
-    close_minutes = to_minutes(close_time)
 
-    if open_minutes is None or close_minutes is None:
-        return False
+def get_effective_now(now=None):
+    now = now or datetime.now(EASTERN_TZ)
+    if now.hour < 2:
+        return now - timedelta(days=1)
+    return now
 
-    adjusted_current_minutes = current_minutes
-    adjusted_close_minutes = close_minutes
-
-    if close_minutes < open_minutes:
-        adjusted_close_minutes = close_minutes + (24 * 60)
-        if adjusted_current_minutes < open_minutes:
-            adjusted_current_minutes += 24 * 60
-
-    return open_minutes <= adjusted_current_minutes <= adjusted_close_minutes
 
 def get_special_status(special_day, all_day, start_time, end_time, current_day_key, current_minutes):
     if special_day != current_day_key:
@@ -147,7 +143,6 @@ def get_special_status(special_day, all_day, start_time, end_time, current_day_k
 
     start_minutes = to_minutes(start_time)
     end_minutes = to_minutes(end_time)
-
     if start_minutes is None or end_minutes is None:
         return 'upcoming'
 
@@ -166,30 +161,24 @@ def get_special_status(special_day, all_day, start_time, end_time, current_day_k
     return 'active'
 
 
-def get_effective_now(now=None):
-    now = now or datetime.now(EASTERN_TZ)
-    if now.hour < 2:
-        return now - timedelta(days=1)
-    return now
-
-
 def get_ordered_day_keys(start_day_key):
     if start_day_key not in DAY_INDEX:
         return DAY_KEYS[:]
     start_index = DAY_INDEX[start_day_key]
     return DAY_KEYS[start_index:] + DAY_KEYS[:start_index]
 
-#Payload builder
-def build_startup_payload(device_id=None):
+
+def build_bar_details_payload(bar_id, device_id=None):
     conn = get_connection()
     try:
         with conn.cursor(pymysql.cursors.DictCursor) as cursor:
-            bars = query_bars(cursor)
-            hours = query_open_hours(cursor)
-            specials = query_specials(cursor)
-            favorite_special_ids = query_device_favorite_special_ids(cursor, device_id)
+            bar = query_bar(cursor, bar_id)
+            if not bar:
+                return None
 
-        active_bar_ids = {bar['bar_id'] for bar in bars}
+            open_hours_rows = query_open_hours(cursor, bar_id)
+            special_rows = query_specials(cursor, bar_id)
+            favorite_special_ids = query_device_favorite_special_ids(cursor, device_id)
 
         now = datetime.now(EASTERN_TZ)
         effective_now = get_effective_now(now)
@@ -199,62 +188,32 @@ def build_startup_payload(device_id=None):
             current_minutes += 24 * 60
         ordered_day_keys = get_ordered_day_keys(current_day_key)
 
-        specials = sorted(
-            specials,
+        open_hours = {}
+        for row in open_hours_rows:
+            day_key = row['day_of_week']
+            open_hours[day_key] = {
+                'open_time': to_time_string(row['open_time']),
+                'close_time': to_time_string(row['close_time']),
+                'display_text': build_hours_display_text(row['open_time'], row['close_time'], row['is_closed'])
+            }
+
+        specials = {}
+        specials_by_day = {day: [] for day in ordered_day_keys}
+
+        ordered_special_rows = sorted(
+            special_rows,
             key=lambda row: (
                 (DAY_INDEX.get(row['day_of_week'], 0) - DAY_INDEX.get(current_day_key, 0)) % 7,
-                row['bar_id'],
                 1 if row['all_day'] == 'Y' else 0,
                 to_minutes(row['start_time']) if to_minutes(row['start_time']) is not None else 10 ** 9,
                 row['special_id']
             )
         )
 
-        bars_lookup = {}
-        for bar in bars:
-            bars_lookup[str(bar['bar_id'])] = {
-                'name': bar['name'],
-                'neighborhood': bar['neighborhood'],
-                'image_url': bar['image_url'],
-                'is_open_now': False,
-                'has_special_this_week': False
-            }
-
-        bars_with_specials = {row['bar_id'] for row in specials if row['bar_id'] in active_bar_ids}
-
-        open_hours_lookup = {}
-        for row in hours:
-            if row['bar_id'] not in bars_with_specials:
-                continue
-            bar_id = str(row['bar_id'])
-            if bar_id not in open_hours_lookup:
-                open_hours_lookup[bar_id] = {}
-
-            day_key = row['day_of_week']
-            open_time = row['open_time']
-            close_time = row['close_time']
-
-            open_hours_lookup[bar_id][day_key] = {
-                'open_time': to_time_string(open_time),
-                'close_time': to_time_string(close_time),
-                'display_text': build_hours_display_text(open_time, close_time, row['is_closed'])
-            }
-
-            if day_key == current_day_key and row['is_closed'] != 'Y':
-                if is_open_for_day(open_time, close_time, current_minutes):
-                    bars_lookup.get(bar_id, {})['is_open_now'] = True
-
-        specials_lookup = {}
-        specials_by_day = {day: [] for day in ordered_day_keys}
-        day_bar_entries = {day: {} for day in ordered_day_keys}
-
-        for row in specials:
-            bar_id = str(row['bar_id'])
+        for row in ordered_special_rows:
             special_id = str(row['special_id'])
             day_key = row['day_of_week']
-            current_status = get_special_status(day_key, row['all_day'], row['start_time'], row['end_time'], current_day_key, current_minutes)
-
-            specials_lookup[special_id] = {
+            specials[special_id] = {
                 'bar_id': row['bar_id'],
                 'day': day_key,
                 'special_type': row['type'],
@@ -262,49 +221,50 @@ def build_startup_payload(device_id=None):
                 'all_day': row['all_day'] == 'Y',
                 'start_time': to_time_string(row['start_time']),
                 'end_time': to_time_string(row['end_time']),
-                'current_status': current_status,
+                'current_status': get_special_status(day_key, row['all_day'], row['start_time'], row['end_time'], current_day_key, current_minutes),
                 'favorite': special_id in favorite_special_ids
             }
+            specials_by_day.setdefault(day_key, []).append(special_id)
 
-            if bar_id in bars_lookup:
-                bars_lookup[bar_id]['has_special_this_week'] = True
-
-            if day_key not in day_bar_entries:
-                day_bar_entries[day_key] = {}
-                specials_by_day[day_key] = []
-
-            if bar_id not in day_bar_entries[day_key]:
-                entry = {
-                    'bar_id': row['bar_id'],
-                    'specials': []
-                }
-                day_bar_entries[day_key][bar_id] = entry
-                specials_by_day[day_key].append(entry)
-
-            day_bar_entries[day_key][bar_id]['specials'].append(row['special_id'])
-
-        payload = {
-            'startup_payload': {
+        return {
+            'bar_details_payload': {
+                'bar': {
+                    'bar_id': bar['bar_id'],
+                    'name': bar['name'],
+                    'neighborhood': bar['neighborhood'],
+                    'image_url': bar['image_url']
+                },
                 'general_data': {
                     'current_day': current_day_key,
                     'generated_at': now.isoformat()
                 },
-                'bars': bars_lookup,
-                'open_hours': open_hours_lookup,
-                'specials': specials_lookup,
+                'open_hours': open_hours,
+                'specials': specials,
                 'specials_by_day': specials_by_day
             }
         }
-
-        return payload
     finally:
         conn.close()
 
-# lambda handler
+
 def lambda_handler(event, context):
     query_params = (event or {}).get('queryStringParameters') or {}
+    bar_id = query_params.get('bar_id')
     device_id = query_params.get('device_id')
-    payload = build_startup_payload(device_id=device_id)
+
+    if not bar_id:
+        return {
+            'statusCode': 400,
+            'body': json.dumps({'error': 'bar_id is required'})
+        }
+
+    payload = build_bar_details_payload(bar_id=bar_id, device_id=device_id)
+    if payload is None:
+        return {
+            'statusCode': 404,
+            'body': json.dumps({'error': 'Bar not found'})
+        }
+
     return {
         'statusCode': 200,
         'body': json.dumps(payload)

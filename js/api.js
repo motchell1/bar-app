@@ -1,4 +1,5 @@
 const STARTUP_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaws.com/default/getStartupData';
+const BAR_DETAILS_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaws.com/default/getBarDetails';
 const SPECIAL_REPORT_API_URL = 'https://3kz7x6tvvi.execute-api.us-east-2.amazonaws.com/default/insertUserReport';
 const UPDATE_DEVICE_FAVORITE_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaws.com/default/updateDeviceFavorite';
 
@@ -45,12 +46,22 @@ function buildStartupUrl() {
   return url.toString();
 }
 
+function buildBarDetailsUrl(barId) {
+  const url = new URL(BAR_DETAILS_API_URL);
+  url.searchParams.set('bar_id', String(barId));
+  if (deviceId) {
+    url.searchParams.set('device_id', deviceId);
+  }
+  return url.toString();
+}
+
 async function loadBars() {
   try {
     const response = await fetch(buildStartupUrl());
     const data = await response.json();
     const parsed = typeof data.body === 'string' ? JSON.parse(data.body) : data;
     startupPayload = parsed.startup_payload || null;
+    barDetailsById = {};
 
     barsData = startupPayload ? buildLegacyBarsData(startupPayload) : [];
     generateNeighborhoodFilters();
@@ -61,6 +72,24 @@ async function loadBars() {
     renderCurrentTabData();
     hideInitialLoadingOverlay();
   }
+}
+
+async function loadBarDetails(barId) {
+  const normalizedBarId = String(barId);
+  if (barDetailsById[normalizedBarId]) {
+    return barDetailsById[normalizedBarId];
+  }
+
+  const response = await fetch(buildBarDetailsUrl(normalizedBarId));
+  const data = await response.json();
+  const parsed = typeof data.body === 'string' ? JSON.parse(data.body) : data;
+  const payload = parsed.bar_details_payload || null;
+
+  if (payload) {
+    barDetailsById[normalizedBarId] = payload;
+  }
+
+  return payload;
 }
 
 async function persistFavoriteChangeInBackground(specialId, isFavorited) {

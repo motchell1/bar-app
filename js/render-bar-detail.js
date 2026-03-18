@@ -21,24 +21,10 @@ function getBarFromPayload(barOrId) {
   };
 }
 
-function showDetail(barOrId, previousScreen = currentTab) {
-  const selectedBar = getBarFromPayload(barOrId) || (typeof barOrId === 'object' ? barOrId : null);
-  if (!selectedBar) return;
-
-  previousScreenState = { type: previousScreen };
-  document.getElementById('home-screen').style.display = 'none';
-  document.getElementById('bars-screen').style.display = 'none';
-  document.getElementById('favorites-screen').style.display = 'none';
-  document.getElementById('special-screen').style.display = 'none';
-  document.getElementById('detail-screen').style.display = 'block';
-  setScreenLayout(false);
-
-  document.getElementById('detail-image').src = selectedBar.image_url || '';
-  document.getElementById('detail-name').textContent = (selectedBar.name || '').toUpperCase();
-
-  const todayKey = startupPayload?.general_data?.current_day || getDayKeyFromName(DAYS_FULL[new Date().getDay()]);
+function renderBarDetailContent(selectedBar, detailPayload) {
+  const todayKey = detailPayload?.general_data?.current_day || startupPayload?.general_data?.current_day || getDayKeyFromName(DAYS_FULL[new Date().getDay()]);
   const orderedDays = getOrderedDaysForDetail(todayKey);
-  const openHoursForBar = startupPayload?.open_hours?.[String(selectedBar.bar_id)] || {};
+  const openHoursForBar = detailPayload?.open_hours || {};
 
   const hoursEl = document.getElementById('detail-hours');
   const hoursEmptyEl = document.getElementById('detail-hours-empty');
@@ -80,9 +66,7 @@ function showDetail(barOrId, previousScreen = currentTab) {
 
   orderedDays.forEach((day) => {
     const dayKey = getDayKeyFromName(day);
-    const dayEntries = startupPayload?.specials_by_day?.[dayKey] || [];
-    const barEntry = dayEntries.find((entry) => String(entry.bar_id) === String(selectedBar.bar_id));
-    const specialIds = barEntry?.specials || [];
+    const specialIds = detailPayload?.specials_by_day?.[dayKey] || [];
 
     const wrapper = document.createElement('div');
     wrapper.className = 'day-group';
@@ -106,7 +90,7 @@ function showDetail(barOrId, previousScreen = currentTab) {
 
     if (specialIds.length > 0) {
       specialIds.forEach((specialId) => {
-        const specialData = startupPayload?.specials?.[String(specialId)];
+        const specialData = detailPayload?.specials?.[String(specialId)];
         if (!specialData) return;
 
         const special = {
@@ -161,4 +145,45 @@ function showDetail(barOrId, previousScreen = currentTab) {
       }
     };
   });
+}
+
+async function showDetail(barOrId, previousScreen = currentTab) {
+  const selectedBar = getBarFromPayload(barOrId) || (typeof barOrId === 'object' ? barOrId : null);
+  if (!selectedBar) return;
+
+  previousScreenState = { type: previousScreen };
+  document.getElementById('home-screen').style.display = 'none';
+  document.getElementById('bars-screen').style.display = 'none';
+  document.getElementById('favorites-screen').style.display = 'none';
+  document.getElementById('special-screen').style.display = 'none';
+  document.getElementById('detail-screen').style.display = 'block';
+  setScreenLayout(false);
+
+  document.getElementById('detail-image').src = selectedBar.image_url || '';
+  document.getElementById('detail-name').textContent = (selectedBar.name || '').toUpperCase();
+
+  const hoursEl = document.getElementById('detail-hours');
+  const hoursEmptyEl = document.getElementById('detail-hours-empty');
+  const specialsContainer = document.getElementById('detail-specials');
+
+  hoursEl.innerHTML = '';
+  hoursEl.style.display = 'none';
+  hoursEmptyEl.style.display = 'block';
+  hoursEmptyEl.textContent = 'Loading open hours...';
+  specialsContainer.innerHTML = '<div class="no-specials-line" style="padding:12px;">Loading specials...</div>';
+
+  try {
+    const detailPayload = await loadBarDetails(selectedBar.bar_id);
+    if (!detailPayload) {
+      hoursEmptyEl.textContent = 'No open hours found';
+      specialsContainer.innerHTML = '<div class="no-specials-line" style="padding:12px;">Unable to load bar details.</div>';
+      return;
+    }
+
+    renderBarDetailContent(selectedBar, detailPayload);
+  } catch (err) {
+    console.error('Failed to load bar details:', err);
+    hoursEmptyEl.textContent = 'No open hours found';
+    specialsContainer.innerHTML = '<div class="no-specials-line" style="padding:12px;">Unable to load bar details.</div>';
+  }
 }
