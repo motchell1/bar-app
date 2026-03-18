@@ -14,7 +14,7 @@ S3_DATA_FOLDER = os.environ['S3_DATA_FOLDER']
 
 GOOGLE_TEXT_SEARCH_URL = 'https://maps.googleapis.com/maps/api/place/textsearch/json'
 BAR_TABLE_NAME = 'bar'
-TRANSACTION_TYPE = 'IU'
+TRANSACTION_TYPE = 'II'
 CSV_HEADERS = ['name', 'google_place_id', 'address', 'neighborhood', 'is_active']
 BAR_KEYWORDS = {'bar', 'pub', 'tavern', 'lounge', 'saloon', 'cocktail', 'taproom', 'alehouse'}
 BAR_TYPES = {'bar', 'night_club'}

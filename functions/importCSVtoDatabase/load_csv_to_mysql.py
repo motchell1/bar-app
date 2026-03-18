@@ -15,7 +15,7 @@ S3_BUCKET = os.environ['S3_BUCKET']
 S3_DATA_FOLDER = os.environ['S3_DATA_FOLDER']
 
 ALLOWED_TABLES = {'bar', 'special', 'open_hours'}
-ALLOWED_TRANSACTION_TYPES = {'I', 'IU', 'D'}
+ALLOWED_TRANSACTION_TYPES = {'I', 'II', 'IU', 'D'}
 
 s3_client = boto3.client('s3')
 
@@ -82,6 +82,12 @@ def build_insert_sql(table_name, columns):
     placeholders = ', '.join(['%s'] * len(columns))
     column_sql = ', '.join(columns)
     return f'INSERT INTO {table_name} ({column_sql}) VALUES ({placeholders})'
+
+
+def build_insert_ignore_sql(table_name, columns):
+    placeholders = ', '.join(['%s'] * len(columns))
+    column_sql = ', '.join(columns)
+    return f'INSERT IGNORE INTO {table_name} ({column_sql}) VALUES ({placeholders})'
 
 
 def build_upsert_sql(table_name, columns):
@@ -205,6 +211,10 @@ def lambda_handler(event, context):
             if rows_processed > 0:
                 if transaction_type == 'I':
                     sql = build_insert_sql(table_name, columns)
+                    cursor.executemany(sql, data_rows)
+                    rows_inserted = cursor.rowcount
+                elif transaction_type == 'II':
+                    sql = build_insert_ignore_sql(table_name, columns)
                     cursor.executemany(sql, data_rows)
                     rows_inserted = cursor.rowcount
                 elif transaction_type == 'IU':
