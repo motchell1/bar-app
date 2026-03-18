@@ -9,6 +9,7 @@ RDS_HOST = os.environ['RDS_HOST']
 DB_USER = os.environ['DB_USER']
 DB_PASSWORD = os.environ['DB_PASSWORD']
 DB_NAME = os.environ['DB_NAME']
+BAR_IMAGE_FOLDER_URL = os.environ['BAR_IMAGE_FOLDER_URL'].rstrip('/')
 
 DAY_KEYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']
 DAY_INDEX = {day: idx for idx, day in enumerate(DAY_KEYS)}
@@ -21,7 +22,7 @@ def get_connection():
 # Query helpers
 def query_bars(cursor):
     cursor.execute("""
-        SELECT bar_id, name, neighborhood, image_url
+        SELECT bar_id, name, neighborhood, image_file
         FROM bar
         WHERE is_active = 'Y'
         ORDER BY neighborhood, name
@@ -62,6 +63,12 @@ def to_time_string(value):
     if value is None:
         return None
     return str(value)
+
+
+def build_bar_image_url(image_file):
+    if not image_file:
+        return None
+    return f"{BAR_IMAGE_FOLDER_URL}/{str(image_file).lstrip('/')}"
 
 
 
@@ -215,7 +222,7 @@ def build_startup_payload(device_id=None):
             bars_lookup[str(bar['bar_id'])] = {
                 'name': bar['name'],
                 'neighborhood': bar['neighborhood'],
-                'image_url': bar['image_url'],
+                'image_url': build_bar_image_url(bar['image_file']),
                 'is_open_now': False,
                 'has_special_this_week': False
             }

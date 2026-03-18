@@ -19,10 +19,10 @@ def get_connection():
     return pymysql.connect(host=RDS_HOST, user=DB_USER, passwd=DB_PASSWORD, db=DB_NAME, connect_timeout=5)
 
 
-def query_bar(cursor, bar_id):
+def query_bar_exists(cursor, bar_id):
     cursor.execute(
         """
-        SELECT bar_id, name, neighborhood, image_url
+        SELECT bar_id
         FROM bar
         WHERE bar_id = %s AND is_active = 'Y'
         """,
@@ -161,7 +161,7 @@ def build_bar_details_payload(bar_id):
     conn = get_connection()
     try:
         with conn.cursor(pymysql.cursors.DictCursor) as cursor:
-            bar = query_bar(cursor, bar_id)
+            bar = query_bar_exists(cursor, bar_id)
             if not bar:
                 return None
 
@@ -215,12 +215,6 @@ def build_bar_details_payload(bar_id):
 
         return {
             'bar_details_payload': {
-                'bar': {
-                    'bar_id': bar['bar_id'],
-                    'name': bar['name'],
-                    'neighborhood': bar['neighborhood'],
-                    'image_url': bar['image_url']
-                },
                 'general_data': {
                     'current_day': current_day_key,
                     'generated_at': now.isoformat()
