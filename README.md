@@ -90,6 +90,56 @@ The folders inside `functions/` each correspond to an AWS Lambda function.
   - `s3:PutObject` on `data/complete/*` and `data/error/*`
   - `s3:DeleteObject` on `data/input/*`
 
+- **`buildNeighborhoodImportCsv`**  
+  Searches Google Places for bar candidates in a configured Pittsburgh neighborhood, filters and deduplicates results, generates a CSV using the existing import structure, and uploads it to the S3 import folder for manual review before running `loadCsvToMysql`.
+
+  Supported input:
+  - `neighborhood` (string key from neighborhood config; currently supports `downtown`)
+
+  Example event payload:
+
+  ```json
+  {
+    "neighborhood": "downtown"
+  }
+  ```
+
+  Required environment variables:
+  - `GOOGLE_API_KEY` (same variable name convention used by `fetchGoogleAPIHours`)
+  - `S3_BUCKET`
+  - `S3_DATA_FOLDER`
+
+  High-level flow:
+  1. Load neighborhood config.
+  2. Run Google Places text searches.
+  3. Deduplicate by `google_place_id`.
+  4. Apply polygon filter.
+  5. Apply restaurant-with-bar filter.
+  6. Generate CSV in existing import format.
+  7. Upload CSV to S3 import folder.
+  8. Manually review CSV.
+  9. Process CSV with `loadCsvToMysql`.
+
+  CSV structure used:
+  - row 1 = table name
+  - row 2 = transaction code
+  - row 3 = column names
+  - row 4+ = data rows
+
+  Current CSV output rows are:
+
+  ```csv
+  bar
+  IU
+  name,google_place_id,address,neighborhood,is_active
+  ```
+
+  S3 destination pattern:
+  - `${S3_DATA_FOLDER}/input/bar_import_<neighborhood>_<timestamp>.csv`
+
+  Design note:
+  - The Lambda is neighborhood-config driven so additional neighborhoods can be added later by configuration (for example North Shore, Strip District, Lawrenceville, Shadyside) without rewriting the import flow.
+
 - **`updateDeviceFavorite`**  
   Updates records in `device_favorite` for a given `device_id` and `special_id`. Pass `is_favorite: true` to insert (or keep) a favorite row, and `is_favorite: false` to delete the row.
 
