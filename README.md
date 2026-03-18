@@ -5,7 +5,10 @@ The folders inside `functions/` each correspond to an AWS Lambda function.
 ## Lambda functions
 
 - **`getStartupData`**  
-  Returns the startup payload used when the app launches.
+  Returns the startup payload used when the app launches. This payload now includes only active bars and only open-hours rows for bars that currently have an active special in the returned week view. Bars with `has_special_this_week = true` already have the detail-screen hours/specials needed by the client in startup data.
+
+- **`getBarDetails`**  
+  Returns only open hours and specials for a single active bar when the user opens the bar details screen. The client should call this only for bars whose details were not already included in `getStartupData` (for example, bars where `has_special_this_week = false`).
 
 - **`refreshOpenHours`**  
   Works together with **`fetchGoogleAPIHours`** to retrieve current open-hours data directly from Google and update the database. This process is currently triggered manually.

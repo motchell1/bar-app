@@ -167,6 +167,7 @@ function loadAppWithoutBoot(document) {
     console,
     document,
     window: { document, localStorage },
+    URL,
     localStorage,
     lucide: { createIcons() {} },
     fetch: async () => ({ json: async () => ({ bars: [] }) }),
@@ -212,6 +213,27 @@ function mountBaseNodes(document) {
   bars.setAttribute('id', 'bars-screen');
   const detail = document.createElement('div');
   detail.setAttribute('id', 'detail-screen');
+
+  const detailImage = document.createElement('img');
+  detailImage.setAttribute('id', 'detail-image');
+  detail.appendChild(detailImage);
+
+  const detailName = document.createElement('div');
+  detailName.setAttribute('id', 'detail-name');
+  detail.appendChild(detailName);
+
+  const detailHours = document.createElement('table');
+  detailHours.setAttribute('id', 'detail-hours');
+  detail.appendChild(detailHours);
+
+  const detailHoursEmpty = document.createElement('p');
+  detailHoursEmpty.setAttribute('id', 'detail-hours-empty');
+  detail.appendChild(detailHoursEmpty);
+
+  const detailSpecials = document.createElement('div');
+  detailSpecials.setAttribute('id', 'detail-specials');
+  detail.appendChild(detailSpecials);
+
   const special = document.createElement('div');
   special.setAttribute('id', 'special-screen');
   document.body.appendChild(home);
@@ -491,4 +513,124 @@ test('renderBarsWeek shows today through next 6 days and open status only for to
   const futureSpecialItem = cards[1].querySelector('.special-item');
   assert.equal(futureSpecialItem.classList.contains('live'), false, 'future all-day special should not render live styling');
   assert.equal(cards[1].querySelector('.active-dot'), null, 'future all-day special should not render active dot');
+});
+
+
+test('showDetail reuses startup payload details when has_special_this_week is true', async () => {
+  const document = new DocumentMock();
+  mountBaseNodes(document);
+  const ctx = loadAppWithoutBoot(document);
+
+  const calls = [];
+  ctx.fetch = async (url) => {
+    calls.push(String(url));
+    return { json: async () => ({}) };
+  };
+
+  vm.runInContext(`
+    startupPayload = {
+      general_data: { current_day: 'MON' },
+      bars: {
+        '1': { name: 'Startup Bar', neighborhood: 'Downtown', image_url: 'bar.jpg', is_open_now: false, has_special_this_week: true }
+      },
+      open_hours: {
+        '1': { MON: { display_text: '4:00 PM – 10:00 PM', open_time: '16:00', close_time: '22:00' } }
+      },
+      specials: {
+        '11': {
+          bar_id: 1,
+          day: 'MON',
+          special_type: 'drink',
+          description: '$5 Beer',
+          all_day: false,
+          start_time: '16:00',
+          end_time: '18:00',
+          current_status: 'active'
+        }
+      },
+      specials_by_day: {
+        MON: [{ bar_id: 1, specials: ['11'] }],
+        TUE: [],
+        WED: [],
+        THU: [],
+        FRI: [],
+        SAT: [],
+        SUN: []
+      }
+    };
+  `, ctx);
+
+  await ctx.showDetail(1, 'bars');
+
+  assert.equal(calls.length, 0, 'does not fetch when startup payload already has this week details');
+  assert.equal(document.getElementById('detail-name').textContent, 'STARTUP BAR');
+  assert.equal(document.getElementById('detail-hours').children.length > 0, true, 'renders startup open hours');
+  assert.equal(document.querySelectorAll('.special-item').length > 0, true, 'renders startup specials');
+});
+
+
+test('showDetail fetches and renders bar-specific hours and specials', async () => {
+  const document = new DocumentMock();
+  mountBaseNodes(document);
+  const ctx = loadAppWithoutBoot(document);
+
+  const calls = [];
+  ctx.fetch = async (url) => {
+    calls.push(String(url));
+    return {
+      json: async () => ({
+        bar_details_payload: {
+          general_data: { current_day: 'MON' },
+          open_hours: {
+            MON: { display_text: '4:00 PM – 10:00 PM', open_time: '16:00', close_time: '22:00' }
+          },
+          specials: {
+            '11': {
+              bar_id: 1,
+              day: 'MON',
+              special_type: 'drink',
+              description: '$5 Beer',
+              all_day: false,
+              start_time: '16:00',
+              end_time: '18:00',
+              current_status: 'active'
+            }
+          },
+          specials_by_day: {
+            MON: ['11'],
+            TUE: [],
+            WED: [],
+            THU: [],
+            FRI: [],
+            SAT: [],
+            SUN: []
+          }
+        }
+      })
+    };
+  };
+
+  vm.runInContext(`
+    startupPayload = {
+      general_data: { current_day: 'MON' },
+      bars: {
+        '1': { name: 'Detail Bar', neighborhood: 'Downtown', image_url: 'bar.jpg', is_open_now: false, has_special_this_week: false }
+      },
+      open_hours: {},
+      specials: {},
+      specials_by_day: { MON: [], TUE: [], WED: [], THU: [], FRI: [], SAT: [], SUN: [] }
+    };
+  `, ctx);
+
+  await ctx.showDetail(1, 'bars');
+
+  assert.equal(calls.length, 1, 'fetches bar details only when startup payload does not already include this week details');
+  assert.match(calls[0], /getBarDetails/);
+  assert.doesNotMatch(calls[0], /device_id=/, 'does not send favorite-related device info to bar details endpoint');
+  assert.equal(document.getElementById('detail-name').textContent, 'DETAIL BAR');
+  assert.equal(document.getElementById('detail-hours').children.length > 0, true, 'renders fetched open hours');
+  assert.equal(document.querySelectorAll('.special-item').length > 0, true, 'renders fetched specials');
+
+  await ctx.showDetail(1, 'bars');
+  assert.equal(calls.length, 1, 'reuses cached bar details on second open');
 });
