@@ -28,7 +28,8 @@ def get_connection():
         user=DB_USER,
         passwd=DB_PASSWORD,
         db=DB_NAME,
-        cursorclass=pymysql.cursors.DictCursor
+        cursorclass=pymysql.cursors.DictCursor,
+        autocommit=False
     )
 
 
@@ -65,15 +66,23 @@ def parse_csv_from_s3(bucket, key):
         raise ValueError('Header row contains empty column names.')
 
     data_rows = []
-    for row in rows[3:]:
+    for row_number, row in enumerate(rows[3:], start=4):
         if not row or all(not str(value).strip() for value in row):
             continue
 
         normalized_row = [value.strip() if isinstance(value, str) else value for value in row]
+        row_error = None
         if len(normalized_row) != len(clean_headers):
-            raise ValueError(f'Malformed CSV data row. Expected {len(clean_headers)} columns but found {len(normalized_row)}.')
+            row_error = (
+                f'Row {row_number}: malformed CSV data row. Expected {len(clean_headers)} columns '
+                f'but found {len(normalized_row)}.'
+            )
 
-        data_rows.append(tuple(normalized_row))
+        data_rows.append({
+            'row_number': row_number,
+            'values': normalized_row,
+            'error': row_error
+        })
 
     return table_name, transaction_type, clean_headers, data_rows
 
@@ -82,6 +91,12 @@ def build_insert_sql(table_name, columns):
     placeholders = ', '.join(['%s'] * len(columns))
     column_sql = ', '.join(columns)
     return f'INSERT INTO {table_name} ({column_sql}) VALUES ({placeholders})'
+
+
+def build_insert_ignore_sql(table_name, columns):
+    placeholders = ', '.join(['%s'] * len(columns))
+    column_sql = ', '.join(columns)
+    return f'INSERT IGNORE INTO {table_name} ({column_sql}) VALUES ({placeholders})'
 
 
 def build_upsert_sql(table_name, columns):
@@ -139,16 +154,42 @@ def resolve_primary_key_values(cursor, table_name, row_dict, match_columns, prim
     return tuple(match[column] for column in primary_key_columns)
 
 
-def move_file(bucket, source_key, destination_prefix):
+def build_s3_destination_key(source_key, destination_prefix):
     filename = source_key.split('/')[-1]
     timestamp = datetime.utcnow().strftime('%Y%m%d_%H%M%S')
-    destination_key = f"{destination_prefix.rstrip('/')}/{timestamp}_{filename}"
+    return f"{destination_prefix.rstrip('/')}/{timestamp}_{filename}"
+
+
+def move_file(bucket, source_key, destination_prefix):
+    destination_key = build_s3_destination_key(source_key, destination_prefix)
 
     s3_client.copy_object(
         Bucket=bucket,
         CopySource={'Bucket': bucket, 'Key': source_key},
         Key=destination_key
     )
+    s3_client.delete_object(Bucket=bucket, Key=source_key)
+
+    return destination_key
+
+
+def upload_error_file(bucket, source_key, destination_prefix, table_name, transaction_type, columns, data_rows):
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow([table_name])
+    writer.writerow([transaction_type])
+    writer.writerow(columns + ['Error'])
+
+    for row in data_rows:
+        values = list(row['values'])
+        if len(values) < len(columns):
+            values.extend([''] * (len(columns) - len(values)))
+        if len(values) > len(columns):
+            values = values[:len(columns)]
+        writer.writerow(values + [row.get('error', '') or ''])
+
+    destination_key = build_s3_destination_key(source_key, destination_prefix)
+    s3_client.put_object(Bucket=bucket, Key=destination_key, Body=output.getvalue().encode('utf-8'))
     s3_client.delete_object(Bucket=bucket, Key=source_key)
 
     return destination_key
@@ -165,6 +206,45 @@ def find_input_file_key(bucket, input_prefix):
 
     file_keys.sort(key=lambda item: item.get('LastModified'))
     return file_keys[0]['Key']
+
+
+def process_insert_row(cursor, table_name, columns, row_values):
+    sql = build_insert_ignore_sql(table_name, columns)
+    cursor.execute(sql, tuple(row_values))
+    if cursor.rowcount == 1:
+        return 'inserted'
+    return 'ignored'
+
+
+def process_upsert_row(cursor, table_name, columns, row_values):
+    sql = build_upsert_sql(table_name, columns)
+    cursor.execute(sql, tuple(row_values))
+    if cursor.rowcount == 1:
+        return 'inserted'
+    if cursor.rowcount == 2:
+        return 'updated'
+    return 'ignored'
+
+
+def process_delete_row(cursor, table_name, columns, row_values, primary_key_columns, has_primary_key_in_csv):
+    row_dict = dict(zip(columns, row_values))
+
+    if has_primary_key_in_csv:
+        delete_values = tuple(row_dict[column] for column in primary_key_columns)
+    else:
+        delete_values = resolve_primary_key_values(
+            cursor,
+            table_name,
+            row_dict,
+            columns,
+            primary_key_columns
+        )
+
+    delete_sql = build_delete_sql(table_name, primary_key_columns)
+    cursor.execute(delete_sql, delete_values)
+    if cursor.rowcount > 0:
+        return 'deleted'
+    return 'ignored'
 
 
 def lambda_handler(event, context):
@@ -196,60 +276,84 @@ def lambda_handler(event, context):
             raise ValueError(f'Unsupported transaction type: {transaction_type}')
 
         connection = get_connection()
-        rows_processed = len(data_rows)
-        rows_deleted = 0
-        rows_inserted = 0
-        rows_updated = 0
+        summary = {
+            'rows_processed': len(data_rows),
+            'rows_inserted': 0,
+            'rows_updated': 0,
+            'rows_deleted': 0,
+            'rows_ignored': 0,
+            'rows_errored': 0
+        }
 
         with connection.cursor() as cursor:
-            if rows_processed > 0:
-                if transaction_type == 'I':
-                    sql = build_insert_sql(table_name, columns)
-                    cursor.executemany(sql, data_rows)
-                    rows_inserted = cursor.rowcount
-                elif transaction_type == 'IU':
-                    sql = build_upsert_sql(table_name, columns)
-                    cursor.executemany(sql, data_rows)
-                    affected_rows = cursor.rowcount
-                    rows_updated = max(0, affected_rows - rows_processed)
-                    rows_inserted = max(0, rows_processed - rows_updated)
-                else:
-                    primary_key_columns = get_primary_key_columns(cursor, table_name)
-                    delete_sql = build_delete_sql(table_name, primary_key_columns)
-                    has_primary_key_in_csv = all(column in columns for column in primary_key_columns)
+            primary_key_columns = []
+            has_primary_key_in_csv = False
+            if transaction_type == 'D' and data_rows:
+                primary_key_columns = get_primary_key_columns(cursor, table_name)
+                has_primary_key_in_csv = all(column in columns for column in primary_key_columns)
 
-                    delete_params = []
-                    for row in data_rows:
-                        row_dict = dict(zip(columns, row))
-                        if has_primary_key_in_csv:
-                            pk_values = tuple(row_dict[column] for column in primary_key_columns)
-                        else:
-                            pk_values = resolve_primary_key_values(
-                                cursor,
-                                table_name,
-                                row_dict,
-                                columns,
-                                primary_key_columns
-                            )
-                        delete_params.append(pk_values)
+            for row in data_rows:
+                if row.get('error'):
+                    summary['rows_errored'] += 1
+                    continue
 
-                    if delete_params:
-                        cursor.executemany(delete_sql, delete_params)
-                        rows_deleted = cursor.rowcount
+                try:
+                    if transaction_type == 'I':
+                        result = process_insert_row(cursor, table_name, columns, row['values'])
+                    elif transaction_type == 'IU':
+                        result = process_upsert_row(cursor, table_name, columns, row['values'])
+                    else:
+                        result = process_delete_row(
+                            cursor,
+                            table_name,
+                            columns,
+                            row['values'],
+                            primary_key_columns,
+                            has_primary_key_in_csv
+                        )
+
+                    if result == 'inserted':
+                        summary['rows_inserted'] += 1
+                    elif result == 'updated':
+                        summary['rows_updated'] += 1
+                    elif result == 'deleted':
+                        summary['rows_deleted'] += 1
+                    else:
+                        summary['rows_ignored'] += 1
+                except Exception as row_error:
+                    row['error'] = f"Row {row['row_number']}: {row_error}"
+                    summary['rows_errored'] += 1
 
         connection.commit()
 
-        completed_key = move_file(bucket, key, complete_prefix)
-        summary = {
-            'status': 'success',
+        completed_key = None
+        error_key = None
+        if summary['rows_errored'] > 0:
+            error_key = upload_error_file(
+                bucket,
+                key,
+                error_prefix,
+                table_name,
+                transaction_type,
+                columns,
+                data_rows
+            )
+        else:
+            completed_key = move_file(bucket, key, complete_prefix)
+
+        response_status = 'partial_success' if summary['rows_errored'] > 0 else 'success'
+        response_message = None
+        if summary['rows_errored'] > 0:
+            response_message = 'One or more rows were skipped. Review the annotated error file for details.'
+
+        summary.update({
+            'status': response_status,
+            'message': response_message,
             'table': table_name,
             'transaction_type': transaction_type,
-            'rows_processed': rows_processed,
-            'rows_inserted': rows_inserted,
-            'rows_updated': rows_updated,
-            'rows_deleted': rows_deleted,
-            'completed_key': completed_key
-        }
+            'completed_key': completed_key,
+            'error_key': error_key
+        })
 
         return {
             'statusCode': 200,

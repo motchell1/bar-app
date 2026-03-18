@@ -16,8 +16,8 @@ The folders inside `functions/` each correspond to an AWS Lambda function.
 - **`insertUserReport`**  
   Used on the special details view. When a user marks a special for review, this function is called to insert a report record in the database.
 
-- **`loadCsvToMysql`**  
-  Loads CSV files from S3 into MySQL in RDS. This Lambda reads `S3_BUCKET` and `S3_DATA_FOLDER` from required environment variables, reads table name from row 1, transaction type from row 2, uses row 3 as headers, and processes rows 4+ with batch SQL operations via `executemany()`. If no `key` is provided in the event, it automatically selects the oldest file in `${S3_DATA_FOLDER}/input/`.
+- **`importCSVtoDatabase`**  
+  Loads CSV files from S3 into MySQL in RDS. This Lambda reads `S3_BUCKET` and `S3_DATA_FOLDER` from required environment variables, reads table name from row 1, transaction type from row 2, uses row 3 as headers, and processes rows 4+ one row at a time so it can report accurate inserted/updated/deleted/ignored/errored counts. If no `key` is provided in the event, it automatically selects the oldest file in `${S3_DATA_FOLDER}/input/`.
 
   Supported tables:
   - `bar`
@@ -35,6 +35,13 @@ The folders inside `functions/` each correspond to an AWS Lambda function.
   - failed files: `data/error/`
 
   Files are moved using S3 copy + delete, with a UTC timestamp prefix added to avoid overwrites.
+
+  Response behavior:
+  - `I` transactions use `INSERT IGNORE`, so duplicate-key rows are counted as `rows_ignored` instead of failing the whole file.
+  - `IU` transactions count each row as inserted, updated, or ignored based on the per-row MySQL result.
+  - Row-level errors are skipped instead of aborting the full import.
+  - If any rows error, the original file is rewritten to `data/error/` with an added `Error` column describing each failed row.
+  - If no rows error, the file is moved to `data/complete/`.
 
   Example event payload:
 
@@ -94,8 +101,8 @@ The folders inside `functions/` each correspond to an AWS Lambda function.
   - `s3:PutObject` on `data/complete/*` and `data/error/*`
   - `s3:DeleteObject` on `data/input/*`
 
-- **`buildNeighborhoodImportCsv`**  
-  Searches Google Places for bar candidates in a configured Pittsburgh neighborhood, filters and deduplicates results, generates a CSV using the existing import structure, and uploads it to the S3 import folder for manual review before running `loadCsvToMysql`.
+- **`findAllBarsByNeighborhood`**  
+  Searches Google Places for bar candidates in a configured Pittsburgh neighborhood, filters and deduplicates results, generates a CSV using the existing import structure, and uploads it to the S3 import folder for manual review before running `importCSVtoDatabase`.
 
   Supported input:
   - `neighborhood` (string key from neighborhood config; currently supports `downtown`)
@@ -122,7 +129,7 @@ The folders inside `functions/` each correspond to an AWS Lambda function.
   6. Generate CSV in existing import format.
   7. Upload CSV to S3 import folder.
   8. Manually review CSV.
-  9. Process CSV with `loadCsvToMysql`.
+  9. Process CSV with `importCSVtoDatabase`.
 
   CSV structure used:
   - row 1 = table name
