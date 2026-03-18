@@ -64,6 +64,15 @@ def lambda_handler(event, context):
             for bar in google_bars:
                 bar_id = bar['bar_id']
                 hours = bar['hours']
+                business_status = bar.get('business_status')
+                is_active = 'Y' if business_status in (None, 'OPERATIONAL') else 'N'
+
+                cursor.execute("""
+                    UPDATE bar
+                    SET is_active = %s,
+                        update_date = NOW()
+                    WHERE bar_id = %s
+                """, (is_active, bar_id))
 
                 for day, value in hours.items():
                     if value == "CLOSED":
