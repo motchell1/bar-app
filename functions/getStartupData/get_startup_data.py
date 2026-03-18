@@ -24,7 +24,7 @@ def query_bars(cursor):
         SELECT bar_id, name, neighborhood, image_url
         FROM bar
         WHERE is_active = 'Y'
-        ORDER BY neighborhood, name
+        ORDER BY name
     """)
     return cursor.fetchall()
 
