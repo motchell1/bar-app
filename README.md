@@ -47,9 +47,9 @@ The folders inside `functions/` each correspond to an AWS Lambda function.
   ```csv
   bar
   IU
-  bar_id,name,address,neighborhood,image_url
-  1,Mike's Beer Bar,123 North Shore Dr,North Shore,https://example.com/mike.jpg
-  2,Cinderlands,456 Butler St,Lawrenceville,https://example.com/cinderlands.jpg
+  bar_id,name,address,neighborhood,image_file
+  1,Mike's Beer Bar,123 North Shore Dr,North Shore,mike.jpg
+  2,Cinderlands,456 Butler St,Lawrenceville,cinderlands.jpg
   ```
 
   Delete file format (`D` transaction):
@@ -84,6 +84,7 @@ The folders inside `functions/` each correspond to an AWS Lambda function.
   - `DB_USER`
   - `DB_PASSWORD`
   - `DB_NAME`
+  - `BAR_IMAGE_FOLDER_URL` (used by `getStartupData` and `getBarDetails` to build full bar image URLs from `image_file`)
   - `S3_BUCKET`
   - `S3_DATA_FOLDER`
 
