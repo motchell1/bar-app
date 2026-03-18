@@ -20,11 +20,23 @@ def get_connection():
 
 # Query helpers
 def query_bars(cursor):
-    cursor.execute("SELECT bar_id, name, neighborhood, image_url FROM bar ORDER BY neighborhood, name")
+    cursor.execute("""
+        SELECT bar_id, name, neighborhood, image_url
+        FROM bar
+        WHERE is_active = 'Y'
+        ORDER BY neighborhood, name
+    """)
     return cursor.fetchall()
 
-def query_open_hours(cursor):
-    cursor.execute("SELECT bar_id, day_of_week, open_time, close_time, is_closed FROM open_hours")
+def query_open_hours(cursor, bar_ids=None):
+    if bar_ids:
+        placeholders = ', '.join(['%s'] * len(bar_ids))
+        cursor.execute(
+            f"SELECT bar_id, day_of_week, open_time, close_time, is_closed FROM open_hours WHERE bar_id IN ({placeholders})",
+            tuple(bar_ids)
+        )
+    else:
+        cursor.execute("SELECT bar_id, day_of_week, open_time, close_time, is_closed FROM open_hours")
     return cursor.fetchall()
 
 def query_specials(cursor):
@@ -177,6 +189,8 @@ def build_startup_payload(device_id=None):
             specials = query_specials(cursor)
             favorite_special_ids = query_device_favorite_special_ids(cursor, device_id)
 
+        active_bar_ids = {bar['bar_id'] for bar in bars}
+
         now = datetime.now(EASTERN_TZ)
         effective_now = get_effective_now(now)
         current_day_key = effective_now.strftime('%a').upper()
@@ -206,8 +220,12 @@ def build_startup_payload(device_id=None):
                 'has_special_this_week': False
             }
 
+        bars_with_specials = {row['bar_id'] for row in specials if row['bar_id'] in active_bar_ids}
+
         open_hours_lookup = {}
         for row in hours:
+            if row['bar_id'] not in bars_with_specials:
+                continue
             bar_id = str(row['bar_id'])
             if bar_id not in open_hours_lookup:
                 open_hours_lookup[bar_id] = {}
