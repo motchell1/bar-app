@@ -18,14 +18,18 @@ ALL_DAYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']
 
 # Google Places API helper
 def fetch_place_open_hours(place_id):
-    url = f'https://maps.googleapis.com/maps/api/place/details/json?place_id={place_id}&fields=opening_hours&key={GOOGLE_API_KEY}'
+    url = f'https://maps.googleapis.com/maps/api/place/details/json?place_id={place_id}&fields=opening_hours,business_status&key={GOOGLE_API_KEY}'
     response = requests.get(url, timeout=5)
     if response.status_code != 200:
-        print(f"Error fetching place {place_id}: {resp.text}")
+        print(f"Error fetching place {place_id}: {response.text}")
         return None
 
     data = response.json()
-    return data.get('result', {}).get('opening_hours', {}).get('periods', [])
+    result = data.get('result', {})
+    return {
+        'business_status': result.get('business_status'),
+        'periods': result.get('opening_hours', {}).get('periods', [])
+    }
 
 # Lambda function handler
 def lambda_handler(event, context):
@@ -38,7 +42,9 @@ def lambda_handler(event, context):
         bar_id = bar['bar_id']
         place_id = bar['google_place_id']
 
-        periods = fetch_place_open_hours(place_id)
+        place_details = fetch_place_open_hours(place_id) or {}
+        periods = place_details.get('periods', [])
+        business_status = place_details.get('business_status')
 
         # Initialize all days as CLOSED
         hours_map = {day: "CLOSED" for day in ALL_DAYS}
@@ -56,7 +62,8 @@ def lambda_handler(event, context):
 
         result.append({
             'bar_id': bar_id,
-            'hours': hours_map
+            'hours': hours_map,
+            'business_status': business_status
         })
     
     return {
