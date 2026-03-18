@@ -94,7 +94,7 @@ The folders inside `functions/` each correspond to an AWS Lambda function.
   - `s3:PutObject` on `data/complete/*` and `data/error/*`
   - `s3:DeleteObject` on `data/input/*`
 
-- **`findAllBarsByNeighorhood`**  
+- **`findAllBarsByNeighborhood`**  
   Searches Google Places for bar candidates in a configured Pittsburgh neighborhood, filters and deduplicates results, generates a CSV using the existing import structure, and uploads it to the S3 import folder for manual review before running `importCSVtoDatabase`.
 
   Supported input:
