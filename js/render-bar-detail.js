@@ -21,6 +21,45 @@ function getBarFromPayload(barOrId) {
   };
 }
 
+function buildBarDetailPayloadFromStartup(barId) {
+  const normalizedBarId = String(barId);
+  const barData = startupPayload?.bars?.[normalizedBarId];
+  if (!barData || barData.has_special_this_week !== true) {
+    return null;
+  }
+
+  const generalData = startupPayload?.general_data || {};
+  const startupSpecials = startupPayload?.specials || {};
+  const startupSpecialsByDay = startupPayload?.specials_by_day || {};
+  const detailSpecials = {};
+  const detailSpecialsByDay = {};
+
+  Object.entries(startupSpecialsByDay).forEach(([dayKey, entries]) => {
+    const barEntry = (entries || []).find((entry) => String(entry.bar_id) === normalizedBarId);
+    const specialIds = barEntry?.specials || [];
+    detailSpecialsByDay[dayKey] = specialIds.map(String);
+
+    specialIds.forEach((specialId) => {
+      const special = startupSpecials[String(specialId)];
+      if (!special) return;
+      detailSpecials[String(specialId)] = special;
+    });
+  });
+
+  return {
+    bar: {
+      bar_id: Number(normalizedBarId),
+      name: barData.name,
+      neighborhood: barData.neighborhood,
+      image_url: barData.image_url
+    },
+    general_data: generalData,
+    open_hours: startupPayload?.open_hours?.[normalizedBarId] || {},
+    specials: detailSpecials,
+    specials_by_day: detailSpecialsByDay
+  };
+}
+
 function renderBarDetailContent(selectedBar, detailPayload) {
   const todayKey = detailPayload?.general_data?.current_day || startupPayload?.general_data?.current_day || getDayKeyFromName(DAYS_FULL[new Date().getDay()]);
   const orderedDays = getOrderedDaysForDetail(todayKey);
@@ -59,6 +98,7 @@ function renderBarDetailContent(selectedBar, detailPayload) {
   } else {
     hoursEl.style.display = 'none';
     hoursEmptyEl.style.display = 'block';
+    hoursEmptyEl.textContent = 'No open hours found';
   }
 
   const specialsContainer = document.getElementById('detail-specials');
@@ -161,6 +201,12 @@ async function showDetail(barOrId, previousScreen = currentTab) {
 
   document.getElementById('detail-image').src = selectedBar.image_url || '';
   document.getElementById('detail-name').textContent = (selectedBar.name || '').toUpperCase();
+
+  const startupDetailPayload = buildBarDetailPayloadFromStartup(selectedBar.bar_id);
+  if (startupDetailPayload) {
+    renderBarDetailContent(selectedBar, startupDetailPayload);
+    return;
+  }
 
   const hoursEl = document.getElementById('detail-hours');
   const hoursEmptyEl = document.getElementById('detail-hours-empty');

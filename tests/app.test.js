@@ -516,6 +516,59 @@ test('renderBarsWeek shows today through next 6 days and open status only for to
 });
 
 
+test('showDetail reuses startup payload details when has_special_this_week is true', async () => {
+  const document = new DocumentMock();
+  mountBaseNodes(document);
+  const ctx = loadAppWithoutBoot(document);
+
+  const calls = [];
+  ctx.fetch = async (url) => {
+    calls.push(String(url));
+    return { json: async () => ({}) };
+  };
+
+  vm.runInContext(`
+    startupPayload = {
+      general_data: { current_day: 'MON' },
+      bars: {
+        '1': { name: 'Startup Bar', neighborhood: 'Downtown', image_url: 'bar.jpg', is_open_now: false, has_special_this_week: true }
+      },
+      open_hours: {
+        '1': { MON: { display_text: '4:00 PM – 10:00 PM', open_time: '16:00', close_time: '22:00' } }
+      },
+      specials: {
+        '11': {
+          bar_id: 1,
+          day: 'MON',
+          special_type: 'drink',
+          description: '$5 Beer',
+          all_day: false,
+          start_time: '16:00',
+          end_time: '18:00',
+          current_status: 'active'
+        }
+      },
+      specials_by_day: {
+        MON: [{ bar_id: 1, specials: ['11'] }],
+        TUE: [],
+        WED: [],
+        THU: [],
+        FRI: [],
+        SAT: [],
+        SUN: []
+      }
+    };
+  `, ctx);
+
+  await ctx.showDetail(1, 'bars');
+
+  assert.equal(calls.length, 0, 'does not fetch when startup payload already has this week details');
+  assert.equal(document.getElementById('detail-name').textContent, 'STARTUP BAR');
+  assert.equal(document.getElementById('detail-hours').children.length > 0, true, 'renders startup open hours');
+  assert.equal(document.querySelectorAll('.special-item').length > 0, true, 'renders startup specials');
+});
+
+
 test('showDetail fetches and renders bar-specific hours and specials', async () => {
   const document = new DocumentMock();
   mountBaseNodes(document);
@@ -561,7 +614,7 @@ test('showDetail fetches and renders bar-specific hours and specials', async () 
     startupPayload = {
       general_data: { current_day: 'MON' },
       bars: {
-        '1': { name: 'Detail Bar', neighborhood: 'Downtown', image_url: 'bar.jpg', is_open_now: false, has_special_this_week: true }
+        '1': { name: 'Detail Bar', neighborhood: 'Downtown', image_url: 'bar.jpg', is_open_now: false, has_special_this_week: false }
       },
       open_hours: {},
       specials: {},
@@ -571,7 +624,7 @@ test('showDetail fetches and renders bar-specific hours and specials', async () 
 
   await ctx.showDetail(1, 'bars');
 
-  assert.equal(calls.length, 1, 'fetches bar details on first open');
+  assert.equal(calls.length, 1, 'fetches bar details only when startup payload does not already include this week details');
   assert.match(calls[0], /getBarDetails/);
   assert.doesNotMatch(calls[0], /device_id=/, 'does not send favorite-related device info to bar details endpoint');
   assert.equal(document.getElementById('detail-name').textContent, 'DETAIL BAR');
