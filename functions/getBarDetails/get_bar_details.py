@@ -9,7 +9,6 @@ RDS_HOST = os.environ['RDS_HOST']
 DB_USER = os.environ['DB_USER']
 DB_PASSWORD = os.environ['DB_PASSWORD']
 DB_NAME = os.environ['DB_NAME']
-BAR_IMAGE_FOLDER_URL = os.environ['BAR_IMAGE_FOLDER_URL'].rstrip('/')
 
 DAY_KEYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']
 DAY_INDEX = {day: idx for idx, day in enumerate(DAY_KEYS)}
@@ -20,10 +19,10 @@ def get_connection():
     return pymysql.connect(host=RDS_HOST, user=DB_USER, passwd=DB_PASSWORD, db=DB_NAME, connect_timeout=5)
 
 
-def query_bar(cursor, bar_id):
+def query_bar_exists(cursor, bar_id):
     cursor.execute(
         """
-        SELECT bar_id, name, neighborhood, image_file
+        SELECT bar_id
         FROM bar
         WHERE bar_id = %s AND is_active = 'Y'
         """,
@@ -55,12 +54,6 @@ def query_specials(cursor, bar_id):
 
 def to_time_string(value):
     return None if value is None else str(value)
-
-
-def build_bar_image_url(image_file):
-    if not image_file:
-        return None
-    return f"{BAR_IMAGE_FOLDER_URL}/{str(image_file).lstrip('/')}"
 
 
 def get_hour_minute(time_value):
@@ -168,7 +161,7 @@ def build_bar_details_payload(bar_id):
     conn = get_connection()
     try:
         with conn.cursor(pymysql.cursors.DictCursor) as cursor:
-            bar = query_bar(cursor, bar_id)
+            bar = query_bar_exists(cursor, bar_id)
             if not bar:
                 return None
 
@@ -222,12 +215,6 @@ def build_bar_details_payload(bar_id):
 
         return {
             'bar_details_payload': {
-                'bar': {
-                    'bar_id': bar['bar_id'],
-                    'name': bar['name'],
-                    'neighborhood': bar['neighborhood'],
-                    'image_url': build_bar_image_url(bar['image_file'])
-                },
                 'general_data': {
                     'current_day': current_day_key,
                     'generated_at': now.isoformat()
