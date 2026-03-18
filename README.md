@@ -16,7 +16,7 @@ The folders inside `functions/` each correspond to an AWS Lambda function.
 - **`insertUserReport`**  
   Used on the special details view. When a user marks a special for review, this function is called to insert a report record in the database.
 
-- **`loadCsvToMysql`**  
+- **`importCSVtoDatabase`**  
   Loads CSV files from S3 into MySQL in RDS. This Lambda reads `S3_BUCKET` and `S3_DATA_FOLDER` from required environment variables, reads table name from row 1, transaction type from row 2, uses row 3 as headers, and processes rows 4+ with batch SQL operations via `executemany()`. If no `key` is provided in the event, it automatically selects the oldest file in `${S3_DATA_FOLDER}/input/`.
 
   Supported tables:
@@ -94,8 +94,8 @@ The folders inside `functions/` each correspond to an AWS Lambda function.
   - `s3:PutObject` on `data/complete/*` and `data/error/*`
   - `s3:DeleteObject` on `data/input/*`
 
-- **`buildNeighborhoodImportCsv`**  
-  Searches Google Places for bar candidates in a configured Pittsburgh neighborhood, filters and deduplicates results, generates a CSV using the existing import structure, and uploads it to the S3 import folder for manual review before running `loadCsvToMysql`.
+- **`findAllBarsByNeighorhood`**  
+  Searches Google Places for bar candidates in a configured Pittsburgh neighborhood, filters and deduplicates results, generates a CSV using the existing import structure, and uploads it to the S3 import folder for manual review before running `importCSVtoDatabase`.
 
   Supported input:
   - `neighborhood` (string key from neighborhood config; currently supports `downtown`)
@@ -122,7 +122,7 @@ The folders inside `functions/` each correspond to an AWS Lambda function.
   6. Generate CSV in existing import format.
   7. Upload CSV to S3 import folder.
   8. Manually review CSV.
-  9. Process CSV with `loadCsvToMysql`.
+  9. Process CSV with `importCSVtoDatabase`.
 
   CSV structure used:
   - row 1 = table name
