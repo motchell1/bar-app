@@ -169,3 +169,28 @@ The folders inside `functions/` each correspond to an AWS Lambda function.
 - Favorites are now persisted in the background whenever a user favorites/unfavorites a special.
 - Endpoint used by the web app:
   - `https://qz5rs9i9ya.execute-api.us-east-2.amazonaws.com/default/updateDeviceFavorite`
+
+## New two-Lambda neighborhood bar sync flow
+
+### `googleBarSync`
+Runs outside the VPC and owns the Google-facing side of the workflow. It searches Google Places for bars inside a neighborhood polygon, formats Google open-hours data to match the app’s existing style as closely as possible, fetches photos only for bars the DB marks as new, and uploads those images to S3 before returning the S3 key back to the DB-side flow.
+
+### `dbBarSync`
+Runs inside the VPC and owns the database-facing side of the workflow. It reuses the same RDS connection pattern as the other DB Lambdas, batch-checks incoming `google_place_id` values against the `bar` table, inserts only new bars, and upserts `open_hours` rows using the same `Y`/`N` closed-state pattern used by the existing refresh flow.
+
+### Orchestration sequence
+1. Call `googleBarSync` to search a neighborhood and return candidate bars as JSON.
+2. Send those candidates to `dbBarSync` so it can split them into `new_bars` and `existing_bars`.
+3. If new bars exist, call `googleBarSync` again so only those new bars get Google photo lookups and S3 uploads.
+4. Call `dbBarSync` to insert new `bar` rows and apply open-hours updates for both new and existing bars.
+
+### Current schema assumptions
+- `bar` table name is `bar`.
+- `bar_id` is the primary key.
+- `google_place_id` is unique.
+- Bar inserts use `name`, `address`, `google_place_id`, `image_file`, `neighborhood`, and `is_active`.
+- Open-hours rows use `open_hours(bar_id, day_of_week, open_time, close_time, is_closed)`.
+
+### Required Python packages beyond the AWS Lambda standard environment
+- `requests`
+- `PyMySQL`
