@@ -66,6 +66,17 @@ def normalize_open_hours(open_hours: Optional[Dict]) -> Dict[str, Dict]:
     return normalized
 
 
+def normalize_bar_payload(bar: Dict, neighborhood_name: Optional[str]) -> Dict:
+    return {
+        'google_place_id': bar.get('google_place_id'),
+        'bar_name': bar.get('bar_name'),
+        'address': bar.get('address'),
+        'neighborhood': bar.get('neighborhood') or neighborhood_name,
+        'image_path': bar.get('image_path'),
+        'open_hours': normalize_open_hours(bar.get('open_hours')),
+    }
+
+
 def fetch_existing_bars(cursor, google_place_ids: Sequence[str]) -> Dict[str, Dict]:
     if not google_place_ids:
         return {}
@@ -73,7 +84,7 @@ def fetch_existing_bars(cursor, google_place_ids: Sequence[str]) -> Dict[str, Di
     placeholders = ', '.join(['%s'] * len(google_place_ids))
     cursor.execute(
         f"""
-        SELECT bar_id, google_place_id, image_path
+        SELECT bar_id, google_place_id, image_file
         FROM {BAR_TABLE}
         WHERE google_place_id IN ({placeholders})
         """,
@@ -85,6 +96,7 @@ def fetch_existing_bars(cursor, google_place_ids: Sequence[str]) -> Dict[str, Di
 
 def categorize_bars(event: Dict) -> Dict:
     bars = require_bars_list(event, 'bars')
+    neighborhood_name = event.get('neighborhood_name')
     google_place_ids = [bar.get('google_place_id') for bar in bars if bar.get('google_place_id')]
 
     conn = get_connection()
@@ -102,12 +114,7 @@ def categorize_bars(event: Dict) -> Dict:
             logger.warning('Skipping bar without google_place_id during categorization: %s', bar)
             continue
 
-        normalized_bar = {
-            'google_place_id': google_place_id,
-            'bar_name': bar.get('bar_name'),
-            'address': bar.get('address'),
-            'open_hours': normalize_open_hours(bar.get('open_hours')),
-        }
+        normalized_bar = normalize_bar_payload(bar, neighborhood_name)
 
         existing_bar = existing_by_place_id.get(google_place_id)
         if existing_bar:
@@ -121,7 +128,7 @@ def categorize_bars(event: Dict) -> Dict:
         {
             'status': 'success',
             'action': 'categorize_bars',
-            'neighborhood_name': event.get('neighborhood_name'),
+            'neighborhood_name': neighborhood_name,
             'new_bars': new_bars,
             'existing_bars': existing_bars,
         },
@@ -146,17 +153,24 @@ def build_open_hours_rows(bar_id: int, open_hours: Dict[str, Dict]) -> List[Tupl
     return rows
 
 
-def insert_new_bars(cursor, new_bars: List[Dict]) -> Dict[str, int]:
+def insert_new_bars(cursor, new_bars: List[Dict], default_neighborhood: Optional[str]) -> Dict[str, int]:
     inserted_bar_ids = {}
     if not new_bars:
         return inserted_bar_ids
 
     sql = f"""
-        INSERT INTO {BAR_TABLE} (name, address, google_place_id, image_path)
-        VALUES (%s, %s, %s, %s)
+        INSERT INTO {BAR_TABLE} (name, address, google_place_id, image_file, neighborhood, is_active)
+        VALUES (%s, %s, %s, %s, %s, %s)
     """
 
     for bar in new_bars:
+        neighborhood = bar.get('neighborhood') or default_neighborhood
+        if not neighborhood:
+            raise ValidationError(
+                f'Missing neighborhood for new bar {bar.get("google_place_id")}. '
+                'Pass neighborhood_name on the event or neighborhood on each bar.'
+            )
+
         cursor.execute(
             sql,
             (
@@ -164,6 +178,8 @@ def insert_new_bars(cursor, new_bars: List[Dict]) -> Dict[str, int]:
                 bar.get('address'),
                 bar.get('google_place_id'),
                 bar.get('image_path'),
+                neighborhood,
+                'Y',
             ),
         )
         inserted_bar_ids[bar['google_place_id']] = cursor.lastrowid
@@ -176,7 +192,6 @@ def upsert_open_hours(cursor, rows: Iterable[Tuple]) -> int:
     if not rows:
         return 0
 
-    # Adjust column names here if your open_hours schema differs.
     sql = f"""
         INSERT INTO {OPEN_HOURS_TABLE} (bar_id, day_of_week, open_time, close_time, is_closed)
         VALUES (%s, %s, %s, %s, %s)
@@ -191,11 +206,12 @@ def upsert_open_hours(cursor, rows: Iterable[Tuple]) -> int:
 def apply_bar_updates(event: Dict) -> Dict:
     new_bars = require_bars_list(event, 'new_bars')
     existing_bars = require_bars_list(event, 'existing_bars')
+    neighborhood_name = event.get('neighborhood_name')
 
     conn = get_connection()
     try:
         with conn.cursor() as cursor:
-            inserted_bar_ids = insert_new_bars(cursor, new_bars)
+            inserted_bar_ids = insert_new_bars(new_bars=new_bars, cursor=cursor, default_neighborhood=neighborhood_name)
 
             new_hours_rows = []
             for bar in new_bars:
