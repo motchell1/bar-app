@@ -231,7 +231,7 @@ Required environment variables:
 - `DB_NAME`
 
 ### Orchestration sequence
-1. Call `googleBarSync` with `action = search_neighborhood_bars`.
+2. `googleBarSync` performs the neighborhood search and polygon filtering.
 2. Send its `bars` list to `dbBarSync` with `action = categorize_bars`.
 3. If `new_bars` is not empty, call `googleBarSync` with `action = enrich_new_bars`.
 4. Call `dbBarSync` with `action = apply_bar_updates` using enriched `new_bars` plus `existing_bars`.

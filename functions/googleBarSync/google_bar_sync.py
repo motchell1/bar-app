@@ -44,8 +44,8 @@ def build_response(status_code: int, body: Dict) -> Dict:
     }
 
 
-def require_fields(payload: Dict, required_fields: List[str]) -> None:
-    missing = [field for field in required_fields if payload.get(field) in (None, '')]
+def parse_lambda_body(response: Dict) -> Dict:
+    body = parse_lambda_body(lambda_payload)
     if missing:
         raise ValidationError(f'Missing required field(s): {missing}')
 
@@ -232,8 +232,8 @@ def search_neighborhood_bars(event: Dict) -> Dict:
     # This is the kickoff action for the whole sync flow.
     require_fields(
         event,
-        ['neighborhood_name', 'polygon', 'search_center_lat', 'search_center_lng', 'search_radius'],
-    )
+def build_search_payload(event: Dict) -> Dict:
+    # Core search step used by both the standalone action and the full sync kickoff action.
     keyword = (event.get('keyword') or 'bar').strip()
     polygon = normalize_polygon(event['polygon'])
     search_center_lat = float(event['search_center_lat'])
@@ -259,22 +259,22 @@ def search_neighborhood_bars(event: Dict) -> Dict:
             logger.warning('Skipping place_id=%s because details lookup failed: %s', place_id, exc)
 
     bars.sort(key=lambda row: (row['bar_name'].lower(), row['google_place_id']))
-    return build_response(
-        200,
-        {
-            'status': 'success',
-            'action': 'search_neighborhood_bars',
-            'neighborhood_name': event['neighborhood_name'],
-            'candidate_count': len(candidate_places),
-            'matched_count': len(bars),
-            'bars': bars,
-        },
-    )
+    return {
+        'status': 'success',
+        'action': 'search_neighborhood_bars',
+        'neighborhood_name': event['neighborhood_name'],
+        'candidate_count': len(candidate_places),
+        'matched_count': len(bars),
+        'bars': bars,
+    }
 
 
-def get_photo_reference(place_id: str) -> Optional[str]:
-    details = fetch_place_details(place_id, 'photos')
-    photos = details.get('photos') or []
+def search_neighborhood_bars(event: Dict) -> Dict:
+    return build_response(200, build_search_payload(event))
+
+
+    search_payload = build_search_payload(event)
+        enriched_new_bars = build_enriched_bars(new_bars)
     if not photos:
         return None
     return photos[0].get('photo_reference')
@@ -356,9 +356,12 @@ def lambda_handler(event, context):
 
     try:
         if action not in ALLOWED_ACTIONS:
-            raise ValidationError(f'Unsupported action "{action}". Allowed actions: {sorted(ALLOWED_ACTIONS)}')
+def build_enriched_bars(new_bars: List[Dict]) -> List[Dict]:
+    return enriched_bars
 
-        if action == 'search_neighborhood_bars':
+
+def enrich_new_bars(event: Dict) -> Dict:
+            'new_bars': build_enriched_bars(event.get('new_bars') or []),
             return search_neighborhood_bars(event)
         if action == 'enrich_new_bars':
             return enrich_new_bars(event)
