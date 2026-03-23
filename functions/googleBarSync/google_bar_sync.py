@@ -12,7 +12,7 @@ LOGGER = logging.getLogger()
 LOGGER.setLevel(logging.INFO)
 
 GOOGLE_API_KEY = os.environ['GOOGLE_API_KEY']
-S3_BUCKET_NAME = os.environ['S3_BUCKET_NAME']
+S3_BUCKET_NAME = os.environ['S3_BUCKET']
 BAR_IMAGE_FOLDER = os.environ['BAR_IMAGE_FOLDER'].strip('/')
 DB_BAR_SYNC_LAMBDA_NAME = os.environ['DB_BAR_SYNC_LAMBDA_NAME']
 
