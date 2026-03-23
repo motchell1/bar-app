@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import time
 from typing import Dict, List, Optional, Tuple
 
 import boto3
@@ -9,213 +10,195 @@ import requests
 GOOGLE_API_KEY = os.environ['GOOGLE_API_KEY']
 S3_BUCKET_NAME = os.environ['S3_BUCKET_NAME']
 BAR_IMAGE_FOLDER = os.environ['BAR_IMAGE_FOLDER'].strip('/')
-
+DB_BAR_SYNC_FUNCTION_NAME = os.environ['DB_BAR_SYNC_FUNCTION_NAME']
 GOOGLE_NEARBY_SEARCH_URL = 'https://maps.googleapis.com/maps/api/place/nearbysearch/json'
 GOOGLE_PLACE_DETAILS_URL = 'https://maps.googleapis.com/maps/api/place/details/json'
-ALLOWED_ACTIONS = {'search_neighborhood_bars', 'enrich_new_bars'}
-DAY_KEYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']
-DAY_MAP = {0: 'SUN', 1: 'MON', 2: 'TUE', 3: 'WED', 4: 'THU', 5: 'FRI', 6: 'SAT'}
-CONTENT_TYPE_EXTENSION_MAP = {
-    'image/jpeg': '.jpg',
-    'image/jpg': '.jpg',
-    'image/png': '.png',
-    'image/webp': '.webp',
-    'image/gif': '.gif',
+GOOGLE_PLACE_PHOTO_URL = 'https://maps.googleapis.com/maps/api/place/photo'
+ALL_DAYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']
+# Keep this neighborhood config in code, matching the older neighborhood-driven flow.
+NEIGHBORHOOD_CONFIGS = {
+    'downtown': {
+        'neighborhood_name': 'Downtown',
+        'search_center_lat': 40.4418,
+        'search_center_lng': -79.9959,
+        'search_radius': 1800,
+        'keyword': 'bar',
+        'polygon': [
+            {'lat': 40.442357, 'lng': -80.015060},
+            {'lat': 40.447582, 'lng': -79.994819},
+            {'lat': 40.443094, 'lng': -79.991779},
+            {'lat': 40.434590, 'lng': -79.996123},
+            {'lat': 40.442357, 'lng': -80.015060},
+        ],
+    }
 }
 
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)
-
-s3_client = boto3.client('s3')
-
-
-class ValidationError(Exception):
-    pass
+    return {'statusCode': status_code, 'body': json.dumps(body)}
+def require_neighborhood_name(event: Dict) -> str:
+    neighborhood_name = (event.get('neighborhood_name') or event.get('neighborhood') or '').strip()
+    if not neighborhood_name:
+        raise ValidationError('Event field "neighborhood_name" is required.')
+    return neighborhood_name
 
 
-class GooglePlacesError(Exception):
-    pass
+def get_neighborhood_config(neighborhood_name: str) -> Dict:
+    config = NEIGHBORHOOD_CONFIGS.get(neighborhood_name.strip().lower())
+    if not config:
+        supported = sorted(NEIGHBORHOOD_CONFIGS.keys())
+        raise ValidationError(
+            f'Unsupported neighborhood "{neighborhood_name}". Supported neighborhoods: {supported}'
+        )
+    return config
+        time.sleep(2)
+
+    deduped = {}
+            deduped[place_id] = place
+    return list(deduped.values())
+        params={'place_id': place_id, 'fields': fields, 'key': GOOGLE_API_KEY},
+# Match the older fetchGoogleApiHours shape as closely as possible: each day is either
+# "CLOSED" or a two-item [open_time, close_time] list.
+def format_open_hours(periods: List[Dict]) -> Dict[str, object]:
+    hours_map = {day: 'CLOSED' for day in ALL_DAYS}
+
+        close_time = parse_google_time(close_info.get('time')) if close_info else None
+        hours_map[open_day] = [open_time, close_time]
+        'open_hours': format_open_hours(place_details.get('opening_hours', {}).get('periods', [])),
+def search_neighborhood_bars(event: Dict) -> Dict:
+    neighborhood_name = require_neighborhood_name(event)
+    config = get_neighborhood_config(neighborhood_name)
+
+    keyword = (event.get('keyword') or config.get('keyword') or 'bar').strip()
+    candidate_places = fetch_nearby_places(
+        config['search_center_lat'],
+        config['search_center_lng'],
+        config['search_radius'],
+        keyword,
+    matched_places = filter_places_by_polygon(candidate_places, config['polygon'])
+    for place in matched_places:
+        details = fetch_place_details(place_id, 'opening_hours')
+        bar_record = build_bar_record(place, details)
+        if bar_record:
+            bars.append(bar_record)
+        'neighborhood_name': config['neighborhood_name'],
+def get_photo_media(place_id: str) -> Tuple[Optional[bytes], Optional[str]]:
+    photos = details.get('photos', [])
+        return None, None
+
+    photo_reference = photos[0].get('photo_reference')
+        GOOGLE_PLACE_PHOTO_URL,
+            'photoreference': photo_reference,
+            'maxwidth': 1200,
+        allow_redirects=True,
+    content_type = response.headers.get('Content-Type', '').split(';')[0].strip().lower()
+    return response.content, content_type
 
 
-def build_response(status_code: int, body: Dict) -> Dict:
+def content_type_to_extension(content_type: Optional[str]) -> str:
+    return CONTENT_TYPE_EXTENSION_MAP.get(content_type or '', '.jpg')
+
+def build_s3_key(folder: str, place_id: str, extension: str) -> str:
+    return f'{folder}/{place_id}{extension}' if folder else f'{place_id}{extension}'
+
+
+def upload_image_to_s3(image_bytes: bytes, content_type: str, s3_key: str) -> None:
+        Key=s3_key,
+        ContentType=content_type or 'image/jpeg',
+def enrich_new_bars(event: Dict) -> Dict:
+    new_bars = event.get('new_bars')
+        enriched_bar = {
+            'google_place_id': bar.get('google_place_id'),
+            'bar_name': bar.get('bar_name'),
+            'address': bar.get('address'),
+            'open_hours': bar.get('open_hours'),
+            'image_path': None,
+        }
+        place_id = enriched_bar['google_place_id']
+
+        if not place_id:
+            logger.warning('Skipping image enrichment for bar without google_place_id: %s', bar)
+            enriched_bars.append(enriched_bar)
+
+            image_bytes, content_type = get_photo_media(place_id)
+                extension = content_type_to_extension(content_type)
+                s3_key = build_s3_key(BAR_IMAGE_FOLDER, place_id, extension)
+                upload_image_to_s3(image_bytes, content_type or 'image/jpeg', s3_key)
+                enriched_bar['image_path'] = s3_key
+            logger.warning('Image enrichment failed for %s: %s', place_id, exc)
     return {
-        'statusCode': status_code,
-        'body': json.dumps(body),
+        'status': 'success',
+        'action': 'enrich_new_bars',
+        'new_bars': enriched_bars,
+    }
+def invoke_db_bar_sync(payload: Dict) -> Dict:
+    response = lambda_client.invoke(
+        FunctionName=DB_BAR_SYNC_FUNCTION_NAME,
+        InvocationType='RequestResponse',
+        Payload=json.dumps(payload).encode('utf-8'),
+    )
+    payload_bytes = response['Payload'].read()
+    lambda_payload = json.loads(payload_bytes or '{}')
+    status_code = int(lambda_payload.get('statusCode', 500))
+    body = parse_lambda_body(lambda_payload)
+
+    if status_code >= 400:
+        raise RuntimeError(f'DB lambda action {payload.get("action")} failed: {body}')
+
+    return body
+
+
+def sync_neighborhood_bars(event: Dict) -> Dict:
+    neighborhood_name = require_neighborhood_name(event)
+    search_payload = search_neighborhood_bars({'neighborhood_name': neighborhood_name, 'keyword': event.get('keyword')})
+
+    categorized = invoke_db_bar_sync(
+            'action': 'categorize_bars',
+            'neighborhood_name': search_payload['neighborhood_name'],
+            'bars': search_payload['bars'],
+        }
+    new_bars = categorized.get('new_bars', [])
+    existing_bars = categorized.get('existing_bars', [])
+    if new_bars:
+        enrich_result = enrich_new_bars({'new_bars': new_bars})
+        new_bars = enrich_result['new_bars']
+
+    applied = invoke_db_bar_sync(
+        {
+            'action': 'apply_bar_updates',
+            'new_bars': new_bars,
+            'existing_bars': existing_bars,
+        }
+    )
+
+    return {
+        'status': 'success',
+        'action': 'sync_neighborhood_bars',
+        'neighborhood_name': search_payload['neighborhood_name'],
+        'search_summary': {
+            'candidate_count': search_payload['candidate_count'],
+            'matched_count': search_payload['matched_count'],
+        },
+        'categorize_summary': {
+            'new_bar_count': len(new_bars),
+            'existing_bar_count': len(existing_bars),
+        },
+        'apply_summary': {
+            'new_bars_inserted': applied.get('new_bars_inserted', 0),
+            'existing_bars_updated': applied.get('existing_bars_updated', 0),
+            'open_hours_rows_inserted': applied.get('open_hours_rows_inserted', 0),
+            'open_hours_rows_updated': applied.get('open_hours_rows_updated', 0),
+        },
+        'new_bars': new_bars,
+        'existing_bars': existing_bars,
     }
 
-
-def parse_lambda_body(response: Dict) -> Dict:
-    body = parse_lambda_body(lambda_payload)
-    if missing:
-        raise ValidationError(f'Missing required field(s): {missing}')
-
-
-def normalize_polygon(polygon: List[Dict]) -> List[Dict[str, float]]:
-    if not isinstance(polygon, list) or len(polygon) < 3:
-        raise ValidationError('"polygon" must contain at least 3 coordinate points.')
-
-    normalized = []
-    for point in polygon:
-        if not isinstance(point, dict) or 'lat' not in point or 'lng' not in point:
-            raise ValidationError('Each polygon point must include "lat" and "lng".')
-        normalized.append({'lat': float(point['lat']), 'lng': float(point['lng'])})
-
-    return normalized
-
-
-def point_in_polygon(lat: float, lng: float, polygon: List[Dict[str, float]]) -> bool:
-    inside = False
-    j = len(polygon) - 1
-
-    for i in range(len(polygon)):
-        yi = polygon[i]['lat']
-        xi = polygon[i]['lng']
-        yj = polygon[j]['lat']
-        xj = polygon[j]['lng']
-
-        intersects = ((yi > lat) != (yj > lat)) and (
-            lng < (xj - xi) * (lat - yi) / ((yj - yi) or 1e-12) + xi
-        )
-        if intersects:
-            inside = not inside
-        j = i
-
-    return inside
-
-
-def filter_places_by_polygon(places: List[Dict], polygon: List[Dict[str, float]]) -> List[Dict]:
-    # Keep only places whose lat/lng fall inside the caller-provided neighborhood boundary.
-    filtered = []
-    for place in places:
-        location = place.get('geometry', {}).get('location', {})
-        lat = location.get('lat')
-        lng = location.get('lng')
-        if lat is None or lng is None:
-            continue
-        if point_in_polygon(float(lat), float(lng), polygon):
-            filtered.append(place)
-    return filtered
-
-
-def fetch_nearby_places(search_center_lat: float, search_center_lng: float, search_radius: int, keyword: str) -> List[Dict]:
-    places = []
-    next_page_token = None
-
-    while True:
-        params = {
-            'location': f'{search_center_lat},{search_center_lng}',
-            'radius': int(search_radius),
-            'keyword': keyword,
-            'type': 'bar',
-            'key': GOOGLE_API_KEY,
-        }
-        if next_page_token:
-            params = {'pagetoken': next_page_token, 'key': GOOGLE_API_KEY}
-
-        response = requests.get(GOOGLE_NEARBY_SEARCH_URL, params=params, timeout=15)
-        response.raise_for_status()
-        payload = response.json()
-        status = payload.get('status')
-
-        if status == 'INVALID_REQUEST' and next_page_token:
-            import time
-            time.sleep(2)
-            continue
-        if status not in ('OK', 'ZERO_RESULTS'):
-            raise GooglePlacesError(payload.get('error_message') or status or 'Unknown nearby search error')
-
-        places.extend(payload.get('results', []))
-        if next_page_token and payload.get('results'):
-            import time
-            time.sleep(2)
-        next_page_token = payload.get('next_page_token')
-        if not next_page_token:
-            break
-
-    deduped_by_place_id = {}
-    for place in places:
-        place_id = place.get('place_id')
-        if place_id:
-            deduped_by_place_id[place_id] = place
-
-    return list(deduped_by_place_id.values())
-
-
-def fetch_place_details(place_id: str, fields: str) -> Dict:
-    response = requests.get(
-        GOOGLE_PLACE_DETAILS_URL,
-        params={
-            'place_id': place_id,
-            'fields': fields,
-            'key': GOOGLE_API_KEY,
-        },
-        timeout=15,
-    )
-    response.raise_for_status()
-    payload = response.json()
-    status = payload.get('status')
-
-    if status not in ('OK', 'ZERO_RESULTS'):
-        raise GooglePlacesError(payload.get('error_message') or status or f'Failed to fetch details for {place_id}')
-
-    return payload.get('result', {})
-
-
-def parse_google_time(raw_time: Optional[str]) -> Optional[str]:
-    if not raw_time or len(raw_time) != 4:
-        return None
-    return f'{raw_time[:2]}:{raw_time[2:]}:00'
-
-
-def format_open_hours(periods: List[Dict]) -> Dict[str, Dict[str, Optional[str]]]:
-    # Mirror the app's existing open-hours shape so the DB lambda can persist rows directly.
-    hours_map = {}
-    for day_key in DAY_KEYS:
-        hours_map[day_key] = {
-            'open_time': None,
-            'close_time': None,
-            'closed': True,
-            'display_text': 'Closed',
-        }
-
-    for period in periods or []:
-        open_info = period.get('open') or {}
-        close_info = period.get('close') or {}
-        open_day = DAY_MAP.get(open_info.get('day'))
-        if not open_day:
-            continue
-
-        open_time = parse_google_time(open_info.get('time'))
-        close_time = parse_google_time(close_info.get('time'))
-
-        hours_map[open_day] = {
-            'open_time': open_time,
-            'close_time': close_time,
-            'closed': False,
-            'display_text': 'Hours unavailable' if not open_time or not close_time else f'{format_display_time(open_time)} – {format_display_time(close_time)}',
-        }
-
-    return hours_map
-
-
-def format_display_time(time_value: Optional[str]) -> Optional[str]:
-    if not time_value:
-        return None
-    hour_str, minute_str, *_ = time_value.split(':')
-    hour = int(hour_str)
-    minute = int(minute_str)
-    ampm = 'AM' if hour < 12 else 'PM'
-    hour = hour % 12
-    if hour == 0:
-        hour = 12
-    return f'{hour}:{minute:02d} {ampm}'
-
-
-def build_bar_record(place: Dict, place_details: Dict) -> Optional[Dict]:
-    place_id = place.get('place_id')
-    bar_name = (place.get('name') or '').strip()
-    address = (place.get('vicinity') or place.get('formatted_address') or '').strip()
-
+            return build_response(200, search_neighborhood_bars(event))
+            return build_response(200, enrich_new_bars(event))
+            return build_response(200, sync_neighborhood_bars(event))
+        logger.exception('Google API request failed')
+        return build_response(502, {'status': 'error', 'message': str(exc), 'action': action})
+    except GooglePlacesError as exc:
+        logger.warning('Google Places returned an error: %s', exc)
+        logger.exception('Unhandled exception in googleBarSync')
     if not place_id or not bar_name or not address:
         return None
 
