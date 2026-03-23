@@ -82,11 +82,25 @@ def search_neighborhood_bars(event: Dict) -> Dict:
         'neighborhood_name': config['neighborhood_name'],
 def get_photo_media(place_id: str) -> Tuple[Optional[bytes], Optional[str]]:
     photos = details.get('photos', [])
-        return None, None
+def filter_places_by_polygon(
+    places: List[Dict],
+    polygon: List[Dict[str, float]],
+) -> List[Dict]:
 
-    photo_reference = photos[0].get('photo_reference')
-        GOOGLE_PLACE_PHOTO_URL,
-            'photoreference': photo_reference,
+def fetch_nearby_places(
+    search_center_lat: float,
+    search_center_lng: float,
+    search_radius: int,
+    keyword: str,
+) -> List[Dict]:
+            raise GooglePlacesError(
+                payload.get('error_message') or status or 'Unknown nearby search error'
+            )
+        raise GooglePlacesError(
+            payload.get('error_message')
+            or status
+            or f'Failed to fetch details for {place_id}'
+        )
             'maxwidth': 1200,
         allow_redirects=True,
     content_type = response.headers.get('Content-Type', '').split(';')[0].strip().lower()
@@ -237,14 +251,15 @@ def build_search_payload(event: Dict) -> Dict:
             details = fetch_place_details(place_id, 'opening_hours')
             record = build_bar_record(place, details)
             if record:
-                bars.append(record)
-        except Exception as exc:
-            logger.warning('Skipping place_id=%s because details lookup failed: %s', place_id, exc)
-
-    bars.sort(key=lambda row: (row['bar_name'].lower(), row['google_place_id']))
-    return {
+        params={'photo_reference': photo_reference, 'maxwidth': 1200, 'key': GOOGLE_API_KEY},
+            logger.warning(
+                'Skipping image enrichment for bar without google_place_id: %s',
+                bar,
+            )
         'status': 'success',
-        'action': 'search_neighborhood_bars',
+    search_payload = search_neighborhood_bars(
+        {'neighborhood_name': neighborhood_name, 'keyword': event.get('keyword')}
+    )
         'neighborhood_name': event['neighborhood_name'],
         'candidate_count': len(candidate_places),
         'matched_count': len(bars),
@@ -359,3 +374,6 @@ def enrich_new_bars(event: Dict) -> Dict:
     except Exception as exc:
         logger.exception('Unexpected error in google_bar_sync action=%s', action)
         return build_response(500, {'status': 'error', 'message': str(exc), 'action': action})
+            raise ValidationError(
+                f'Unsupported action "{action}". Allowed actions: {sorted(ALLOWED_ACTIONS)}'
+            )

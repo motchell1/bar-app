@@ -194,13 +194,23 @@ def apply_bar_updates(event: Dict) -> Dict:
             for bar in new_bars:
                 bar_id = inserted_bar_ids.get(bar.get('google_place_id'))
                 if bar_id:
-                    new_hours_rows.extend(build_open_hours_rows(bar_id, normalize_open_hours(bar.get('open_hours'))))
+                    new_hours_rows.extend(
+                        build_open_hours_rows(
+                            bar_id,
+                            normalize_open_hours(bar.get('open_hours')),
+                        )
+                    )
 
             existing_hours_rows = []
             for bar in existing_bars:
                 bar_id = bar.get('bar_id')
                 if bar_id:
-                    existing_hours_rows.extend(build_open_hours_rows(bar_id, normalize_open_hours(bar.get('open_hours'))))
+                    existing_hours_rows.extend(
+                        build_open_hours_rows(
+                            bar_id,
+                            normalize_open_hours(bar.get('open_hours')),
+                        )
+                    )
 
             upsert_open_hours(cursor, new_hours_rows)
             upsert_open_hours(cursor, existing_hours_rows)
@@ -227,7 +237,9 @@ def lambda_handler(event, context):
 
     try:
         if action not in ALLOWED_ACTIONS:
-            raise ValidationError(f'Unsupported action "{action}". Allowed actions: {sorted(ALLOWED_ACTIONS)}')
+            raise ValidationError(
+                f'Unsupported action "{action}". Allowed actions: {sorted(ALLOWED_ACTIONS)}'
+            )
 
         if action == 'categorize_bars':
             return build_response(200, categorize_bars(event))
