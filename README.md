@@ -24,7 +24,7 @@ The folders inside `functions/` each correspond to an AWS Lambda function.
   - `DB_BAR_SYNC_LAMBDA_NAME`
 
 - **`dbBarSync`**  
-  This Lambda is invoked only by `googleBarSync`. On the first invocation it categorizes bars into `new_bars` and `existing_bars` by `google_place_id`. On the second invocation it inserts new bar records into `bar` and upserts all open-hours rows into `open_hours`. It uses the same RDS connection variable pattern as the existing database Lambdas.
+  This Lambda is invoked only by `googleBarSync`. On the first invocation it categorizes bars into `new_bars` and `existing_bars` by `google_place_id`. On the second invocation it inserts new bar records into `bar`, upserts all open-hours rows into `open_hours`, and marks any bar whose Google `business_status` is not `OPERATIONAL` as inactive. It uses the same RDS connection variable pattern as the existing database Lambdas.
 
   Required environment variables:
   - `RDS_HOST`

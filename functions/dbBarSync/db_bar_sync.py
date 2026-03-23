@@ -53,6 +53,10 @@ def categorize_bars(cursor, bars: List[Dict]) -> Dict[str, List[Dict]]:
     return {'new_bars': new_bars, 'existing_bars': existing_bars}
 
 
+def is_bar_operational(bar: Dict) -> bool:
+    return bar.get('business_status') == 'OPERATIONAL'
+
+
 def insert_new_bars(cursor, new_bars: List[Dict]) -> Dict[str, int]:
     inserted_count = 0
     for bar in new_bars:
@@ -67,7 +71,7 @@ def insert_new_bars(cursor, new_bars: List[Dict]) -> Dict[str, int]:
                 bar['address'],
                 bar['neighborhood'],
                 bar.get('image_file'),
-                'Y' if bar.get('business_status') in (None, 'OPERATIONAL') else 'N',
+                'Y' if is_bar_operational(bar) else 'N',
             ),
         )
         bar['bar_id'] = cursor.lastrowid
@@ -89,7 +93,7 @@ def upsert_open_hours(cursor, bars: List[Dict]) -> int:
                 update_date = NOW()
             WHERE bar_id = %s
             """,
-            ('Y' if bar.get('business_status') in (None, 'OPERATIONAL') else 'N', bar_id),
+            ('Y' if is_bar_operational(bar) else 'N', bar_id),
         )
 
         hours = bar.get('hours', {})
