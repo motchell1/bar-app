@@ -169,3 +169,88 @@ The folders inside `functions/` each correspond to an AWS Lambda function.
 - Favorites are now persisted in the background whenever a user favorites/unfavorites a special.
 - Endpoint used by the web app:
   - `https://qz5rs9i9ya.execute-api.us-east-2.amazonaws.com/default/updateDeviceFavorite`
+
+## New two-Lambda neighborhood bar sync flow
+
+### `googleBarSync`
+Purpose:
+- Runs outside the VPC.
+- Kicks off the full sync flow.
+- Looks up the neighborhood polygon and search settings from code using `neighborhood_name`.
+- Calls Google Places and uploads images to S3.
+- Invokes `dbBarSync` directly for categorization and persistence.
+- Never connects to MySQL directly.
+
+Expected input event:
+- `action = sync_neighborhood_bars` to kick off the full Google -> DB flow
+- `neighborhood_name`
+- optional `keyword` override
+
+Also supports:
+- `action = search_neighborhood_bars` with `neighborhood_name` for search-only behavior
+- `action = enrich_new_bars` with `new_bars` for image enrichment only
+
+Expected output:
+- For `sync_neighborhood_bars`: combined search, categorization, enrichment, and DB update summaries.
+- For `search_neighborhood_bars`: `bars[]` with `google_place_id`, `bar_name`, `address`, and `open_hours`.
+- For `enrich_new_bars`: `new_bars[]` with `image_path` added when an image upload succeeds.
+
+Required environment variables:
+- `GOOGLE_API_KEY`
+- `S3_BUCKET_NAME`
+- `BAR_IMAGE_FOLDER`
+- `DB_BAR_SYNC_FUNCTION_NAME`
+
+Neighborhood config note:
+- The kickoff event should only send the neighborhood name.
+- The polygon, search center, and radius are stored in `functions/googleBarSync/google_bar_sync.py` in `NEIGHBORHOOD_CONFIGS`.
+- The current implementation includes a `downtown` config and is structured so more neighborhoods can be added in the same place.
+
+### `dbBarSync`
+Purpose:
+- Runs inside the VPC.
+- Uses the same RDS environment variables and connection pattern as the repo's other DB Lambdas.
+- Categorizes incoming Google candidates into `new_bars` and `existing_bars`.
+- Inserts new bars and upserts open-hours rows.
+- Never calls Google APIs directly.
+
+Expected input event:
+- `action = categorize_bars`
+- `neighborhood_name`
+- `bars`
+
+or:
+- `action = apply_bar_updates`
+- `new_bars`
+- `existing_bars`
+
+Expected output:
+- For `categorize_bars`: `new_bars[]` and `existing_bars[]`, with `bar_id` added to existing bars.
+- For `apply_bar_updates`: counts for inserted bars, updated existing bars, inserted open-hours rows, and updated open-hours rows.
+
+Required environment variables:
+- `RDS_HOST`
+- `DB_USER`
+- `DB_PASSWORD`
+- `DB_NAME`
+
+### Orchestration sequence
+1. Call `googleBarSync` with `action = sync_neighborhood_bars` and `neighborhood_name`.
+2. `googleBarSync` loads that neighborhood's polygon and search settings from `NEIGHBORHOOD_CONFIGS`.
+3. `googleBarSync` searches Google Places, filters results to the stored polygon, and formats open hours.
+4. `googleBarSync` invokes `dbBarSync` with `action = categorize_bars`.
+5. If `new_bars` is not empty, `googleBarSync` enriches only those bars with S3 image paths.
+6. `googleBarSync` invokes `dbBarSync` again with `action = apply_bar_updates`.
+7. Existing bars still receive open-hours updates even when `new_bars` is empty.
+
+### Schema areas you may need to edit
+- `functions/dbBarSync/db_bar_sync.py`
+  - `BAR_TABLE` if your bar table has a different name.
+  - `OPEN_HOURS_TABLE` if your open-hours table has a different name.
+  - `insert_new_bars()` if your `bar` table requires additional columns such as `neighborhood`, `is_active`, or timestamps.
+  - `upsert_open_hours()` if your `open_hours` table uses different column names or a different unique key.
+  - `build_open_hours_rows()` if your open-hours table stores data in a different shape.
+
+### Required Python packages beyond the AWS Lambda standard environment
+- `requests`
+- `PyMySQL`
