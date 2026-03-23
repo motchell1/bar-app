@@ -34,8 +34,8 @@ ALL_DAYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']
 NEIGHBORHOOD_CONFIGS = {
     'downtown': {
         'neighborhood_name': 'Downtown',
-        'center': {'lat': 40.4406, 'lng': -79.9959},
-        'radius_meters': 1800,
+        'center': {'lat': 40.440572, 'lng': -80.000451},
+        'radius_meters': 1000,
         'polygon': [
             {'lat': 40.442357, 'lng': -80.015060},
             {'lat': 40.447582, 'lng': -79.994819},
