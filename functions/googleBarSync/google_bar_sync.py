@@ -96,7 +96,6 @@ def fetch_places(center: Dict[str, float], radius_meters: int) -> List[Dict]:
             'key': GOOGLE_API_KEY,
             'location': f"{center['lat']},{center['lng']}",
             'radius': radius_meters,
-            'keyword': 'bar',
             'type': 'bar',
         }
         if next_page_token:
