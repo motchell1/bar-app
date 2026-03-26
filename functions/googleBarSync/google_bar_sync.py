@@ -27,6 +27,7 @@ GOOGLE_FIELD_MASK = ','.join([
     'places.currentOpeningHours',
     'places.rating',
     'places.priceLevel',
+    'places.websiteUri',
     # Required to keep the existing new-bar image flow without any Place Details call.
     'places.photos',
     'nextPageToken'
@@ -165,7 +166,14 @@ def search_text_places(rectangles: List[Dict[str, Dict[str, float]]]) -> List[Di
     combined = []
     for index, rectangle in enumerate(rectangles, start=1):
         LOGGER.info('Running Text Search rectangle %s/%s', index, len(rectangles))
-        combined.extend(search_text_by_rectangle(rectangle))
+        rectangle_places = search_text_by_rectangle(rectangle)
+        LOGGER.info(
+            'Text Search rectangle %s/%s returned %s place result(s)',
+            index,
+            len(rectangles),
+            len(rectangle_places),
+        )
+        combined.extend(rectangle_places)
 
     deduped = {}
     for place in combined:
@@ -220,6 +228,7 @@ def build_candidate_bar(place: Dict, neighborhood_name: str) -> Optional[Dict]:
         'google_place_id': place_id,
         'name': name,
         'address': address,
+        'website_url': place.get('websiteUri'),
         'neighborhood': neighborhood_name,
         'business_status': place.get('businessStatus'),
         'hours': format_open_hours(opening_hours.get('periods', [])),
