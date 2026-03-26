@@ -28,7 +28,6 @@ GOOGLE_FIELD_MASK = ','.join([
     'places.rating',
     'places.priceLevel',
     'places.websiteUri',
-    # Required to keep the existing new-bar image flow without any Place Details call.
     'places.photos',
     'nextPageToken'
 ])
@@ -54,7 +53,7 @@ NEIGHBORHOOD_CONFIGS = {
             },
             {
                 'low': {'lat': 40.4351, 'lng':  -80.0085},
-                'high': {'lat': 40.4454, 'lng':  -80.0020},
+                'high': {'lat': 40.4454, 'lng':  -80.0000},
             }
         ],
         'polygon': [
@@ -119,9 +118,10 @@ def search_text_by_rectangle(rectangle: Dict[str, Dict[str, float]]) -> List[Dic
 
     while True:
         body = {
-            'textQuery': 'bar',
+            'textQuery': 'bars',
             'pageSize': 20,
             'rankPreference': 'RELEVANCE',
+            'includedType': 'bar',
             'locationRestriction': {
                 'rectangle': {
                     'low': {
@@ -152,11 +152,13 @@ def search_text_by_rectangle(rectangle: Dict[str, Dict[str, float]]) -> List[Dic
         payload = response.json()
 
         places.extend(payload.get('places', []))
+    
         next_page_token = payload.get('nextPageToken')
         if not next_page_token:
+            print('No more Text Search pages.')
             break
 
-        LOGGER.info('Fetching next Text Search page for rectangle.')
+        LOGGER.info('Fetching next page of results for rectangle.')
         time.sleep(2)
 
     return places
