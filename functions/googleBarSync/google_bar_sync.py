@@ -29,6 +29,7 @@ GOOGLE_FIELD_MASK = ','.join([
     'places.priceLevel',
     # Required to keep the existing new-bar image flow without any Place Details call.
     'places.photos',
+    'nextPageToken'
 ])
 
 DAY_MAP = {
@@ -47,8 +48,12 @@ NEIGHBORHOOD_CONFIGS = {
         'neighborhood_name': 'Downtown',
         'search_rectangles': [
             {
-                'low': {'lat': 40.4325, 'lng': -80.0208},
-                'high': {'lat': 40.4475, 'lng': -79.9870},
+                'low': {'lat': 40.4351, 'lng': -80.0020},
+                'high': {'lat': 40.4484, 'lng':  -79.9939},
+            },
+            {
+                'low': {'lat': 40.4351, 'lng':  -80.0085},
+                'high': {'lat': 40.4454, 'lng':  -80.0020},
             }
         ],
         'polygon': [
@@ -115,6 +120,7 @@ def search_text_by_rectangle(rectangle: Dict[str, Dict[str, float]]) -> List[Dic
         body = {
             'textQuery': 'bar',
             'pageSize': 20,
+            'rankPreference': 'RELEVANCE',
             'locationRestriction': {
                 'rectangle': {
                     'low': {
