@@ -29,7 +29,6 @@ GOOGLE_FIELD_MASK = ','.join([
     'places.priceLevel',
     # Required to keep the existing new-bar image flow without any Place Details call.
     'places.photos',
-    'nextPageToken',
 ])
 
 DAY_MAP = {
