@@ -13,6 +13,25 @@ The folders inside `functions/` each correspond to an AWS Lambda function.
 - **`refreshOpenHours`**  
   Works together with **`fetchGoogleAPIHours`** to retrieve current open-hours data directly from Google and update the database. This process is currently triggered manually.
 
+
+- **`googleBarSync`**  
+  This is the only entry point for the new two-Lambda bar sync flow. It accepts only `{ "neighborhood": "downtown" }`, loads the built-in neighborhood config, calls Places API (New) Text Search (`textQuery: "bar"`) using one or more configured rectangle `locationRestriction` search windows per neighborhood, dedupes results across all rectangles/pages, filters candidates to the configured polygon, formats open hours using the same structure as `fetchGoogleAPIHours`, asks `dbBarSync` which bars are new vs existing, fetches Google photos only for new bars using Place Photos (New), uploads those images to S3, and then calls `dbBarSync` again to save the results. It no longer makes Place Details calls during the sync.
+
+  Required environment variables:
+  - `GOOGLE_API_KEY`
+  - `S3_BUCKET_NAME`
+  - `BAR_IMAGE_FOLDER`
+  - `DB_BAR_SYNC_LAMBDA_NAME`
+
+- **`dbBarSync`**  
+  This Lambda is invoked only by `googleBarSync`. On the first invocation it categorizes bars into `new_bars` and `existing_bars` by `google_place_id`. On the second invocation it inserts new bar records into `bar`, upserts all open-hours rows into `open_hours`, and marks any bar whose Google `business_status` is not `OPERATIONAL` as inactive. It uses the same RDS connection variable pattern as the existing database Lambdas.
+
+  Required environment variables:
+  - `RDS_HOST`
+  - `DB_USER`
+  - `DB_PASSWORD`
+  - `DB_NAME`
+
 - **`insertUserReport`**  
   Used on the special details view. When a user marks a special for review, this function is called to insert a report record in the database.
 
@@ -169,3 +188,26 @@ The folders inside `functions/` each correspond to an AWS Lambda function.
 - Favorites are now persisted in the background whenever a user favorites/unfavorites a special.
 - Endpoint used by the web app:
   - `https://qz5rs9i9ya.execute-api.us-east-2.amazonaws.com/default/updateDeviceFavorite`
+
+
+## Two-Lambda bar sync flow
+
+1. Invoke `googleBarSync` with:
+
+   ```json
+   {
+     "neighborhood": "downtown"
+   }
+   ```
+
+2. `googleBarSync` loads the built-in neighborhood config (polygon + one or more search rectangles), runs Places Text Search for each rectangle with pagination, dedupes results, filters candidates to the polygon, and builds a bar list with formatted hours.
+3. `googleBarSync` invokes `dbBarSync` to split candidates into `new_bars` and `existing_bars` using `google_place_id`.
+4. `googleBarSync` leaves `existing_bars` alone, fetches and uploads images only for `new_bars`, and assigns each one an `image_file`.
+5. `googleBarSync` invokes `dbBarSync` a second time.
+6. `dbBarSync` inserts new bars and updates open hours for both new and existing bars.
+
+Design rules:
+- `googleBarSync` is the only public entry point.
+- `googleBarSync` invokes `dbBarSync`.
+- `dbBarSync` never invokes `googleBarSync`.
+- There is no third orchestrator Lambda.
