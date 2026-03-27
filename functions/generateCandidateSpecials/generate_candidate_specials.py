@@ -136,13 +136,10 @@ def extract_text(html: str) -> str:
 def collect_page_text(urls: List[str], max_chars_per_page: int = 6000) -> List[Dict[str, str]]:
     pages: List[Dict[str, str]] = []
     for url in urls:
-        try:
-            html = fetch_html(url)
-            text = extract_text(html)
-            if text:
-                pages.append({'url': url, 'text': text[:max_chars_per_page]})
-        except Exception as exc:
-            print(f'Failed to fetch candidate page {url}: {exc}')
+        html = fetch_html(url)
+        text = extract_text(html)
+        if text:
+            pages.append({'url': url, 'text': text[:max_chars_per_page]})
     return pages
 
 
@@ -167,12 +164,14 @@ def build_openai_prompt(homepage_url: str, pages: List[Dict[str, str]]) -> str:
         'end_time (HH:MM 24-hour or null), '\
         'all_day ("Y"|"N"), '\
         'confidence (0.0-1.0), '\
-        'notes (short explanation).\n\n'
+        'notes (short explanation), '\
+        'source (URL string).\n\n'
         'Normalization rules: '\
         'times like "5-7pm" must be normalized to 24-hour HH:MM; '\
         '"late night" without explicit time => start_time/end_time null; '\
         '"daily" => all 7 days; "weekdays" => MON-FRI; '\
-        'if no time is given => all_day="Y" and times null.'
+        'if no time is given => all_day="Y" and times null. '\
+        'source must be one of the Source URLs provided above.'
     )
 
 
@@ -230,7 +229,7 @@ def _normalize_time(value: Any) -> Optional[str]:
     return f'{hour:02d}:{minute:02d}'
 
 
-def normalize_specials(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def normalize_specials(items: List[Dict[str, Any]], homepage_url: str, candidate_urls: List[str]) -> List[Dict[str, Any]]:
     normalized: List[Dict[str, Any]] = []
     for item in items:
         if not isinstance(item, dict):
@@ -270,6 +269,12 @@ def normalize_specials(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         notes = item.get('notes')
         notes = notes.strip() if isinstance(notes, str) else ''
 
+        source_raw = item.get('source')
+        source = source_raw.strip() if isinstance(source_raw, str) else ''
+        source_matches_candidate = source in candidate_urls
+        if not source_matches_candidate:
+            source = homepage_url
+
         normalized.append({
             'description': description.strip(),
             'type': special_type,
@@ -278,7 +283,8 @@ def normalize_specials(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
             'end_time': end_time,
             'all_day': all_day,
             'confidence': confidence,
-            'notes': notes
+            'notes': notes,
+            'source': source
         })
 
     return normalized
@@ -296,7 +302,7 @@ def generate_candidate_specials(homepage_url: str) -> List[Dict[str, Any]]:
 
     prompt = build_openai_prompt(homepage_url, pages)
     raw_specials = call_openai_for_specials(prompt)
-    return normalize_specials(raw_specials)
+    return normalize_specials(raw_specials, homepage_url=homepage_url, candidate_urls=target_urls)
 
 
 def lambda_handler(event, context):

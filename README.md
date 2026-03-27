@@ -129,6 +129,7 @@ The folders inside `functions/` each correspond to an AWS Lambda function.
   - `all_day` (`Y` or `N`)
   - `confidence` (0.0–1.0)
   - `notes`
+  - `source` (homepage URL for crawl-only attribution, or source page URL when AI extracts from candidate links)
 
   Guardrails:
   - Excludes regular menu items and general business hours
