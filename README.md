@@ -120,6 +120,28 @@ The folders inside `functions/` each correspond to an AWS Lambda function.
   - `s3:PutObject` on `data/complete/*` and `data/error/*`
   - `s3:DeleteObject` on `data/input/*`
 
+- **`generateCandidateSpecials`**  
+  Given a bar website homepage URL, this Lambda crawls homepage links, prioritizes pages whose links contain `special`, `happy`, `menu`, or `event`, extracts text from the top 1–3 matches, and sends that content to OpenAI to produce structured candidate specials. It returns normalized fields:
+  - `description`
+  - `type` (`food`, `drink`, or `unknown`)
+  - `days_of_week` (`MON`..`SUN`)
+  - `start_time`/`end_time` in `HH:MM` (24-hour) or `null`
+  - `all_day` (`Y` or `N`)
+  - `confidence` (0.0–1.0)
+  - `notes`
+
+  Guardrails:
+  - Excludes regular menu items and general business hours
+  - Does not infer missing information
+  - Returns `[]` when no specials are found
+
+  Required environment variables:
+  - `OPENAI_API_KEY`
+
+  Optional environment variables:
+  - `OPENAI_MODEL` (default `gpt-4.1-mini`)
+  - `OPENAI_TIMEOUT_SECONDS` (default `20`)
+
 - **`findAllBarsByNeighborhood`**  
   Searches Google Places for bar candidates in a configured Pittsburgh neighborhood, filters and deduplicates results, generates a CSV using the existing import structure, and uploads it to the S3 import folder for manual review before running `importCSVtoDatabase`.
 
