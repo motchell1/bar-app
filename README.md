@@ -170,6 +170,14 @@ The folders inside `functions/` each correspond to an AWS Lambda function.
   Design note:
   - The Lambda is neighborhood-config driven so additional neighborhoods can be added later by configuration (for example North Shore, Strip District, Lawrenceville, Shadyside) without rewriting the import flow.
 
+- **`generateCandidateSpecials`**  
+  Contains a Python helper function `generate_candidate_specials_from_homepage(homepage_url, ...)` that:
+  1) fetches homepage links,
+  2) filters links containing `special`, `happy`, `menu`, or `event`,
+  3) visits up to 3 matching pages,
+  4) extracts text, and
+  5) sends the text to the OpenAI API to return candidate specials.
+
 - **`updateDeviceFavorite`**  
   Updates records in `device_favorite` for a given `device_id` and `special_id`. Pass `is_favorite: true` to insert (or keep) a favorite row, and `is_favorite: false` to delete the row.
 
