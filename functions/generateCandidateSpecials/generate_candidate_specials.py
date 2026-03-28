@@ -14,6 +14,8 @@ OPENAI_MODEL = os.environ.get('OPENAI_MODEL', 'gpt-4.1-mini')
 OPENAI_RESPONSES_URL = 'https://api.openai.com/v1/responses'
 MAX_LINKS_TO_VISIT = 3
 MAX_TEXT_CHARS_PER_PAGE = 12000
+HTML_CONTENT_HINTS = ('text/html', 'application/xhtml+xml')
+NON_HTML_EXTENSIONS = ('.pdf', '.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.zip', '.mp4', '.mp3')
 
 KEYWORDS = ('special', 'happy', 'menu', 'event')
 DAY_KEYS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN']
@@ -111,11 +113,53 @@ def parse_event(event):
 def fetch_html(url):
     started_at = time.perf_counter()
     LOGGER.info('Fetching URL: %s', url)
-    response = requests.get(url, timeout=10, headers={'User-Agent': 'bar-specials-bot/1.0'})
+    response = requests.get(
+        url,
+        timeout=10,
+        stream=True,
+        headers={'User-Agent': 'bar-specials-bot/1.0'}
+    )
     response.raise_for_status()
+
+    final_url = response.url or url
+    parsed_final = urlparse(final_url)
+    if parsed_final.path.lower().endswith(NON_HTML_EXTENSIONS):
+        elapsed = time.perf_counter() - started_at
+        LOGGER.info('Skipping non-HTML URL in %.2fs: %s', elapsed, final_url)
+        response.close()
+        return None
+
+    content_type = (response.headers.get('Content-Type') or '').lower()
+    if content_type and all(hint not in content_type for hint in HTML_CONTENT_HINTS):
+        elapsed = time.perf_counter() - started_at
+        LOGGER.info(
+            'Skipping response with non-HTML content-type in %.2fs: %s (%s)',
+            elapsed,
+            final_url,
+            content_type
+        )
+        response.close()
+        return None
+
+    response.encoding = response.encoding or response.apparent_encoding
+    html = response.text
+    response.close()
     elapsed = time.perf_counter() - started_at
     LOGGER.info('Fetched URL in %.2fs: %s', elapsed, url)
-    return response.text
+    return html
+
+
+def _normalize_host(host):
+    normalized = (host or '').lower().strip()
+    if normalized.startswith('www.'):
+        normalized = normalized[4:]
+    return normalized
+
+
+def _is_same_site(host, base_host):
+    host = _normalize_host(host)
+    base_host = _normalize_host(base_host)
+    return host == base_host or host.endswith(f'.{base_host}')
 
 
 def extract_links(homepage_url, html):
@@ -135,7 +179,7 @@ def extract_links(homepage_url, html):
         if parsed.scheme not in ('http', 'https'):
             continue
 
-        if parsed.netloc != homepage_domain:
+        if not _is_same_site(parsed.netloc, homepage_domain):
             continue
 
         normalized = parsed._replace(fragment='').geturl()
@@ -147,12 +191,15 @@ def extract_links(homepage_url, html):
 def choose_candidate_links(links):
     scored = []
     for link in links:
-        blob = f"{link.get('url', '')} {link.get('text', '')}".lower()
+        url_blob = f"{link.get('url', '')}".lower()
+        text_blob = f"{link.get('text', '')}".lower()
+        blob = f'{url_blob} {text_blob}'
         hits = sum(1 for keyword in KEYWORDS if keyword in blob)
         if hits == 0:
             continue
 
-        scored.append((hits, -len(link.get('url', '')), link))
+        keyword_in_text_boost = sum(1 for keyword in KEYWORDS if keyword in text_blob)
+        scored.append((hits, keyword_in_text_boost, -len(link.get('url', '')), link))
 
     scored.sort(reverse=True)
     return [item[2] for item in scored[:MAX_LINKS_TO_VISIT]]
@@ -343,6 +390,9 @@ def generate_from_crawl(homepage_url, bar_name, neighborhood):
         homepage_url
     )
     homepage_html = fetch_html(homepage_url)
+    if not homepage_html:
+        LOGGER.info('Homepage was non-HTML or empty; returning empty crawl result')
+        return []
     links = extract_links(homepage_url, homepage_html)
     LOGGER.info('Extracted %d same-domain links from homepage', len(links))
     top_links = choose_candidate_links(links)
@@ -352,12 +402,20 @@ def generate_from_crawl(homepage_url, bar_name, neighborhood):
     for link in top_links:
         try:
             html = fetch_html(link['url'])
+            if not html:
+                LOGGER.info('Skipping non-HTML candidate link: %s', link['url'])
+                continue
             text = extract_text(html)
             if text:
                 page_payloads.append({'url': link['url'], 'text': text})
                 LOGGER.info('Captured %d characters from %s', len(text), link['url'])
+            else:
+                LOGGER.info('No HTML text captured from %s (likely non-HTML content)', link['url'])
         except requests.RequestException:
             LOGGER.exception('Failed fetching candidate link: %s', link['url'])
+            continue
+        except Exception:
+            LOGGER.exception('Unexpected parse error for candidate link: %s', link['url'])
             continue
 
     if not page_payloads:
