@@ -1,6 +1,8 @@
 import json
+import logging
 import os
 import re
+import time
 from html import unescape
 from html.parser import HTMLParser
 from urllib.parse import urljoin, urlparse
@@ -15,6 +17,9 @@ MAX_TEXT_CHARS_PER_PAGE = 12000
 
 KEYWORDS = ('special', 'happy', 'menu', 'event')
 DAY_KEYS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN']
+
+LOGGER = logging.getLogger(__name__)
+LOGGER.setLevel(logging.INFO)
 
 
 class LinkExtractor(HTMLParser):
@@ -104,8 +109,12 @@ def parse_event(event):
 
 
 def fetch_html(url):
+    started_at = time.perf_counter()
+    LOGGER.info('Fetching URL: %s', url)
     response = requests.get(url, timeout=10, headers={'User-Agent': 'bar-specials-bot/1.0'})
     response.raise_for_status()
+    elapsed = time.perf_counter() - started_at
+    LOGGER.info('Fetched URL in %.2fs: %s', elapsed, url)
     return response.text
 
 
@@ -252,8 +261,16 @@ def call_openai(payload):
         'Content-Type': 'application/json'
     }
 
+    started_at = time.perf_counter()
+    LOGGER.info(
+        'Calling OpenAI Responses API model=%s tools=%s',
+        payload.get('model'),
+        payload.get('tools', [])
+    )
     response = requests.post(OPENAI_RESPONSES_URL, headers=headers, json=payload, timeout=45)
     response.raise_for_status()
+    elapsed = time.perf_counter() - started_at
+    LOGGER.info('OpenAI Responses API call completed in %.2fs', elapsed)
     return response.json()
 
 
@@ -318,9 +335,18 @@ def normalize_item(item, default_source):
 
 
 def generate_from_crawl(homepage_url, bar_name, neighborhood):
+    started_at = time.perf_counter()
+    LOGGER.info(
+        'Starting crawl flow bar_name=%s neighborhood=%s homepage_url=%s',
+        bar_name,
+        neighborhood,
+        homepage_url
+    )
     homepage_html = fetch_html(homepage_url)
     links = extract_links(homepage_url, homepage_html)
+    LOGGER.info('Extracted %d same-domain links from homepage', len(links))
     top_links = choose_candidate_links(links)
+    LOGGER.info('Selected %d candidate links for crawl', len(top_links))
 
     page_payloads = []
     for link in top_links:
@@ -329,10 +355,13 @@ def generate_from_crawl(homepage_url, bar_name, neighborhood):
             text = extract_text(html)
             if text:
                 page_payloads.append({'url': link['url'], 'text': text})
+                LOGGER.info('Captured %d characters from %s', len(text), link['url'])
         except requests.RequestException:
+            LOGGER.exception('Failed fetching candidate link: %s', link['url'])
             continue
 
     if not page_payloads:
+        LOGGER.info('No crawl text payloads available; returning empty list')
         return []
 
     prompt = build_crawl_prompt(bar_name, neighborhood, homepage_url, page_payloads)
@@ -351,10 +380,18 @@ def generate_from_crawl(homepage_url, bar_name, neighborhood):
         if normalized_item and normalized_item['description']:
             normalized.append(normalized_item)
 
+    elapsed = time.perf_counter() - started_at
+    LOGGER.info(
+        'Crawl flow completed in %.2fs; produced %d normalized specials',
+        elapsed,
+        len(normalized)
+    )
     return normalized
 
 
 def generate_from_search(bar_name, neighborhood):
+    started_at = time.perf_counter()
+    LOGGER.info('Starting direct web_search flow bar_name=%s neighborhood=%s', bar_name, neighborhood)
     prompt = build_search_prompt(bar_name, neighborhood)
     payload = {
         'model': OPENAI_MODEL,
@@ -372,27 +409,40 @@ def generate_from_search(bar_name, neighborhood):
         if normalized_item and normalized_item['description']:
             normalized.append(normalized_item)
 
+    elapsed = time.perf_counter() - started_at
+    LOGGER.info(
+        'Direct web_search flow completed in %.2fs; produced %d normalized specials',
+        elapsed,
+        len(normalized)
+    )
     return normalized
 
 
 def lambda_handler(event, context):
+    started_at = time.perf_counter()
     try:
+        LOGGER.info('generate_candidate_specials invocation started')
         homepage_url, bar_name, neighborhood = parse_event(event)
 
         specials = generate_from_crawl(homepage_url, bar_name, neighborhood)
         if not specials:
+            LOGGER.info('No crawl specials found; falling back to OpenAI web_search')
             specials = generate_from_search(bar_name, neighborhood)
 
+        elapsed = time.perf_counter() - started_at
+        LOGGER.info('Invocation complete in %.2fs with %d specials', elapsed, len(specials))
         return {
             'statusCode': 200,
             'body': json.dumps(specials)
         }
     except ValueError as exc:
+        LOGGER.exception('Validation error in generate_candidate_specials')
         return {
             'statusCode': 400,
             'body': json.dumps({'error': str(exc)})
         }
     except Exception as exc:
+        LOGGER.exception('Unhandled error in generate_candidate_specials')
         return {
             'statusCode': 500,
             'body': json.dumps({'error': str(exc)})
