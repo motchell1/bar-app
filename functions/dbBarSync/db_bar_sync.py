@@ -131,13 +131,56 @@ def apply_changes(cursor, new_bars: List[Dict], existing_bars: List[Dict]) -> Di
     return result
 
 
+def get_bars_by_neighborhood(cursor, neighborhood: str) -> Dict[str, List[Dict]]:
+    cursor.execute(
+        """
+        SELECT bar_id, name AS bar_name, neighborhood, website_url
+        FROM bar
+        WHERE neighborhood = %s
+        """,
+        (neighborhood,),
+    )
+    return {'bars': cursor.fetchall()}
+
+
+def insert_special_candidates(cursor, candidates: List[Dict]) -> Dict[str, int]:
+    inserted_count = 0
+    for candidate in candidates:
+        cursor.execute(
+            """
+            INSERT INTO special_candidate
+            (bar_id, bar_name, neighborhood, description, type, days_of_week, start_time, end_time, all_day, is_recurring, date, fetch_method)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """,
+            (
+                candidate['bar_id'],
+                candidate['bar_name'],
+                candidate['neighborhood'],
+                candidate['description'],
+                candidate['type'],
+                json.dumps(candidate.get('days_of_week', [])),
+                candidate.get('start_time'),
+                candidate.get('end_time'),
+                candidate.get('all_day'),
+                candidate.get('is_recurring'),
+                candidate.get('date'),
+                candidate.get('fetch_method'),
+            ),
+        )
+        inserted_count += 1
+
+    return {'inserted_count': inserted_count}
+
+
 def lambda_handler(event, context):
     event = event or {}
     mode = event.get('mode')
-    if mode not in {'categorize', 'apply'}:
+    if mode not in {'categorize', 'apply', 'get_bars_by_neighborhood', 'insert_special_candidates'}:
         return {
             'statusCode': 400,
-            'body': json.dumps({'error': 'mode must be either categorize or apply'}),
+            'body': json.dumps({
+                'error': 'mode must be one of categorize, apply, get_bars_by_neighborhood, insert_special_candidates'
+            }),
         }
 
     conn = get_connection()
@@ -146,8 +189,17 @@ def lambda_handler(event, context):
             if mode == 'categorize':
                 result = categorize_bars(cursor, event.get('bars', []))
                 conn.commit()
-            else:
+            elif mode == 'apply':
                 result = apply_changes(cursor, event.get('new_bars', []), event.get('existing_bars', []))
+                conn.commit()
+            elif mode == 'get_bars_by_neighborhood':
+                neighborhood = event.get('neighborhood')
+                if not neighborhood:
+                    raise ValueError('neighborhood is required for get_bars_by_neighborhood')
+                result = get_bars_by_neighborhood(cursor, neighborhood)
+                conn.commit()
+            else:
+                result = insert_special_candidates(cursor, event.get('candidates', []))
                 conn.commit()
 
         LOGGER.info('dbBarSync %s result=%s', mode, result)
