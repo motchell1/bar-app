@@ -191,6 +191,9 @@ def extract_links(homepage_url, html):
 def choose_candidate_links(links):
     scored = []
     for link in links:
+        if not isinstance(link, dict):
+            continue
+
         url_blob = f"{link.get('url', '')}".lower()
         text_blob = f"{link.get('text', '')}".lower()
         blob = f'{url_blob} {text_blob}'
@@ -202,7 +205,7 @@ def choose_candidate_links(links):
         scored.append((hits, keyword_in_text_boost, -len(link.get('url', '')), link))
 
     scored.sort(reverse=True)
-    return [item[2] for item in scored[:MAX_LINKS_TO_VISIT]]
+    return [item[3].get('url') for item in scored[:MAX_LINKS_TO_VISIT] if item[3].get('url')]
 
 
 def extract_text(html):
@@ -400,22 +403,26 @@ def generate_from_crawl(homepage_url, bar_name, neighborhood):
 
     page_payloads = []
     for link in top_links:
+        candidate_url = link if isinstance(link, str) else None
+        if not candidate_url:
+            LOGGER.info('Skipping malformed candidate link entry: %s', link)
+            continue
         try:
-            html = fetch_html(link['url'])
+            html = fetch_html(candidate_url)
             if not html:
-                LOGGER.info('Skipping non-HTML candidate link: %s', link['url'])
+                LOGGER.info('Skipping non-HTML candidate link: %s', candidate_url)
                 continue
             text = extract_text(html)
             if text:
-                page_payloads.append({'url': link['url'], 'text': text})
-                LOGGER.info('Captured %d characters from %s', len(text), link['url'])
+                page_payloads.append({'url': candidate_url, 'text': text})
+                LOGGER.info('Captured %d characters from %s', len(text), candidate_url)
             else:
-                LOGGER.info('No HTML text captured from %s (likely non-HTML content)', link['url'])
+                LOGGER.info('No HTML text captured from %s (likely non-HTML content)', candidate_url)
         except requests.RequestException:
-            LOGGER.exception('Failed fetching candidate link: %s', link['url'])
+            LOGGER.exception('Failed fetching candidate link: %s', candidate_url)
             continue
         except Exception:
-            LOGGER.exception('Unexpected parse error for candidate link: %s', link['url'])
+            LOGGER.exception('Unexpected parse error for candidate link: %s', candidate_url)
             continue
 
     if not page_payloads:
