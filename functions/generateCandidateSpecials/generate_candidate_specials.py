@@ -243,6 +243,13 @@ STRICT RULES:
 - If information is missing, leave it null
 - If no specials are present, return an empty array []
 
+Extraction strategy (important):
+- Prioritize sections/headings that contain words like: specials, weekly specials, happy hour, deals, promotions.
+- When a section defines a shared schedule (example: "Happy Hour Monday-Friday 4pm-6pm"), apply that schedule to each offer listed under it unless an item overrides it.
+- Split grouped offers into separate specials. If a line contains multiple offers separated by dashes, bullets, semicolons, or conjunctions, output one JSON object per offer.
+- Keep explicit promotional items even when the same page also contains menu and general hours text.
+- Do not discard a valid special just because it appears near menu content.
+
 For each special, return:
 - description (string)
 - type ("food", "drink", or "unknown")
