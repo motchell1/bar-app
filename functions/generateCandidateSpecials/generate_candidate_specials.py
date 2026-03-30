@@ -162,6 +162,11 @@ def _is_same_site(host, base_host):
     return host == base_host or host.endswith(f'.{base_host}')
 
 
+def _is_http_url(value):
+    parsed = urlparse(str(value or '').strip())
+    return parsed.scheme in ('http', 'https') and bool(parsed.netloc)
+
+
 def extract_links(homepage_url, html):
     parser = LinkExtractor()
     parser.feed(html)
@@ -286,7 +291,7 @@ For each special, return:
 - all_day ("Y" or "N")
 - confidence (0.0–1.0)
 - notes (short explanation of how it was interpreted and that this came from direct AI web search)
-- source (include source URL used for the item if available, otherwise "openai_web_search")
+- source (required: exact source URL used by web_search for this item)
 
 Normalization rules:
 - Convert times like "5–7pm" → "17:00" to "19:00"
@@ -298,6 +303,7 @@ Normalization rules:
   - drinks/alcohol → "drink"
   - food/appetizers → "food"
 
+Only include items when a concrete source URL is available.
 Return ONLY valid JSON. No explanations.
 """.strip()
 
@@ -399,6 +405,8 @@ def generate_from_crawl(homepage_url, bar_name, neighborhood):
     links = extract_links(homepage_url, homepage_html)
     LOGGER.info('Extracted %d same-domain links from homepage', len(links))
     top_links = choose_candidate_links(links)
+    top_links = [homepage_url] + [url for url in top_links if url != homepage_url]
+    top_links = top_links[:MAX_LINKS_TO_VISIT]
     LOGGER.info('Selected %d candidate links for crawl', len(top_links))
 
     page_payloads = []
@@ -472,6 +480,12 @@ def generate_from_search(bar_name, neighborhood):
     for item in items:
         normalized_item = normalize_item(item, 'openai_web_search')
         if normalized_item and normalized_item['description']:
+            if not _is_http_url(normalized_item['source']):
+                LOGGER.info('Skipping web_search item without concrete source URL: %s', normalized_item)
+                continue
+            notes = normalized_item.get('notes', '')
+            if 'web_search' not in notes.lower():
+                normalized_item['notes'] = (notes + ' | extracted via direct AI web_search').strip(' |')
             normalized.append(normalized_item)
 
     elapsed = time.perf_counter() - started_at
