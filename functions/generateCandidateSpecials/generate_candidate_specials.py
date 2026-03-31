@@ -113,15 +113,77 @@ def parse_event(event):
         except json.JSONDecodeError:
             pass
 
-    neighborhood = payload.get('neighborhood')
+    if not isinstance(payload, dict):
+        raise ValueError('Event payload must be a JSON object')
 
-    if not neighborhood:
+    bars = payload.get('bars')
+    if isinstance(bars, list):
+        normalized_bars = []
+        for index, bar in enumerate(bars):
+            if not isinstance(bar, dict):
+                raise ValueError(f'bars[{index}] must be an object')
+
+            bar_id = bar.get('bar_id')
+            bar_name = (bar.get('bar_name') or '').strip()
+            neighborhood = (bar.get('neighborhood') or '').strip()
+            homepage_url = (bar.get('homepage_url') or bar.get('website_url') or '').strip()
+
+            missing = []
+            if bar_id in (None, ''):
+                missing.append('bar_id')
+            if not bar_name:
+                missing.append('bar_name')
+            if not neighborhood:
+                missing.append('neighborhood')
+            if not homepage_url:
+                missing.append('homepage_url')
+            if missing:
+                raise ValueError(f"bars[{index}] missing required fields: {', '.join(missing)}")
+
+            normalized_bars.append({
+                'bar_id': bar_id,
+                'bar_name': bar_name,
+                'neighborhood': neighborhood,
+                'homepage_url': homepage_url
+            })
+
+        if not normalized_bars:
+            raise ValueError('bars must include at least one bar')
+        return {'mode': 'bars', 'bars': normalized_bars}
+
+    if any(key in payload for key in ('bar_id', 'bar_name', 'homepage_url', 'website_url')):
+        bar_id = payload.get('bar_id')
+        bar_name = (payload.get('bar_name') or '').strip()
+        neighborhood = (payload.get('neighborhood') or '').strip()
+        homepage_url = (payload.get('homepage_url') or payload.get('website_url') or '').strip()
+
         missing = []
+        if bar_id in (None, ''):
+            missing.append('bar_id')
+        if not bar_name:
+            missing.append('bar_name')
         if not neighborhood:
             missing.append('neighborhood')
-        raise ValueError(f'Missing required fields: {", ".join(missing)}')
+        if not homepage_url:
+            missing.append('homepage_url')
+        if missing:
+            raise ValueError(f"Missing required fields: {', '.join(missing)}")
 
-    return neighborhood.strip()
+        return {
+            'mode': 'bars',
+            'bars': [{
+                'bar_id': bar_id,
+                'bar_name': bar_name,
+                'neighborhood': neighborhood,
+                'homepage_url': homepage_url
+            }]
+        }
+
+    neighborhood = (payload.get('neighborhood') or '').strip()
+    if not neighborhood:
+        raise ValueError('Missing required fields: neighborhood')
+
+    return {'mode': 'neighborhood', 'neighborhood': neighborhood}
 
 
 def invoke_db_bar_sync(payload):
@@ -618,31 +680,39 @@ def lambda_handler(event, context):
     started_at = time.perf_counter()
     try:
         LOGGER.info('generate_candidate_specials invocation started')
-        neighborhood = parse_event(event)
+        parsed_event = parse_event(event)
+        response_neighborhood = parsed_event.get('neighborhood')
         total_candidates = []
         processed_bars = 0
-        bars_result = invoke_db_bar_sync({'mode': 'get_bars_by_neighborhood', 'neighborhood': neighborhood})
-        bars = bars_result.get('bars', [])
-        LOGGER.info('Found %d bars in neighborhood=%s', len(bars), neighborhood)
+
+        if parsed_event['mode'] == 'bars':
+            bars = parsed_event['bars']
+            LOGGER.info('Received %d bars directly in event payload', len(bars))
+        else:
+            neighborhood = parsed_event['neighborhood']
+            bars_result = invoke_db_bar_sync({'mode': 'get_bars_by_neighborhood', 'neighborhood': neighborhood})
+            bars = bars_result.get('bars', [])
+            LOGGER.info('Found %d bars in neighborhood=%s', len(bars), neighborhood)
 
         for bar in bars:
-            homepage_url = (bar.get('website_url') or '').strip()
+            homepage_url = (bar.get('homepage_url') or bar.get('website_url') or '').strip()
             bar_name = (bar.get('bar_name') or '').strip()
+            bar_neighborhood = (bar.get('neighborhood') or '').strip()
             if not homepage_url or not bar_name:
                 LOGGER.info('Skipping bar_id=%s due to missing website or name', bar.get('bar_id'))
                 continue
 
             processed_bars += 1
-            specials = generate_from_crawl(homepage_url, bar_name, neighborhood)
+            specials = generate_from_crawl(homepage_url, bar_name, bar_neighborhood)
             if not specials:
                 LOGGER.info('No crawl specials found for bar_id=%s; using OpenAI web_search', bar.get('bar_id'))
-                specials = generate_from_search(bar_name, neighborhood)
+                specials = generate_from_search(bar_name, bar_neighborhood)
 
             for special in specials:
                 total_candidates.append({
                     'bar_id': bar['bar_id'],
                     'bar_name': bar_name,
-                    'neighborhood': neighborhood,
+                    'neighborhood': bar_neighborhood,
                     **special
                 })
 
@@ -660,7 +730,7 @@ def lambda_handler(event, context):
         return {
             'statusCode': 200,
             'body': json.dumps({
-                'neighborhood': neighborhood,
+                'neighborhood': response_neighborhood,
                 'processed_bars': processed_bars,
                 'candidate_specials_found': len(total_candidates),
                 'candidate_specials_inserted': inserted_count
