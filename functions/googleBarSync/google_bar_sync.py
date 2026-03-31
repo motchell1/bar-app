@@ -63,7 +63,24 @@ NEIGHBORHOOD_CONFIGS = {
             {'lat': 40.434590, 'lng': -79.996123},
             {'lat': 40.442357, 'lng': -80.015060},
         ],
-    }
+    },
+    'north shore': {
+        'neighborhood_name': 'North Shore',
+        'search_rectangles': [
+            {
+                'low': {'lat': 40.4450, 'lng': -80.0240},
+                'high': {'lat': 40.4568, 'lng': -80.0005},
+            },
+        ],
+        'polygon': [
+            {'lat': 40.451900, 'lng': -80.024900},
+            {'lat': 40.456800, 'lng': -80.015000},
+            {'lat': 40.454900, 'lng': -80.000500},
+            {'lat': 40.446700, 'lng': -79.999300},
+            {'lat': 40.445000, 'lng': -80.017800},
+            {'lat': 40.451900, 'lng': -80.024900},
+        ],
+    },
 }
 
 lambda_client = boto3.client('lambda')
@@ -76,7 +93,7 @@ class GoogleBarSyncError(Exception):
 
 
 def get_neighborhood_config(neighborhood: Optional[str]) -> Dict:
-    neighborhood_key = (neighborhood or '').strip().lower()
+    neighborhood_key = (neighborhood or '').strip().lower().replace('_', ' ').replace('-', ' ')
     if not neighborhood_key:
         raise GoogleBarSyncError('Event field "neighborhood" is required.')
 
