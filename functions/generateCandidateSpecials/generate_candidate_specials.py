@@ -244,7 +244,7 @@ def choose_candidate_links(links):
         keyword_in_text_boost = sum(1 for keyword in KEYWORDS if keyword in text_blob)
         scored.append((hits, keyword_in_text_boost, -len(link.get('url', '')), link))
 
-    scored.sort(reverse=True)
+    scored.sort(key=lambda row: (row[0], row[1], row[2]), reverse=True)
     return [item[3].get('url') for item in scored[:MAX_LINKS_TO_VISIT] if item[3].get('url')]
 
 
