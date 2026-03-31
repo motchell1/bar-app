@@ -575,7 +575,14 @@ def generate_from_crawl(homepage_url, bar_name, neighborhood):
         neighborhood,
         homepage_url
     )
-    homepage_html = fetch_html(homepage_url)
+    try:
+        homepage_html = fetch_html(homepage_url)
+    except requests.RequestException:
+        LOGGER.exception('Failed fetching homepage for crawl; falling back to web_search: %s', homepage_url)
+        return []
+    except Exception:
+        LOGGER.exception('Unexpected homepage crawl error; falling back to web_search: %s', homepage_url)
+        return []
     if not homepage_html:
         LOGGER.info('Homepage was non-HTML or empty; returning empty crawl result')
         return []
@@ -703,7 +710,14 @@ def lambda_handler(event, context):
                 continue
 
             processed_bars += 1
-            specials = generate_from_crawl(homepage_url, bar_name, bar_neighborhood)
+            try:
+                specials = generate_from_crawl(homepage_url, bar_name, bar_neighborhood)
+            except Exception:
+                LOGGER.exception(
+                    'Crawl flow crashed for bar_id=%s; falling back to OpenAI web_search',
+                    bar.get('bar_id')
+                )
+                specials = []
             if not specials:
                 LOGGER.info('No crawl specials found for bar_id=%s; using OpenAI web_search', bar.get('bar_id'))
                 specials = generate_from_search(bar_name, bar_neighborhood)
