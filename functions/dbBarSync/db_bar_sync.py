@@ -149,8 +149,8 @@ def insert_special_candidates(cursor, candidates: List[Dict]) -> Dict[str, int]:
         cursor.execute(
             """
             INSERT INTO special_candidate
-            (bar_id, bar_name, neighborhood, description, type, days_of_week, start_time, end_time, all_day, is_recurring, date, fetch_method)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            (bar_id, bar_name, neighborhood, description, type, days_of_week, start_time, end_time, all_day, is_recurring, date, fetch_method, source, confidence)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """,
             (
                 candidate['bar_id'],
@@ -165,6 +165,8 @@ def insert_special_candidates(cursor, candidates: List[Dict]) -> Dict[str, int]:
                 candidate.get('is_recurring'),
                 candidate.get('date'),
                 candidate.get('fetch_method'),
+                candidate.get('source') or candidate.get('source_url'),
+                candidate.get('confidence'),
             ),
         )
         inserted_count += 1
