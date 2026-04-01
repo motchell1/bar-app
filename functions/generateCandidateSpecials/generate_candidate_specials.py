@@ -16,9 +16,9 @@ OPENAI_MODEL = os.environ.get('OPENAI_MODEL', 'gpt-4.1-mini')
 OPENAI_RESPONSES_URL = 'https://api.openai.com/v1/responses'
 DB_BAR_SYNC_LAMBDA_NAME = os.environ.get('DB_BAR_SYNC_LAMBDA_NAME')
 MAX_LINKS_TO_VISIT = 3
-MAX_TEXT_CHARS_PER_PAGE = 12000
-MAX_WEB_SCRAPE_CHARS = int(os.environ.get('MAX_WEB_SCRAPE_CHARS', '12000'))
-KEYWORD_MATCH_CHAR_WINDOW_SIZE = int(os.environ.get('KEYWORD_MATCH_CHAR_WINDOW_SIZE', '220'))
+MAX_TEXT_CHARS_PER_PAGE = 40000
+MAX_WEB_SCRAPE_CHARS = 12000
+KEYWORD_MATCH_CHAR_WINDOW_SIZE = 500
 HTML_CONTENT_HINTS = ('text/html', 'application/xhtml+xml')
 NON_HTML_EXTENSIONS = ('.pdf', '.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.zip', '.mp4', '.mp3')
 
