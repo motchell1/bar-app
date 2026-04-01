@@ -169,8 +169,8 @@ def _insert_auto_approved_specials(cursor, candidate: Dict) -> List[int]:
         cursor.execute(
             """
             INSERT INTO special
-            (bar_id, day_of_week, all_day, start_time, end_time, description, type)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            (bar_id, day_of_week, all_day, start_time, end_time, description, type, insert_method)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
             RETURNING special_id
             """,
             (
@@ -181,6 +181,7 @@ def _insert_auto_approved_specials(cursor, candidate: Dict) -> List[int]:
                 candidate.get('end_time'),
                 candidate.get('description'),
                 candidate.get('type'),
+                'AUTO',
             ),
         )
         row = cursor.fetchone() or {}
