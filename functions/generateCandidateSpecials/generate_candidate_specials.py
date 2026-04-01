@@ -17,11 +17,19 @@ OPENAI_RESPONSES_URL = 'https://api.openai.com/v1/responses'
 DB_BAR_SYNC_LAMBDA_NAME = os.environ.get('DB_BAR_SYNC_LAMBDA_NAME')
 MAX_LINKS_TO_VISIT = 3
 MAX_TEXT_CHARS_PER_PAGE = 12000
+MAX_WEB_SCRAPE_CHARS = int(os.environ.get('MAX_WEB_SCRAPE_CHARS', '12000'))
+KEYWORD_MATCH_CHAR_WINDOW_SIZE = int(os.environ.get('KEYWORD_MATCH_CHAR_WINDOW_SIZE', '220'))
 HTML_CONTENT_HINTS = ('text/html', 'application/xhtml+xml')
 NON_HTML_EXTENSIONS = ('.pdf', '.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.zip', '.mp4', '.mp3')
 
 KEYWORDS = ('special', 'happy', 'menu', 'event')
 DAY_KEYS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN']
+SPECIALS_VOCAB = (
+    'happy hour', 'special', 'specials', 'deal', 'deals', 'promo', 'promotion', 'daily', 'weekdays',
+    'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday',
+    'draft', 'beer', 'wine', 'cocktail', 'half off',
+    'wings', 'apps', 'burger night', 'taco tuesday'
+)
 
 LOGGER = logging.getLogger(__name__)
 LOGGER.setLevel(logging.INFO)
@@ -307,7 +315,7 @@ def choose_candidate_links(links):
         scored.append((hits, keyword_in_text_boost, -len(link.get('url', '')), link))
 
     scored.sort(key=lambda row: (row[0], row[1], row[2]), reverse=True)
-    return [item[3].get('url') for item in scored[:MAX_LINKS_TO_VISIT] if item[3].get('url')]
+    return [item[3].get('url') for item in scored if item[3].get('url')]
 
 
 def extract_text(html):
@@ -317,10 +325,46 @@ def extract_text(html):
     return text[:MAX_TEXT_CHARS_PER_PAGE]
 
 
+def _extract_keyword_windows(text):
+    capped_text = (text or '')[:MAX_WEB_SCRAPE_CHARS]
+    lowered = capped_text.lower()
+    if not lowered:
+        return capped_text
+
+    intervals = []
+    for term in SPECIALS_VOCAB:
+        start = 0
+        while True:
+            index = lowered.find(term, start)
+            if index == -1:
+                break
+            interval_start = max(0, index - KEYWORD_MATCH_CHAR_WINDOW_SIZE)
+            interval_end = min(len(capped_text), index + len(term) + KEYWORD_MATCH_CHAR_WINDOW_SIZE)
+            intervals.append((interval_start, interval_end))
+            start = index + len(term)
+
+    if not intervals:
+        return capped_text
+
+    intervals.sort()
+    merged = [intervals[0]]
+    for start, end in intervals[1:]:
+        last_start, last_end = merged[-1]
+        if start <= last_end:
+            merged[-1] = (last_start, max(last_end, end))
+        else:
+            merged.append((start, end))
+
+    snippets = [capped_text[start:end].strip() for start, end in merged if capped_text[start:end].strip()]
+    focused_text = '\n...\n'.join(snippets)
+    return focused_text[:MAX_WEB_SCRAPE_CHARS]
+
+
 def build_crawl_prompt(bar_name, neighborhood, homepage_url, page_payloads):
     pages_blob = []
     for page in page_payloads:
-        pages_blob.append(f"URL: {page['url']}\nTEXT:\n{page['text']}")
+        focused_text = _extract_keyword_windows(page['text'])
+        pages_blob.append(f"URL: {page['url']}\nTEXT:\n{focused_text}")
 
     content = '\n\n'.join(pages_blob)
 
@@ -595,12 +639,13 @@ def generate_from_crawl(homepage_url, bar_name, neighborhood):
     links = extract_links(homepage_url, homepage_html)
     LOGGER.info('Extracted %d same-domain links from homepage', len(links))
     top_links = choose_candidate_links(links)
-    top_links = [homepage_url] + [url for url in top_links if url != homepage_url]
-    top_links = top_links[:MAX_LINKS_TO_VISIT]
-    LOGGER.info('Selected %d candidate links for crawl', len(top_links))
+    candidate_links = [homepage_url] + [url for url in top_links if url != homepage_url]
+    LOGGER.info('Selected %d initial candidate links for crawl', len(candidate_links))
 
     page_payloads = []
-    for link in top_links:
+    for link in candidate_links:
+        if len(page_payloads) >= MAX_LINKS_TO_VISIT:
+            break
         candidate_url = link if isinstance(link, str) else None
         if not candidate_url:
             LOGGER.info('Skipping malformed candidate link entry: %s', link)
