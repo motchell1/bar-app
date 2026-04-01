@@ -410,7 +410,13 @@ Normalization rules:
   - drinks/alcohol → "drink"
   - food/appetizers → "food"
 - Validate that each source URL actually supports the special claim; reduce confidence if source evidence is weak, indirect, or ambiguous.
-- Never set confidence above 0.9 for web_search-derived specials.
+- Set confidence based on evidence strength and source quality. Suggested rubric:
+  - 0.85-1.00: corroborated by multiple independent reliable sources and recent updates.
+  - 0.65-0.84: supported by one reliable primary source (official bar site or verified official social post) with clear details.
+  - 0.40-0.64: only one source and/or details are partially ambiguous (missing day/time, unclear recurrence).
+  - 0.10-0.39: stale or weak evidence (old posts, indirect mentions, third-party reposts without confirmation).
+- If only one source is found, avoid high confidence unless the source is clearly official and specific.
+- Lower confidence when source content appears outdated or does not include a clear effective timeframe.
 
 Only include items when a concrete source URL is available.
 Return ONLY valid JSON. No explanations.
@@ -670,7 +676,6 @@ def generate_from_search(bar_name, neighborhood):
             if not _is_http_url(normalized_item['source_url']):
                 LOGGER.info('Skipping web_search item without concrete source URL: %s', normalized_item)
                 continue
-            normalized_item['confidence'] = min(normalized_item['confidence'], 0.9)
             normalized_item['fetch_method'] = 'web_ai_search'
             normalized.append(normalized_item)
 
