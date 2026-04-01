@@ -329,7 +329,7 @@ def _extract_keyword_windows(text):
     capped_text = (text or '')[:MAX_WEB_SCRAPE_CHARS]
     lowered = capped_text.lower()
     if not lowered:
-        return capped_text
+        return ''
 
     intervals = []
     for term in SPECIALS_VOCAB:
@@ -344,7 +344,7 @@ def _extract_keyword_windows(text):
             start = index + len(term)
 
     if not intervals:
-        return capped_text
+        return ''
 
     intervals.sort()
     merged = [intervals[0]]
@@ -363,8 +363,7 @@ def _extract_keyword_windows(text):
 def build_crawl_prompt(bar_name, neighborhood, homepage_url, page_payloads):
     pages_blob = []
     for page in page_payloads:
-        focused_text = _extract_keyword_windows(page['text'])
-        pages_blob.append(f"URL: {page['url']}\nTEXT:\n{focused_text}")
+        pages_blob.append(f"URL: {page['url']}\nTEXT:\n{page['text']}")
 
     content = '\n\n'.join(pages_blob)
 
@@ -657,8 +656,15 @@ def generate_from_crawl(homepage_url, bar_name, neighborhood):
                 continue
             text = extract_text(html)
             if text:
-                page_payloads.append({'url': candidate_url, 'text': text})
-                LOGGER.info('Captured %d characters from %s', len(text), candidate_url)
+                focused_text = _extract_keyword_windows(text)
+                if not focused_text:
+                    LOGGER.info(
+                        'No specials-vocabulary hits in %s; skipping AI payload and backfilling next candidate',
+                        candidate_url
+                    )
+                    continue
+                page_payloads.append({'url': candidate_url, 'text': focused_text})
+                LOGGER.info('Captured %d focused characters from %s', len(focused_text), candidate_url)
             else:
                 LOGGER.info('No HTML text captured from %s (likely non-HTML content)', candidate_url)
         except requests.RequestException:
