@@ -452,7 +452,7 @@ Extraction strategy (important):
 
 For each special, return:
 - description (string; omit labels such as "happy hour" / "HH" and keep only the actual offer details)
-- type ("food", "drink", or "unknown")
+- type ("food", "drink", "both", or "unknown")
 - days_of_week (array of MON, TUE, WED, THU, FRI, SAT, SUN)
 - start_time (HH:MM 24-hour or null)
 - end_time (HH:MM 24-hour or null)
@@ -496,7 +496,7 @@ STRICT RULES:
 
 For each special, return:
 - description (string; omit labels such as "happy hour" / "HH" and keep only the actual offer details)
-- type ("food", "drink", or "unknown")
+- type ("food", "drink",  or "unknown")
 - days_of_week (array of MON, TUE, WED, THU, FRI, SAT, SUN)
 - start_time (HH:MM 24-hour or null)
 - end_time (HH:MM 24-hour or null)
@@ -516,14 +516,13 @@ Normalization rules:
   - food/appetizers → "food"
 - Validate that each source URL actually supports the special claim; reduce confidence if source evidence is weak, indirect, or ambiguous.
 - Set confidence based on evidence strength and source quality. Suggested rubric:
-  - 0.85-1.00: corroborated by multiple independent reliable sources and recent updates.
-  - 0.65-0.84: supported by one reliable primary source (official bar site or verified official social post) with clear details.
-  - 0.40-0.64: only one source and/or details are partially ambiguous (missing day/time, unclear recurrence).
+  - 1.00: Special has price or discount type, food or drink item, and clear determination of day/time/recurrance defined for each item corroborated by at least two independent reliable sources with recent updates.
+  - 0.85-0.99: Special has price or discount type, food or drink item, and clear determination of day/time/recurrance defined for each item corroborated by only one reliable source with recent updates.
+  - 0.70-0.84: Slight ambiguity of one of: (price or discount type, food or drink item, or day/time/recurrance) or source is questionable
+  - 0.40-0.69: Ambiguity of two of: (price or discount type, food or drink item, or day/time/recurrance)
   - 0.10-0.39: stale or weak evidence (old posts, indirect mentions, third-party reposts without confirmation).
-- If only one source is found, avoid high confidence unless the source is clearly official and specific.
-- Lower confidence when source content appears outdated or does not include a clear effective timeframe.
 
-Only include items when a concrete source URL is available.
+Only include items when a concrete source URL is available. Only include items that are an actual discount - don't just include events without a food or drink discount.
 Return ONLY valid JSON. No explanations.
 """.strip()
 
@@ -857,6 +856,10 @@ def lambda_handler(event, context):
         processed_bars = 0
         crawl_specials_count = 0
         web_ai_search_specials_count = 0
+        auto_approved_count = 0
+        inserted_count = 0
+        runs_created = 0
+        auto_published_runs = 0
 
         if parsed_event['mode'] == 'bars':
             bars = parsed_event['bars']
@@ -868,6 +871,7 @@ def lambda_handler(event, context):
             LOGGER.info('Found %d bars in neighborhood=%s', len(bars), neighborhood)
 
         for bar in bars:
+            run_started_at = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
             homepage_url = (bar.get('homepage_url') or bar.get('website_url') or '').strip()
             bar_name = (bar.get('bar_name') or '').strip()
             bar_neighborhood = (bar.get('neighborhood') or '').strip()
@@ -897,21 +901,56 @@ def lambda_handler(event, context):
                 )
                 specials = generate_from_search(bar_name, bar_neighborhood)
 
+            bar_candidates = []
+            bar_crawl_specials_count = 0
+            bar_web_ai_search_specials_count = 0
             for special in specials:
                 if special.get('fetch_method') == 'website_crawl':
                     crawl_specials_count += 1
+                    bar_crawl_specials_count += 1
                 elif special.get('fetch_method') == 'web_ai_search':
                     web_ai_search_specials_count += 1
-                total_candidates.append({
+                    bar_web_ai_search_specials_count += 1
+                candidate_payload = {
                     'bar_id': bar['bar_id'],
                     'bar_name': bar_name,
                     'neighborhood': bar_neighborhood,
                     **special
-                })
+                }
+                total_candidates.append(candidate_payload)
+                bar_candidates.append(candidate_payload)
 
-        insert_result = invoke_db_bar_sync({'mode': 'insert_special_candidates', 'candidates': total_candidates})
-        inserted_count = int(insert_result.get('inserted_count', 0))
-        auto_approved_count = int(insert_result.get('auto_approved_count', 0))
+            run_payload = {
+                'bar_id': bar['bar_id'],
+                'total_candidates': len(bar_candidates),
+                'web_crawl_candidates': bar_crawl_specials_count,
+                'web_ai_search_candidates': bar_web_ai_search_specials_count,
+                'web_crawl_candidate_links': 0,
+                'web_crawl_keyword_matches': 0,
+                'web_crawl_prompt_char_count': 0,
+                'web_crawl_ai_parse_attempted': 'Y' if bar_crawl_specials_count > 0 else 'N',
+                'web_ai_search_attempted': 'Y' if bar_web_ai_search_specials_count > 0 else 'N',
+                'started_at': run_started_at,
+                'completed_at': datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
+            }
+            insert_result = invoke_db_bar_sync({
+                'mode': 'insert_special_candidates',
+                'run': run_payload,
+                'candidates': bar_candidates
+            })
+            runs_created += 1
+            inserted_count += int(insert_result.get('inserted_count', 0))
+            auto_approved_count += int(insert_result.get('auto_approved_count', 0))
+            run_id = insert_result.get('run_id')
+
+            if insert_result.get('all_auto_approved') and run_id:
+                invoke_db_bar_sync({
+                    'mode': 'publish_candidate_specials',
+                    'bar_id': bar['bar_id'],
+                    'run_id': run_id,
+                    'auto_publish': 'Y'
+                })
+                auto_published_runs += 1
 
         elapsed = time.perf_counter() - started_at
         LOGGER.info(
@@ -930,7 +969,9 @@ def lambda_handler(event, context):
                 'candidate_specials_inserted': inserted_count,
                 'auto_approved_specials': auto_approved_count,
                 'website_crawl_specials': crawl_specials_count,
-                'web_ai_search_specials': web_ai_search_specials_count
+                'web_ai_search_specials': web_ai_search_specials_count,
+                'candidate_runs_created': runs_created,
+                'candidate_runs_auto_published': auto_published_runs
             })
         }
     except ValueError as exc:
