@@ -23,14 +23,15 @@ HTML_CONTENT_HINTS = ('text/html', 'application/xhtml+xml')
 NON_HTML_EXTENSIONS = ('.pdf', '.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.zip', '.mp4', '.mp3')
 
 KEYWORDS = ('special', 'happy', 'menu', 'event')
-DAY_KEYS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN']
-CONFIDENCE_THRESHOLD = 0.75
 SPECIALS_VOCAB = (
     'happy hour', 'special', 'specials', 'deal', 'deals', 'promo', 'promotion', 'daily', 'weekdays',
     'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday',
     'draft', 'beer', 'wine', 'cocktail', 'half off',
     'wings', 'apps', 'burger night', 'taco tuesday'
 )
+KEYWORD_WINDOW_TERMS = tuple(dict.fromkeys(KEYWORDS + SPECIALS_VOCAB))
+DAY_KEYS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN']
+CONFIDENCE_THRESHOLD = 0.75
 FOOD_DRINK_CLUES = (
     'food', 'drink', 'beer', 'wine', 'cocktail', 'draft', 'shot', 'margarita',
     'burger', 'wings', 'taco', 'pizza', 'app', 'appetizer', 'fries', 'nachos'
@@ -334,10 +335,10 @@ def _extract_keyword_windows(text):
     capped_text = (text or '')[:MAX_WEB_SCRAPE_CHARS]
     lowered = capped_text.lower()
     if not lowered:
-        return capped_text
+        return ''
 
     intervals = []
-    for term in SPECIALS_VOCAB:
+    for term in KEYWORD_WINDOW_TERMS:
         start = 0
         while True:
             index = lowered.find(term, start)
@@ -349,7 +350,7 @@ def _extract_keyword_windows(text):
             start = index + len(term)
 
     if not intervals:
-        return capped_text
+        return ''
 
     intervals.sort()
     merged = [intervals[0]]
@@ -369,7 +370,12 @@ def build_crawl_prompt(bar_name, neighborhood, homepage_url, page_payloads):
     pages_blob = []
     for page in page_payloads:
         focused_text = _extract_keyword_windows(page['text'])
+        if not focused_text:
+            continue
         pages_blob.append(f"URL: {page['url']}\nTEXT:\n{focused_text}")
+
+    if not pages_blob:
+        return None
 
     content = '\n\n'.join(pages_blob)
 
@@ -734,6 +740,9 @@ def generate_from_crawl(homepage_url, bar_name, neighborhood):
         return []
 
     prompt = build_crawl_prompt(bar_name, neighborhood, homepage_url, page_payloads)
+    if not prompt:
+        LOGGER.info('No keyword-matching crawl page content found; skipping OpenAI crawl call')
+        return []
     payload = {
         'model': OPENAI_MODEL,
         'input': prompt,
