@@ -171,7 +171,6 @@ def _insert_auto_approved_specials(cursor, candidate: Dict) -> List[int]:
             INSERT INTO special
             (bar_id, day_of_week, all_day, start_time, end_time, description, type, insert_method)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-            RETURNING special_id
             """,
             (
                 candidate['bar_id'],
@@ -184,8 +183,7 @@ def _insert_auto_approved_specials(cursor, candidate: Dict) -> List[int]:
                 'AUTO',
             ),
         )
-        row = cursor.fetchone() or {}
-        special_id = row.get('special_id')
+        special_id = cursor.lastrowid
         if special_id is not None:
             created_special_ids.append(special_id)
 
