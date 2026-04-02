@@ -171,7 +171,6 @@ def _insert_auto_approved_specials(cursor, candidate: Dict) -> List[int]:
             INSERT INTO special
             (bar_id, day_of_week, all_day, start_time, end_time, description, type, insert_method)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-            RETURNING special_id
             """,
             (
                 candidate['bar_id'],
@@ -184,8 +183,7 @@ def _insert_auto_approved_specials(cursor, candidate: Dict) -> List[int]:
                 'AUTO',
             ),
         )
-        row = cursor.fetchone() or {}
-        special_id = row.get('special_id')
+        special_id = cursor.lastrowid
         if special_id is not None:
             created_special_ids.append(special_id)
 
@@ -212,8 +210,8 @@ def insert_special_candidates(cursor, candidates: List[Dict]) -> Dict[str, int]:
         cursor.execute(
             """
             INSERT INTO special_candidate
-            (bar_id, bar_name, neighborhood, description, type, days_of_week, start_time, end_time, all_day, is_recurring, date, fetch_method, source, confidence, approval_status, approval_date, approved_special_id)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            (bar_id, bar_name, neighborhood, description, type, days_of_week, start_time, end_time, all_day, is_recurring, date, fetch_method, source, confidence, notes, approval_status, approval_date, approved_special_id)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """,
             (
                 candidate['bar_id'],
@@ -230,6 +228,7 @@ def insert_special_candidates(cursor, candidates: List[Dict]) -> Dict[str, int]:
                 candidate.get('fetch_method'),
                 candidate.get('source') or candidate.get('source_url'),
                 candidate.get('confidence'),
+                candidate.get('notes'),
                 approval_status,
                 approval_date,
                 approved_special_id,
