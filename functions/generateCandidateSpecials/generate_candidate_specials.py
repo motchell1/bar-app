@@ -389,7 +389,10 @@ STRICT RULES:
 - If information is missing, leave it null
 - If no specials are present, return an empty array []
 - If an item does not clearly mention food or drink, exclude it.
-- Confidence scoring rule: set confidence to 1.0 ONLY when the item has a clear time window and clear money-saving signal (for example "$", "half off", "% off", or "off").
+- Confidence scoring should be determined based on inclusion of the following elements and only set as 1 if all three elements are included:
+  - Price or discount type
+  - Food or drink item
+  - Clear determination of day/time/recurrance for each item
 
 Extraction strategy (important):
 - Prioritize sections/headings that contain words like: specials, weekly specials, happy hour, deals, promotions.
@@ -397,7 +400,7 @@ Extraction strategy (important):
 - Split grouped offers into separate specials. If a line contains multiple offers separated by dashes, bullets, semicolons, or conjunctions, output one JSON object per offer.
 - Keep explicit promotional items even when the same page also contains menu and general hours text.
 - Do not discard a valid special just because it appears near menu content.
-- Use layout clues embedded in text (section separators, heading-like boundaries, and image clues such as `[IMAGE ... file=tuesday.png alt=Tuesday ...]`) to infer when offers belong to different day/column groupings.
+- Use layout clues embedded in text (section separators, heading-like boundaries, and image clues such as `[IMAGE ... file=tuesday.png alt=Tuesday ...]`) to infer when offers belong to different day/column groupings. 
 - Do NOT force one shared day/time across all offers if image/section clues indicate separate groups (for example Tuesday-only section vs Happy Hour section).
 - If day/time attribution is ambiguous after using all clues, keep fields null/empty as needed and assign lower confidence (generally 0.15-0.45).
 
@@ -409,7 +412,7 @@ For each special, return:
 - end_time (HH:MM 24-hour or null)
 - all_day ("Y" or "N")
 - confidence (0.0–1.0)
-- notes (short explanation of how it was interpreted)
+- notes (short explanation of confidence score)
 - source_url (required: exact page URL where this special was found; must be one of the provided crawl URLs)
 
 Normalization rules:
@@ -421,6 +424,11 @@ Normalization rules:
 - Classify type:
   - drinks/alcohol → "drink"
   - food/appetizers → "food"
+  - food and drink → "both"
+- Confidence should be determined based on inclusion of the following elements:
+  - Price or discount type
+  - Food or drink item
+  - Clear determination of day/time/recurrance for each item
 
 Return ONLY valid JSON (an array). No explanations.
 
