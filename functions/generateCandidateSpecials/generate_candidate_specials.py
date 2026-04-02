@@ -857,6 +857,10 @@ def lambda_handler(event, context):
         processed_bars = 0
         crawl_specials_count = 0
         web_ai_search_specials_count = 0
+        auto_approved_count = 0
+        inserted_count = 0
+        runs_created = 0
+        auto_published_runs = 0
 
         if parsed_event['mode'] == 'bars':
             bars = parsed_event['bars']
@@ -868,6 +872,7 @@ def lambda_handler(event, context):
             LOGGER.info('Found %d bars in neighborhood=%s', len(bars), neighborhood)
 
         for bar in bars:
+            run_started_at = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
             homepage_url = (bar.get('homepage_url') or bar.get('website_url') or '').strip()
             bar_name = (bar.get('bar_name') or '').strip()
             bar_neighborhood = (bar.get('neighborhood') or '').strip()
@@ -897,21 +902,55 @@ def lambda_handler(event, context):
                 )
                 specials = generate_from_search(bar_name, bar_neighborhood)
 
+            bar_candidates = []
+            bar_crawl_specials_count = 0
+            bar_web_ai_search_specials_count = 0
             for special in specials:
                 if special.get('fetch_method') == 'website_crawl':
                     crawl_specials_count += 1
+                    bar_crawl_specials_count += 1
                 elif special.get('fetch_method') == 'web_ai_search':
                     web_ai_search_specials_count += 1
-                total_candidates.append({
+                    bar_web_ai_search_specials_count += 1
+                candidate_payload = {
                     'bar_id': bar['bar_id'],
                     'bar_name': bar_name,
                     'neighborhood': bar_neighborhood,
                     **special
-                })
+                }
+                total_candidates.append(candidate_payload)
+                bar_candidates.append(candidate_payload)
 
-        insert_result = invoke_db_bar_sync({'mode': 'insert_special_candidates', 'candidates': total_candidates})
-        inserted_count = int(insert_result.get('inserted_count', 0))
-        auto_approved_count = int(insert_result.get('auto_approved_count', 0))
+            run_payload = {
+                'bar_id': bar['bar_id'],
+                'total_candidates': len(bar_candidates),
+                'web_crawl_candidates': bar_crawl_specials_count,
+                'web_ai_search_candidates': bar_web_ai_search_specials_count,
+                'web_crawl_candidate_links': 0,
+                'web_crawl_keyword_matches': 0,
+                'web_crawl_prompt_char_count': 0,
+                'web_crawl_ai_parse_attempted': 'Y' if bar_crawl_specials_count > 0 else 'N',
+                'web_ai_search_attempted': 'Y' if bar_web_ai_search_specials_count > 0 else 'N',
+                'started_at': run_started_at,
+                'completed_at': datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
+            }
+            insert_result = invoke_db_bar_sync({
+                'mode': 'insert_special_candidates',
+                'run': run_payload,
+                'candidates': bar_candidates
+            })
+            runs_created += 1
+            inserted_count += int(insert_result.get('inserted_count', 0))
+            auto_approved_count += int(insert_result.get('auto_approved_count', 0))
+            run_id = insert_result.get('run_id')
+
+            if insert_result.get('all_auto_approved') and run_id:
+                invoke_db_bar_sync({
+                    'mode': 'publish_candidate_specials',
+                    'bar_id': bar['bar_id'],
+                    'run_id': run_id
+                })
+                auto_published_runs += 1
 
         elapsed = time.perf_counter() - started_at
         LOGGER.info(
@@ -930,7 +969,9 @@ def lambda_handler(event, context):
                 'candidate_specials_inserted': inserted_count,
                 'auto_approved_specials': auto_approved_count,
                 'website_crawl_specials': crawl_specials_count,
-                'web_ai_search_specials': web_ai_search_specials_count
+                'web_ai_search_specials': web_ai_search_specials_count,
+                'candidate_runs_created': runs_created,
+                'candidate_runs_auto_published': auto_published_runs
             })
         }
     except ValueError as exc:

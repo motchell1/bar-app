@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+from difflib import SequenceMatcher
 from datetime import datetime
 from typing import Dict, List
 
@@ -157,42 +158,89 @@ def _parse_confidence(value) -> float:
     return 0.0
 
 
-def _insert_auto_approved_specials(cursor, candidate: Dict) -> List[int]:
-    raw_days = candidate.get('days_of_week', [])
+def _normalize_description(value: str) -> str:
+    return ' '.join(str(value or '').lower().split())
+
+
+def _descriptions_match(candidate_description: str, special_description: str) -> bool:
+    candidate_normalized = _normalize_description(candidate_description)
+    special_normalized = _normalize_description(special_description)
+    if not candidate_normalized or not special_normalized:
+        return False
+
+    if candidate_normalized == special_normalized:
+        return True
+
+    return SequenceMatcher(None, candidate_normalized, special_normalized).ratio() >= 0.78
+
+
+def _parse_days_of_week(raw_days) -> List[str]:
+    if isinstance(raw_days, str):
+        try:
+            raw_days = json.loads(raw_days)
+        except json.JSONDecodeError:
+            raw_days = []
+
     if not isinstance(raw_days, list):
-        raw_days = []
-    day_values = [
-        day
-        for day in raw_days
-        if isinstance(day, str) and day.strip()
-    ]
-    created_special_ids = []
-    for day_of_week in day_values:
-        cursor.execute(
-            """
-            INSERT INTO special
-            (bar_id, day_of_week, all_day, start_time, end_time, description, type, insert_method)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-            """,
-            (
-                candidate['bar_id'],
-                day_of_week,
-                candidate.get('all_day'),
-                candidate.get('start_time'),
-                candidate.get('end_time'),
-                candidate.get('description'),
-                candidate.get('type'),
-                'AUTO',
-            ),
+        return []
+
+    return [day for day in raw_days if isinstance(day, str) and day.strip()]
+
+
+def _is_candidate_same_as_special(candidate_row: Dict, special_row: Dict) -> bool:
+    return (
+        candidate_row.get('day_of_week') == special_row.get('day_of_week')
+        and candidate_row.get('all_day') == special_row.get('all_day')
+        and candidate_row.get('start_time') == special_row.get('start_time')
+        and candidate_row.get('end_time') == special_row.get('end_time')
+        and _descriptions_match(candidate_row.get('description'), special_row.get('description'))
+    )
+
+
+def insert_special_candidate_run(cursor, run: Dict) -> int:
+    cursor.execute(
+        """
+        INSERT INTO special_candidate_run
+        (
+            bar_id,
+            total_candidates,
+            auto_approved_candidates,
+            web_crawl_candidates,
+            web_ai_search_candidates,
+            web_crawl_candidate_links,
+            web_crawl_keyword_matches,
+            web_crawl_prompt_char_count,
+            web_crawl_ai_parse_attempted,
+            web_ai_search_attempted,
+            auto_publish,
+            started_at,
+            completed_at,
+            published_at
         )
-        special_id = cursor.lastrowid
-        if special_id is not None:
-            created_special_ids.append(special_id)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """,
+        (
+            run['bar_id'],
+            run.get('total_candidates', 0),
+            0,
+            run.get('web_crawl_candidates', 0),
+            run.get('web_ai_search_candidates', 0),
+            run.get('web_crawl_candidate_links', 0),
+            run.get('web_crawl_keyword_matches', 0),
+            run.get('web_crawl_prompt_char_count', 0),
+            'Y' if run.get('web_crawl_ai_parse_attempted') == 'Y' else 'N',
+            'Y' if run.get('web_ai_search_attempted') == 'Y' else 'N',
+            'N',
+            run.get('started_at') or datetime.utcnow(),
+            run.get('completed_at') or datetime.utcnow(),
+            None,
+        ),
+    )
+    return cursor.lastrowid
 
-    return created_special_ids
 
-
-def insert_special_candidates(cursor, candidates: List[Dict]) -> Dict[str, int]:
+def insert_special_candidates(cursor, run: Dict, candidates: List[Dict]) -> Dict[str, int]:
+    run_id = insert_special_candidate_run(cursor, run)
     inserted_count = 0
     auto_approved_count = 0
     for candidate in candidates:
@@ -208,20 +256,18 @@ def insert_special_candidates(cursor, candidates: List[Dict]) -> Dict[str, int]:
             auto_approval_threshold = WEB_SCRAPE_AUTO_APPROVAL_THRESHOLD
 
         if confidence >= auto_approval_threshold:
-            created_special_ids = _insert_auto_approved_specials(cursor, candidate)
-            if created_special_ids:
-                approval_status = 'AUTO_APPROVED'
-                approval_date = datetime.utcnow()
-                approved_special_id = created_special_ids[0]
-                auto_approved_count += 1
+            approval_status = 'AUTO_APPROVED'
+            approval_date = datetime.utcnow()
+            auto_approved_count += 1
 
         cursor.execute(
             """
             INSERT INTO special_candidate
-            (bar_id, bar_name, neighborhood, description, type, days_of_week, start_time, end_time, all_day, is_recurring, date, fetch_method, source, confidence, notes, approval_status, approval_date, approved_special_id)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            (run_id, bar_id, bar_name, neighborhood, description, type, days_of_week, start_time, end_time, all_day, is_recurring, date, fetch_method, source, confidence, notes, approval_status, approval_date, approved_special_id)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """,
             (
+                run_id,
                 candidate['bar_id'],
                 candidate['bar_name'],
                 candidate['neighborhood'],
@@ -244,17 +290,140 @@ def insert_special_candidates(cursor, candidates: List[Dict]) -> Dict[str, int]:
         )
         inserted_count += 1
 
-    return {'inserted_count': inserted_count, 'auto_approved_count': auto_approved_count}
+    cursor.execute(
+        """
+        UPDATE special_candidate_run
+        SET total_candidates = %s,
+            auto_approved_candidates = %s,
+            completed_at = COALESCE(%s, NOW())
+        WHERE run_id = %s
+        """,
+        (inserted_count, auto_approved_count, run.get('completed_at'), run_id),
+    )
+
+    return {
+        'run_id': run_id,
+        'inserted_count': inserted_count,
+        'auto_approved_count': auto_approved_count,
+        'all_auto_approved': inserted_count > 0 and inserted_count == auto_approved_count,
+    }
+
+
+def publish_candidate_specials(cursor, bar_id: int, run_id: int) -> Dict[str, int]:
+    cursor.execute(
+        """
+        SELECT candidate_id, description, type, days_of_week, start_time, end_time, all_day
+        FROM special_candidate
+        WHERE bar_id = %s
+            AND run_id = %s
+            AND approval_status = 'AUTO_APPROVED'
+        """,
+        (bar_id, run_id),
+    )
+    approved_candidates = cursor.fetchall()
+
+    candidate_rows = []
+    for candidate in approved_candidates:
+        for day in _parse_days_of_week(candidate.get('days_of_week')):
+            candidate_rows.append(
+                {
+                    'candidate_id': candidate['candidate_id'],
+                    'description': candidate.get('description'),
+                    'type': candidate.get('type'),
+                    'day_of_week': day,
+                    'start_time': candidate.get('start_time'),
+                    'end_time': candidate.get('end_time'),
+                    'all_day': candidate.get('all_day'),
+                }
+            )
+
+    cursor.execute(
+        """
+        SELECT special_id, day_of_week, all_day, start_time, end_time, description
+        FROM special
+        WHERE bar_id = %s
+            AND is_active = 'Y'
+        """,
+        (bar_id,),
+    )
+    existing_specials = cursor.fetchall()
+
+    matched_special_ids = set()
+    unmatched_candidates = []
+    for candidate in candidate_rows:
+        matched_id = None
+        for special in existing_specials:
+            if special['special_id'] in matched_special_ids:
+                continue
+            if _is_candidate_same_as_special(candidate, special):
+                matched_id = special['special_id']
+                break
+
+        if matched_id is not None:
+            matched_special_ids.add(matched_id)
+        else:
+            unmatched_candidates.append(candidate)
+
+    for special in existing_specials:
+        if special['special_id'] not in matched_special_ids:
+            cursor.execute(
+                """
+                UPDATE special
+                SET is_active = 'N',
+                    update_date = NOW()
+                WHERE special_id = %s
+                """,
+                (special['special_id'],),
+            )
+
+    inserted_special_count = 0
+    for candidate in unmatched_candidates:
+        cursor.execute(
+            """
+            INSERT INTO special
+            (bar_id, day_of_week, all_day, start_time, end_time, description, type, insert_method, is_active)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 'Y')
+            """,
+            (
+                bar_id,
+                candidate['day_of_week'],
+                candidate.get('all_day'),
+                candidate.get('start_time'),
+                candidate.get('end_time'),
+                candidate.get('description'),
+                candidate.get('type'),
+                'AUTO',
+            ),
+        )
+        inserted_special_count += 1
+
+    deactivated_special_count = len(existing_specials) - len(matched_special_ids)
+    cursor.execute(
+        """
+        UPDATE special_candidate_run
+        SET auto_publish = 'Y',
+            published_at = NOW()
+        WHERE run_id = %s
+        """,
+        (run_id,),
+    )
+
+    return {
+        'run_id': run_id,
+        'matched_existing_count': len(matched_special_ids),
+        'inserted_special_count': inserted_special_count,
+        'deactivated_special_count': deactivated_special_count,
+    }
 
 
 def lambda_handler(event, context):
     event = event or {}
     mode = event.get('mode')
-    if mode not in {'categorize', 'apply', 'get_bars_by_neighborhood', 'insert_special_candidates'}:
+    if mode not in {'categorize', 'apply', 'get_bars_by_neighborhood', 'insert_special_candidates', 'publish_candidate_specials'}:
         return {
             'statusCode': 400,
             'body': json.dumps({
-                'error': 'mode must be one of categorize, apply, get_bars_by_neighborhood, insert_special_candidates'
+                'error': 'mode must be one of categorize, apply, get_bars_by_neighborhood, insert_special_candidates, publish_candidate_specials'
             }),
         }
 
@@ -273,8 +442,20 @@ def lambda_handler(event, context):
                     raise ValueError('neighborhood is required for get_bars_by_neighborhood')
                 result = get_bars_by_neighborhood(cursor, neighborhood)
                 conn.commit()
+            elif mode == 'publish_candidate_specials':
+                bar_id = event.get('bar_id')
+                run_id = event.get('run_id')
+                if not bar_id:
+                    raise ValueError('bar_id is required for publish_candidate_specials')
+                if not run_id:
+                    raise ValueError('run_id is required for publish_candidate_specials')
+                result = publish_candidate_specials(cursor, bar_id, run_id)
+                conn.commit()
             else:
-                result = insert_special_candidates(cursor, event.get('candidates', []))
+                run = event.get('run', {}) or {}
+                if not run.get('bar_id'):
+                    raise ValueError('run.bar_id is required for insert_special_candidates')
+                result = insert_special_candidates(cursor, run, event.get('candidates', []))
                 conn.commit()
 
         LOGGER.info('dbBarSync %s result=%s', mode, result)
