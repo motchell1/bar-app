@@ -92,7 +92,7 @@ class TextExtractor(HTMLParser):
             return
 
         if tag_lower in ('h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'section', 'article', 'li', 'p', 'br', 'tr'):
-            self.text_parts.append(' | ')
+            self.text_parts.append('\n')
 
         if tag_lower == 'img':
             attrs_map = {key.lower(): (value or '').strip() for key, value in attrs}
@@ -102,7 +102,7 @@ class TextExtractor(HTMLParser):
             image_file = ''
             if src:
                 image_file = urlparse(src).path.split('/')[-1]
-            clue = f'[IMAGE src={src} file={image_file} alt={alt} title={title}]'.strip()
+            clue = f'\n[IMAGE src={src} file={image_file} alt={alt} title={title}]\n'.strip()
             self.text_parts.append(clue)
 
     def handle_endtag(self, tag):
@@ -326,7 +326,9 @@ def choose_candidate_links(links):
 def extract_text(html):
     parser = TextExtractor()
     parser.feed(html)
-    text = ' '.join(parser.text_parts)
+    text = ''.join(parser.text_parts)
+    text = re.sub(r'[ \t]+', ' ', text)
+    text = re.sub(r'\n{3,}', '\n\n', text)
     return text[:MAX_TEXT_CHARS_PER_PAGE]
 
 
@@ -364,20 +366,48 @@ def _extract_keyword_windows(text):
     return snippets
 
 
+def _get_keyword_hit_stats(text):
+    lowered = (text or '').lower()
+    if not lowered:
+        return {'total_hits': 0, 'terms': {}}
+
+    terms = {}
+    total_hits = 0
+    for term in KEYWORD_WINDOW_TERMS:
+        count = lowered.count(term)
+        if count > 0:
+            terms[term] = count
+            total_hits += count
+
+    return {'total_hits': total_hits, 'terms': terms}
+
+
 def build_crawl_prompt(bar_name, neighborhood, homepage_url, page_payloads):
     pages_blob = []
     for page in page_payloads:
+        hit_stats = _get_keyword_hit_stats(page['text'])
         keyword_windows = _extract_keyword_windows(page['text'])
         if not keyword_windows:
-            LOGGER.info('Link %s contributes 0 keyword windows to crawl prompt', page['url'])
+            LOGGER.info(
+                'Link %s contributes 0 merged keyword windows (keyword_hits=%d, matched_terms=%s)',
+                page['url'],
+                hit_stats['total_hits'],
+                list(hit_stats['terms'].keys())
+            )
             continue
 
         window_char_counts = [len(window) for window in keyword_windows]
         LOGGER.info(
-            'Link %s contributes %d keyword windows to crawl prompt (window_char_counts=%s)',
+            (
+                'Link %s contributes %d merged keyword windows '
+                '(window_char_counts=%s, keyword_hits=%d, matched_terms=%s, char_window_size=%d)'
+            ),
             page['url'],
             len(keyword_windows),
-            window_char_counts
+            window_char_counts,
+            hit_stats['total_hits'],
+            list(hit_stats['terms'].keys()),
+            KEYWORD_MATCH_CHAR_WINDOW_SIZE
         )
 
         focused_text = '\n...\n'.join(keyword_windows)
@@ -416,11 +446,12 @@ Extraction strategy (important):
 - Keep explicit promotional items even when the same page also contains menu and general hours text.
 - Do not discard a valid special just because it appears near menu content.
 - Use layout clues embedded in text (section separators, heading-like boundaries, and image clues such as `[IMAGE ... file=tuesday.png alt=Tuesday ...]`) to infer when offers belong to different day/column groupings. 
+- Treat weekday signals in nearby image metadata (e.g. `file=tuesday.png`, `alt=Tuesday`) as strong local day context for the nearest offers directly below/adjacent to that image.
 - Do NOT force one shared day/time across all offers if image/section clues indicate separate groups (for example Tuesday-only section vs Happy Hour section).
 - If day/time attribution is ambiguous after using all clues, keep fields null/empty as needed and assign lower confidence (generally 0.15-0.45).
 
 For each special, return:
-- description (string)
+- description (string; omit labels such as "happy hour" / "HH" and keep only the actual offer details)
 - type ("food", "drink", or "unknown")
 - days_of_week (array of MON, TUE, WED, THU, FRI, SAT, SUN)
 - start_time (HH:MM 24-hour or null)
@@ -464,7 +495,7 @@ STRICT RULES:
 - If no specials are present, return an empty array []
 
 For each special, return:
-- description (string)
+- description (string; omit labels such as "happy hour" / "HH" and keep only the actual offer details)
 - type ("food", "drink", or "unknown")
 - days_of_week (array of MON, TUE, WED, THU, FRI, SAT, SUN)
 - start_time (HH:MM 24-hour or null)
@@ -507,10 +538,12 @@ def call_openai(payload):
     }
 
     started_at = time.perf_counter()
+    input_chars = len(payload.get('input', '') or '')
     LOGGER.info(
-        'Calling OpenAI Responses API model=%s tools=%s',
+        'Calling OpenAI Responses API model=%s tools=%s prompt_chars=%d',
         payload.get('model'),
-        payload.get('tools', [])
+        payload.get('tools', []),
+        input_chars
     )
     response = requests.post(OPENAI_RESPONSES_URL, headers=headers, json=payload, timeout=45)
     response.raise_for_status()
@@ -839,7 +872,7 @@ def lambda_handler(event, context):
             bar_name = (bar.get('bar_name') or '').strip()
             bar_neighborhood = (bar.get('neighborhood') or '').strip()
             if not homepage_url or not bar_name:
-                LOGGER.info('Skipping bar_id=%s %s due to missing website or name', bar.get('bar_ID'), bar.get('bar_name'))
+                LOGGER.info('Skipping bar_name=%s due to missing website or name', bar.get('bar_name'))
                 continue
 
             processed_bars += 1
@@ -847,8 +880,8 @@ def lambda_handler(event, context):
                 specials = generate_from_crawl(homepage_url, bar_name, bar_neighborhood)
             except Exception:
                 LOGGER.exception(
-                    'Crawl flow crashed for bar_id=%s %s; falling back to OpenAI web_search',
-                    bar.get('bar_id'), bar.get('bar_name')
+                    'Crawl flow crashed for bar_name=%s; falling back to OpenAI web_search',
+                    bar.get('bar_name')
                 )
                 specials = []
             has_fallback_confidence = any(
@@ -858,9 +891,9 @@ def lambda_handler(event, context):
             )
             if not specials or not has_fallback_confidence:
                 LOGGER.info(
-                    'No crawl specials met fallback threshold %.2f for bar_id=%s; OpenAI web_search fallback is temporarily disabled',
+                    'No crawl specials met fallback threshold %.2f for bar_name=%s; OpenAI web_search fallback is temporarily disabled',
                     WEB_SCRAPE_FALLBACK_THRESHOLD,
-                    bar.get('bar_id')
+                    bar_name
                 )
                 # Temporarily disabled for crawler-only testing:
                 # specials = generate_from_search(bar_name, bar_neighborhood)
