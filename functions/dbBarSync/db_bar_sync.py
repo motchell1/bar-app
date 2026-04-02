@@ -14,8 +14,8 @@ RDS_HOST = os.environ['RDS_HOST']
 DB_USER = os.environ['DB_USER']
 DB_PASSWORD = os.environ['DB_PASSWORD']
 DB_NAME = os.environ['DB_NAME']
-WEB_SCRAPE_AUTO_APPROVAL_THRESHOLD = float(os.environ.get('WEB_SCRAPE_AUTO_APPROVAL_THRESHOLD', '1.0'))
-WEB_AI_SEARCH_AUTO_APPROVAL_THRESHOLD = float(os.environ.get('WEB_AI_SEARCH_AUTO_APPROVAL_THRESHOLD', '1.0'))
+WEB_SCRAPE_AUTO_APPROVAL_THRESHOLD = .5
+WEB_AI_SEARCH_AUTO_APPROVAL_THRESHOLD = .8
 
 
 def get_connection():
@@ -312,7 +312,7 @@ def insert_special_candidates(cursor, run: Dict, candidates: List[Dict]) -> Dict
 def publish_candidate_specials(cursor, bar_id: int, run_id: int, auto_publish: str = 'N') -> Dict[str, int]:
     cursor.execute(
         """
-        SELECT candidate_id, description, type, days_of_week, start_time, end_time, all_day
+        SELECT special_candidate_id, description, type, days_of_week, start_time, end_time, all_day
         FROM special_candidate
         WHERE bar_id = %s
             AND run_id = %s
@@ -327,7 +327,7 @@ def publish_candidate_specials(cursor, bar_id: int, run_id: int, auto_publish: s
         for day in _parse_days_of_week(candidate.get('days_of_week')):
             candidate_rows.append(
                 {
-                    'candidate_id': candidate['candidate_id'],
+                    'candidate_id': candidate['special_candidate_id'],
                     'description': candidate.get('description'),
                     'type': candidate.get('type'),
                     'day_of_week': day,
