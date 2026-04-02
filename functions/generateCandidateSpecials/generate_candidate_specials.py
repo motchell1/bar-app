@@ -35,6 +35,10 @@ FOOD_DRINK_CLUES = (
     'food', 'drink', 'beer', 'wine', 'cocktail', 'draft', 'shot', 'margarita',
     'burger', 'wings', 'taco', 'pizza', 'app', 'appetizer', 'fries', 'nachos'
 )
+HAPPY_HOUR_DESCRIPTION_PATTERNS = (
+    r'\bhappy\s*hour\b',
+    r'\bhh\b'
+)
 
 LOGGER = logging.getLogger(__name__)
 LOGGER.setLevel(logging.INFO)
@@ -92,7 +96,7 @@ class TextExtractor(HTMLParser):
             return
 
         if tag_lower in ('h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'section', 'article', 'li', 'p', 'br', 'tr'):
-            self.text_parts.append(' | ')
+            self.text_parts.append('\n')
 
         if tag_lower == 'img':
             attrs_map = {key.lower(): (value or '').strip() for key, value in attrs}
@@ -102,7 +106,7 @@ class TextExtractor(HTMLParser):
             image_file = ''
             if src:
                 image_file = urlparse(src).path.split('/')[-1]
-            clue = f'[IMAGE src={src} file={image_file} alt={alt} title={title}]'.strip()
+            clue = f'\n[IMAGE src={src} file={image_file} alt={alt} title={title}]\n'.strip()
             self.text_parts.append(clue)
 
     def handle_endtag(self, tag):
@@ -326,7 +330,9 @@ def choose_candidate_links(links):
 def extract_text(html):
     parser = TextExtractor()
     parser.feed(html)
-    text = ' '.join(parser.text_parts)
+    text = ''.join(parser.text_parts)
+    text = re.sub(r'[ \t]+', ' ', text)
+    text = re.sub(r'\n{3,}', '\n\n', text)
     return text[:MAX_TEXT_CHARS_PER_PAGE]
 
 
@@ -416,11 +422,12 @@ Extraction strategy (important):
 - Keep explicit promotional items even when the same page also contains menu and general hours text.
 - Do not discard a valid special just because it appears near menu content.
 - Use layout clues embedded in text (section separators, heading-like boundaries, and image clues such as `[IMAGE ... file=tuesday.png alt=Tuesday ...]`) to infer when offers belong to different day/column groupings. 
+- Treat weekday signals in nearby image metadata (e.g. `file=tuesday.png`, `alt=Tuesday`) as strong local day context for the nearest offers directly below/adjacent to that image.
 - Do NOT force one shared day/time across all offers if image/section clues indicate separate groups (for example Tuesday-only section vs Happy Hour section).
 - If day/time attribution is ambiguous after using all clues, keep fields null/empty as needed and assign lower confidence (generally 0.15-0.45).
 
 For each special, return:
-- description (string)
+- description (string; omit labels such as "happy hour" / "HH" and keep only the actual offer details)
 - type ("food", "drink", or "unknown")
 - days_of_week (array of MON, TUE, WED, THU, FRI, SAT, SUN)
 - start_time (HH:MM 24-hour or null)
@@ -464,7 +471,7 @@ STRICT RULES:
 - If no specials are present, return an empty array []
 
 For each special, return:
-- description (string)
+- description (string; omit labels such as "happy hour" / "HH" and keep only the actual offer details)
 - type ("food", "drink", or "unknown")
 - days_of_week (array of MON, TUE, WED, THU, FRI, SAT, SUN)
 - start_time (HH:MM 24-hour or null)
@@ -631,8 +638,10 @@ def normalize_item(item, default_source):
         return None
     is_recurring = 'N' if parsed_date else 'Y'
 
+    description = _strip_happy_hour_label(item.get('description'))
+
     return {
-        'description': str(item.get('description') or '').strip(),
+        'description': description,
         'type': item_type,
         'days_of_week': normalized_days,
         'start_time': item.get('start_time') if item.get('start_time') else None,
@@ -645,6 +654,16 @@ def normalize_item(item, default_source):
         'is_recurring': is_recurring,
         'date': parsed_date.isoformat() if parsed_date else None
     }
+
+
+def _strip_happy_hour_label(description):
+    cleaned = str(description or '').strip()
+    for pattern in HAPPY_HOUR_DESCRIPTION_PATTERNS:
+        cleaned = re.sub(pattern, '', cleaned, flags=re.IGNORECASE)
+
+    cleaned = re.sub(r'^[\s:\-–|,;/]+', '', cleaned)
+    cleaned = re.sub(r'[\s]{2,}', ' ', cleaned)
+    return cleaned.strip()
 
 
 def _contains_time_signal(text):
