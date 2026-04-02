@@ -332,9 +332,9 @@ def extract_text(html):
 
 
 def _extract_keyword_windows(text):
-    capped_text = (text or '')[:MAX_WEB_SCRAPE_CHARS]
-    lowered = capped_text.lower()
-    if not lowered:
+    full_text = text or ''
+    lowered = full_text.lower()
+    if not lowered.strip():
         return ''
 
     intervals = []
@@ -345,12 +345,15 @@ def _extract_keyword_windows(text):
             if index == -1:
                 break
             interval_start = max(0, index - KEYWORD_MATCH_CHAR_WINDOW_SIZE)
-            interval_end = min(len(capped_text), index + len(term) + KEYWORD_MATCH_CHAR_WINDOW_SIZE)
+            interval_end = min(len(full_text), index + len(term) + KEYWORD_MATCH_CHAR_WINDOW_SIZE)
             intervals.append((interval_start, interval_end))
             start = index + len(term)
 
     if not intervals:
         return ''
+
+    if len(full_text) <= MAX_WEB_SCRAPE_CHARS:
+        return full_text
 
     intervals.sort()
     merged = [intervals[0]]
@@ -361,7 +364,7 @@ def _extract_keyword_windows(text):
         else:
             merged.append((start, end))
 
-    snippets = [capped_text[start:end].strip() for start, end in merged if capped_text[start:end].strip()]
+    snippets = [full_text[start:end].strip() for start, end in merged if full_text[start:end].strip()]
     focused_text = '\n...\n'.join(snippets)
     return focused_text[:MAX_WEB_SCRAPE_CHARS]
 
