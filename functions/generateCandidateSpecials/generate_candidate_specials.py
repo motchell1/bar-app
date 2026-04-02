@@ -17,20 +17,20 @@ OPENAI_RESPONSES_URL = 'https://api.openai.com/v1/responses'
 DB_BAR_SYNC_LAMBDA_NAME = os.environ.get('DB_BAR_SYNC_LAMBDA_NAME')
 MAX_LINKS_TO_VISIT = 3
 MAX_TEXT_CHARS_PER_PAGE = 20000
-MAX_WEB_SCRAPE_CHARS = 5000
 KEYWORD_MATCH_CHAR_WINDOW_SIZE = int(os.environ.get('KEYWORD_MATCH_CHAR_WINDOW_SIZE', '220'))
 HTML_CONTENT_HINTS = ('text/html', 'application/xhtml+xml')
 NON_HTML_EXTENSIONS = ('.pdf', '.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.zip', '.mp4', '.mp3')
 
 KEYWORDS = ('special', 'happy', 'menu', 'event')
-DAY_KEYS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN']
-CONFIDENCE_THRESHOLD = 0.75
 SPECIALS_VOCAB = (
     'happy hour', 'special', 'specials', 'deal', 'deals', 'promo', 'promotion', 'daily', 'weekdays',
     'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday',
     'draft', 'beer', 'wine', 'cocktail', 'half off',
     'wings', 'apps', 'burger night', 'taco tuesday'
 )
+KEYWORD_WINDOW_TERMS = tuple(dict.fromkeys(KEYWORDS + SPECIALS_VOCAB))
+DAY_KEYS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN']
+WEB_SCRAPE_FALLBACK_THRESHOLD = float(os.environ.get('WEB_SCRAPE_FALLBACK_THRESHOLD', '0.75'))
 FOOD_DRINK_CLUES = (
     'food', 'drink', 'beer', 'wine', 'cocktail', 'draft', 'shot', 'margarita',
     'burger', 'wings', 'taco', 'pizza', 'app', 'appetizer', 'fries', 'nachos'
@@ -331,25 +331,25 @@ def extract_text(html):
 
 
 def _extract_keyword_windows(text):
-    capped_text = (text or '')[:MAX_WEB_SCRAPE_CHARS]
-    lowered = capped_text.lower()
+    page_text = (text or '')
+    lowered = page_text.lower()
     if not lowered:
-        return capped_text
+        return ''
 
     intervals = []
-    for term in SPECIALS_VOCAB:
+    for term in KEYWORD_WINDOW_TERMS:
         start = 0
         while True:
             index = lowered.find(term, start)
             if index == -1:
                 break
             interval_start = max(0, index - KEYWORD_MATCH_CHAR_WINDOW_SIZE)
-            interval_end = min(len(capped_text), index + len(term) + KEYWORD_MATCH_CHAR_WINDOW_SIZE)
+            interval_end = min(len(page_text), index + len(term) + KEYWORD_MATCH_CHAR_WINDOW_SIZE)
             intervals.append((interval_start, interval_end))
             start = index + len(term)
 
     if not intervals:
-        return capped_text
+        return ''
 
     intervals.sort()
     merged = [intervals[0]]
@@ -360,16 +360,21 @@ def _extract_keyword_windows(text):
         else:
             merged.append((start, end))
 
-    snippets = [capped_text[start:end].strip() for start, end in merged if capped_text[start:end].strip()]
+    snippets = [page_text[start:end].strip() for start, end in merged if page_text[start:end].strip()]
     focused_text = '\n...\n'.join(snippets)
-    return focused_text[:MAX_WEB_SCRAPE_CHARS]
+    return focused_text
 
 
 def build_crawl_prompt(bar_name, neighborhood, homepage_url, page_payloads):
     pages_blob = []
     for page in page_payloads:
         focused_text = _extract_keyword_windows(page['text'])
+        if not focused_text:
+            continue
         pages_blob.append(f"URL: {page['url']}\nTEXT:\n{focused_text}")
+
+    if not pages_blob:
+        return None
 
     content = '\n\n'.join(pages_blob)
 
@@ -734,6 +739,9 @@ def generate_from_crawl(homepage_url, bar_name, neighborhood):
         return []
 
     prompt = build_crawl_prompt(bar_name, neighborhood, homepage_url, page_payloads)
+    if not prompt:
+        LOGGER.info('No keyword-matching crawl page content found; skipping OpenAI crawl call')
+        return []
     payload = {
         'model': OPENAI_MODEL,
         'input': prompt,
@@ -833,18 +841,19 @@ def lambda_handler(event, context):
                     bar.get('bar_id'), bar.get('bar_name')
                 )
                 specials = []
-            has_high_confidence = any(
-                isinstance(special.get('confidence'), (int, float)) and special.get('confidence', 0) >= CONFIDENCE_THRESHOLD
+            has_fallback_confidence = any(
+                isinstance(special.get('confidence'), (int, float))
+                and special.get('confidence', 0) >= WEB_SCRAPE_FALLBACK_THRESHOLD
                 for special in specials
             )
-            if not specials or not has_high_confidence:
+            if not specials or not has_fallback_confidence:
                 LOGGER.info(
-                    'No crawl specials found for bar_id=%s; OpenAI web_search fallback is temporarily disabled',
+                    'No crawl specials met fallback threshold %.2f for bar_id=%s; OpenAI web_search fallback is temporarily disabled',
+                    WEB_SCRAPE_FALLBACK_THRESHOLD,
                     bar.get('bar_id')
                 )
                 # Temporarily disabled for crawler-only testing:
                 # specials = generate_from_search(bar_name, bar_neighborhood)
-                specials = []
 
             for special in specials:
                 if special.get('fetch_method') == 'website_crawl':

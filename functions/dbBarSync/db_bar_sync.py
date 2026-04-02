@@ -13,6 +13,7 @@ RDS_HOST = os.environ['RDS_HOST']
 DB_USER = os.environ['DB_USER']
 DB_PASSWORD = os.environ['DB_PASSWORD']
 DB_NAME = os.environ['DB_NAME']
+WEB_SCRAPE_AUTO_APPROVAL_THRESHOLD = float(os.environ.get('WEB_SCRAPE_AUTO_APPROVAL_THRESHOLD', '1.0'))
 
 
 def get_connection():
@@ -199,7 +200,7 @@ def insert_special_candidates(cursor, candidates: List[Dict]) -> Dict[str, int]:
         approved_special_id = None
         confidence = _parse_confidence(candidate.get('confidence'))
 
-        if confidence == 1.0:
+        if confidence >= WEB_SCRAPE_AUTO_APPROVAL_THRESHOLD:
             created_special_ids = _insert_auto_approved_specials(cursor, candidate)
             if created_special_ids:
                 approval_status = 'AUTO_APPROVED'
