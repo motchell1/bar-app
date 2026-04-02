@@ -210,8 +210,8 @@ def insert_special_candidates(cursor, candidates: List[Dict]) -> Dict[str, int]:
         cursor.execute(
             """
             INSERT INTO special_candidate
-            (bar_id, bar_name, neighborhood, description, type, days_of_week, start_time, end_time, all_day, is_recurring, date, fetch_method, source, confidence, approval_status, approval_date, approved_special_id)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            (bar_id, bar_name, neighborhood, description, type, days_of_week, start_time, end_time, all_day, is_recurring, date, fetch_method, source, confidence, notes, approval_status, approval_date, approved_special_id)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """,
             (
                 candidate['bar_id'],
@@ -228,6 +228,7 @@ def insert_special_candidates(cursor, candidates: List[Dict]) -> Dict[str, int]:
                 candidate.get('fetch_method'),
                 candidate.get('source') or candidate.get('source_url'),
                 candidate.get('confidence'),
+                candidate.get('notes'),
                 approval_status,
                 approval_date,
                 approved_special_id,
