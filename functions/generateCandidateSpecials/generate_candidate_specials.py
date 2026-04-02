@@ -334,7 +334,7 @@ def _extract_keyword_windows(text):
     page_text = (text or '')
     lowered = page_text.lower()
     if not lowered:
-        return ''
+        return []
 
     intervals = []
     for term in KEYWORD_WINDOW_TERMS:
@@ -349,7 +349,7 @@ def _extract_keyword_windows(text):
             start = index + len(term)
 
     if not intervals:
-        return ''
+        return []
 
     intervals.sort()
     merged = [intervals[0]]
@@ -361,16 +361,26 @@ def _extract_keyword_windows(text):
             merged.append((start, end))
 
     snippets = [page_text[start:end].strip() for start, end in merged if page_text[start:end].strip()]
-    focused_text = '\n...\n'.join(snippets)
-    return focused_text
+    return snippets
 
 
 def build_crawl_prompt(bar_name, neighborhood, homepage_url, page_payloads):
     pages_blob = []
     for page in page_payloads:
-        focused_text = _extract_keyword_windows(page['text'])
-        if not focused_text:
+        keyword_windows = _extract_keyword_windows(page['text'])
+        if not keyword_windows:
+            LOGGER.info('Link %s contributes 0 keyword windows to crawl prompt', page['url'])
             continue
+
+        window_char_counts = [len(window) for window in keyword_windows]
+        LOGGER.info(
+            'Link %s contributes %d keyword windows to crawl prompt (window_char_counts=%s)',
+            page['url'],
+            len(keyword_windows),
+            window_char_counts
+        )
+
+        focused_text = '\n...\n'.join(keyword_windows)
         pages_blob.append(f"URL: {page['url']}\nTEXT:\n{focused_text}")
 
     if not pages_blob:
