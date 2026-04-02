@@ -948,7 +948,8 @@ def lambda_handler(event, context):
                 invoke_db_bar_sync({
                     'mode': 'publish_candidate_specials',
                     'bar_id': bar['bar_id'],
-                    'run_id': run_id
+                    'run_id': run_id,
+                    'auto_publish': 'Y'
                 })
                 auto_published_runs += 1
 

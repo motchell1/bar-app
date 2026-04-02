@@ -309,14 +309,14 @@ def insert_special_candidates(cursor, run: Dict, candidates: List[Dict]) -> Dict
     }
 
 
-def publish_candidate_specials(cursor, bar_id: int, run_id: int) -> Dict[str, int]:
+def publish_candidate_specials(cursor, bar_id: int, run_id: int, auto_publish: str = 'N') -> Dict[str, int]:
     cursor.execute(
         """
         SELECT candidate_id, description, type, days_of_week, start_time, end_time, all_day
         FROM special_candidate
         WHERE bar_id = %s
             AND run_id = %s
-            AND approval_status = 'AUTO_APPROVED'
+            AND approval_status IN ('AUTO_APPROVED', 'APPROVED')
         """,
         (bar_id, run_id),
     )
@@ -401,15 +401,16 @@ def publish_candidate_specials(cursor, bar_id: int, run_id: int) -> Dict[str, in
     cursor.execute(
         """
         UPDATE special_candidate_run
-        SET auto_publish = 'Y',
+        SET auto_publish = %s,
             published_at = NOW()
         WHERE run_id = %s
         """,
-        (run_id,),
+        ('Y' if auto_publish == 'Y' else 'N', run_id),
     )
 
     return {
         'run_id': run_id,
+        'published_candidate_count': len(candidate_rows),
         'matched_existing_count': len(matched_special_ids),
         'inserted_special_count': inserted_special_count,
         'deactivated_special_count': deactivated_special_count,
@@ -445,11 +446,12 @@ def lambda_handler(event, context):
             elif mode == 'publish_candidate_specials':
                 bar_id = event.get('bar_id')
                 run_id = event.get('run_id')
+                auto_publish = event.get('auto_publish', 'N')
                 if not bar_id:
                     raise ValueError('bar_id is required for publish_candidate_specials')
                 if not run_id:
                     raise ValueError('run_id is required for publish_candidate_specials')
-                result = publish_candidate_specials(cursor, bar_id, run_id)
+                result = publish_candidate_specials(cursor, bar_id, run_id, auto_publish)
                 conn.commit()
             else:
                 run = event.get('run', {}) or {}
