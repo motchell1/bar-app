@@ -35,10 +35,6 @@ FOOD_DRINK_CLUES = (
     'food', 'drink', 'beer', 'wine', 'cocktail', 'draft', 'shot', 'margarita',
     'burger', 'wings', 'taco', 'pizza', 'app', 'appetizer', 'fries', 'nachos'
 )
-HAPPY_HOUR_DESCRIPTION_PATTERNS = (
-    r'\bhappy\s*hour\b',
-    r'\bhh\b'
-)
 
 LOGGER = logging.getLogger(__name__)
 LOGGER.setLevel(logging.INFO)
@@ -638,10 +634,8 @@ def normalize_item(item, default_source):
         return None
     is_recurring = 'N' if parsed_date else 'Y'
 
-    description = _strip_happy_hour_label(item.get('description'))
-
     return {
-        'description': description,
+        'description': str(item.get('description') or '').strip(),
         'type': item_type,
         'days_of_week': normalized_days,
         'start_time': item.get('start_time') if item.get('start_time') else None,
@@ -654,16 +648,6 @@ def normalize_item(item, default_source):
         'is_recurring': is_recurring,
         'date': parsed_date.isoformat() if parsed_date else None
     }
-
-
-def _strip_happy_hour_label(description):
-    cleaned = str(description or '').strip()
-    for pattern in HAPPY_HOUR_DESCRIPTION_PATTERNS:
-        cleaned = re.sub(pattern, '', cleaned, flags=re.IGNORECASE)
-
-    cleaned = re.sub(r'^[\s:\-–|,;/]+', '', cleaned)
-    cleaned = re.sub(r'[\s]{2,}', ' ', cleaned)
-    return cleaned.strip()
 
 
 def _contains_time_signal(text):
