@@ -16,8 +16,8 @@ OPENAI_MODEL = os.environ.get('OPENAI_MODEL', 'gpt-4.1-mini')
 OPENAI_RESPONSES_URL = 'https://api.openai.com/v1/responses'
 DB_BAR_SYNC_LAMBDA_NAME = os.environ.get('DB_BAR_SYNC_LAMBDA_NAME')
 MAX_LINKS_TO_VISIT = 3
-MAX_TEXT_CHARS_PER_PAGE = 12000
-MAX_WEB_SCRAPE_CHARS = int(os.environ.get('MAX_WEB_SCRAPE_CHARS', '12000'))
+MAX_TEXT_CHARS_PER_PAGE = 20000
+MAX_WEB_SCRAPE_CHARS = 5000
 KEYWORD_MATCH_CHAR_WINDOW_SIZE = int(os.environ.get('KEYWORD_MATCH_CHAR_WINDOW_SIZE', '220'))
 HTML_CONTENT_HINTS = ('text/html', 'application/xhtml+xml')
 NON_HTML_EXTENSIONS = ('.pdf', '.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.zip', '.mp4', '.mp3')
@@ -821,7 +821,7 @@ def lambda_handler(event, context):
             bar_name = (bar.get('bar_name') or '').strip()
             bar_neighborhood = (bar.get('neighborhood') or '').strip()
             if not homepage_url or not bar_name:
-                LOGGER.info('Skipping bar_id=%s due to missing website or name', bar.get('bar_id'))
+                LOGGER.info('Skipping bar_id=%s %s due to missing website or name', bar.get('bar_ID'), bar.get('bar_name'))
                 continue
 
             processed_bars += 1
@@ -829,8 +829,8 @@ def lambda_handler(event, context):
                 specials = generate_from_crawl(homepage_url, bar_name, bar_neighborhood)
             except Exception:
                 LOGGER.exception(
-                    'Crawl flow crashed for bar_id=%s; falling back to OpenAI web_search',
-                    bar.get('bar_id')
+                    'Crawl flow crashed for bar_id=%s %s; falling back to OpenAI web_search',
+                    bar.get('bar_id'), bar.get('bar_name')
                 )
                 specials = []
             has_high_confidence = any(
