@@ -31,6 +31,8 @@ The folders inside `functions/` each correspond to an AWS Lambda function.
   - `DB_USER`
   - `DB_PASSWORD`
   - `DB_NAME`
+  - `WEB_SCRAPE_AUTO_APPROVAL_THRESHOLD` (optional; defaults to `1.0`)
+  - `WEB_AI_SEARCH_AUTO_APPROVAL_THRESHOLD` (optional; defaults to `1.0`)
 
 - **`insertUserReport`**  
   Used on the special details view. When a user marks a special for review, this function is called to insert a report record in the database.

@@ -891,12 +891,11 @@ def lambda_handler(event, context):
             )
             if not specials or not has_fallback_confidence:
                 LOGGER.info(
-                    'No crawl specials met fallback threshold %.2f for bar_name=%s; OpenAI web_search fallback is temporarily disabled',
+                    'No crawl specials met fallback threshold %.2f for bar_name=%s; using OpenAI web_search fallback',
                     WEB_SCRAPE_FALLBACK_THRESHOLD,
                     bar_name
                 )
-                # Temporarily disabled for crawler-only testing:
-                # specials = generate_from_search(bar_name, bar_neighborhood)
+                specials = generate_from_search(bar_name, bar_neighborhood)
 
             for special in specials:
                 if special.get('fetch_method') == 'website_crawl':
