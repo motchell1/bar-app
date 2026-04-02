@@ -830,8 +830,13 @@ def lambda_handler(event, context):
                 for special in specials
             )
             if not specials or not has_high_confidence:
-                LOGGER.info('No crawl specials found for bar_id=%s; using OpenAI web_search', bar.get('bar_id'))
-                specials = generate_from_search(bar_name, bar_neighborhood)
+                LOGGER.info(
+                    'No crawl specials found for bar_id=%s; OpenAI web_search fallback is temporarily disabled',
+                    bar.get('bar_id')
+                )
+                # Temporarily disabled for crawler-only testing:
+                # specials = generate_from_search(bar_name, bar_neighborhood)
+                specials = []
 
             for special in specials:
                 if special.get('fetch_method') == 'website_crawl':
