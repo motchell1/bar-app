@@ -452,7 +452,7 @@ Extraction strategy (important):
 
 For each special, return:
 - description (string; omit labels such as "happy hour" / "HH" and keep only the actual offer details)
-- type ("food", "drink", or "unknown")
+- type ("food", "drink", "both", or "unknown")
 - days_of_week (array of MON, TUE, WED, THU, FRI, SAT, SUN)
 - start_time (HH:MM 24-hour or null)
 - end_time (HH:MM 24-hour or null)
@@ -496,7 +496,7 @@ STRICT RULES:
 
 For each special, return:
 - description (string; omit labels such as "happy hour" / "HH" and keep only the actual offer details)
-- type ("food", "drink", or "unknown")
+- type ("food", "drink",  or "unknown")
 - days_of_week (array of MON, TUE, WED, THU, FRI, SAT, SUN)
 - start_time (HH:MM 24-hour or null)
 - end_time (HH:MM 24-hour or null)
@@ -516,14 +516,13 @@ Normalization rules:
   - food/appetizers → "food"
 - Validate that each source URL actually supports the special claim; reduce confidence if source evidence is weak, indirect, or ambiguous.
 - Set confidence based on evidence strength and source quality. Suggested rubric:
-  - 0.85-1.00: corroborated by multiple independent reliable sources and recent updates.
-  - 0.65-0.84: supported by one reliable primary source (official bar site or verified official social post) with clear details.
-  - 0.40-0.64: only one source and/or details are partially ambiguous (missing day/time, unclear recurrence).
+  - 1.00: Special has price or discount type, food or drink item, and clear determination of day/time/recurrance defined for each item corroborated by at least two independent reliable sources with recent updates.
+  - 0.85-0.99: Special has price or discount type, food or drink item, and clear determination of day/time/recurrance defined for each item corroborated by only one reliable source with recent updates.
+  - 0.70-0.84: Slight ambiguity of one of: (price or discount type, food or drink item, or day/time/recurrance) or source is questionable
+  - 0.40-0.69: Ambiguity of two of: (price or discount type, food or drink item, or day/time/recurrance)
   - 0.10-0.39: stale or weak evidence (old posts, indirect mentions, third-party reposts without confirmation).
-- If only one source is found, avoid high confidence unless the source is clearly official and specific.
-- Lower confidence when source content appears outdated or does not include a clear effective timeframe.
 
-Only include items when a concrete source URL is available.
+Only include items when a concrete source URL is available. Only include items that are an actual discount - don't just include events without a food or drink discount.
 Return ONLY valid JSON. No explanations.
 """.strip()
 
