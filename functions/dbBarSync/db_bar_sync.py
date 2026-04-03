@@ -2,7 +2,7 @@ import json
 import logging
 import os
 from difflib import SequenceMatcher
-from datetime import datetime
+from datetime import datetime, time, timedelta
 from typing import Dict, List
 
 import pymysql
@@ -16,6 +16,7 @@ DB_PASSWORD = os.environ['DB_PASSWORD']
 DB_NAME = os.environ['DB_NAME']
 WEB_SCRAPE_AUTO_APPROVAL_THRESHOLD = .5
 WEB_AI_SEARCH_AUTO_APPROVAL_THRESHOLD = .8
+DAY_KEYS = {'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'}
 
 
 def get_connection():
@@ -184,15 +185,89 @@ def _parse_days_of_week(raw_days) -> List[str]:
     if not isinstance(raw_days, list):
         return []
 
-    return [day for day in raw_days if isinstance(day, str) and day.strip()]
+    normalized_days = []
+    for day in raw_days:
+        normalized = _normalize_day_of_week(day)
+        if normalized:
+            normalized_days.append(normalized)
+    return normalized_days
+
+
+def _normalize_day_of_week(value):
+    if value is None:
+        return None
+    normalized = str(value).strip().upper()
+    return normalized if normalized in DAY_KEYS else None
+
+
+def _normalize_all_day(value):
+    if isinstance(value, str):
+        normalized = value.strip().upper()
+        if normalized in {'Y', 'YES', 'TRUE', '1'}:
+            return 'Y'
+        if normalized in {'N', 'NO', 'FALSE', '0'}:
+            return 'N'
+    elif isinstance(value, bool):
+        return 'Y' if value else 'N'
+    elif isinstance(value, (int, float)):
+        return 'Y' if value else 'N'
+
+    return 'Y' if value == 'Y' else 'N'
+
+
+def _normalize_time_value(value):
+    if value in (None, ''):
+        return None
+
+    if isinstance(value, timedelta):
+        total_seconds = int(value.total_seconds())
+        hours = (total_seconds // 3600) % 24
+        minutes = (total_seconds % 3600) // 60
+        seconds = total_seconds % 60
+        return f'{hours:02d}:{minutes:02d}:{seconds:02d}'
+
+    if isinstance(value, time):
+        return value.strftime('%H:%M:%S')
+
+    if isinstance(value, datetime):
+        return value.strftime('%H:%M:%S')
+
+    raw = str(value).strip()
+    if not raw:
+        return None
+
+    parts = raw.split(':')
+    if len(parts) == 2:
+        hours, minutes = parts
+        if hours.isdigit() and minutes.isdigit():
+            return f'{int(hours):02d}:{int(minutes):02d}:00'
+    if len(parts) == 3:
+        hours, minutes, seconds = parts
+        if hours.isdigit() and minutes.isdigit() and seconds.isdigit():
+            return f'{int(hours):02d}:{int(minutes):02d}:{int(seconds):02d}'
+
+    return raw
 
 
 def _is_candidate_same_as_special(candidate_row: Dict, special_row: Dict) -> bool:
+    candidate_all_day = _normalize_all_day(candidate_row.get('all_day'))
+    special_all_day = _normalize_all_day(special_row.get('all_day'))
+    candidate_start = _normalize_time_value(candidate_row.get('start_time'))
+    candidate_end = _normalize_time_value(candidate_row.get('end_time'))
+    special_start = _normalize_time_value(special_row.get('start_time'))
+    special_end = _normalize_time_value(special_row.get('end_time'))
+
+    if candidate_all_day == 'Y' and special_all_day == 'Y':
+        candidate_start = None
+        candidate_end = None
+        special_start = None
+        special_end = None
+
     return (
-        candidate_row.get('day_of_week') == special_row.get('day_of_week')
-        and candidate_row.get('all_day') == special_row.get('all_day')
-        and candidate_row.get('start_time') == special_row.get('start_time')
-        and candidate_row.get('end_time') == special_row.get('end_time')
+        _normalize_day_of_week(candidate_row.get('day_of_week')) == _normalize_day_of_week(special_row.get('day_of_week'))
+        and candidate_all_day == special_all_day
+        and candidate_start == special_start
+        and candidate_end == special_end
         and _descriptions_match(candidate_row.get('description'), special_row.get('description'))
     )
 
@@ -325,19 +400,30 @@ def publish_candidate_specials(cursor, bar_id: int, run_id: int, auto_publish: s
     approved_candidates = cursor.fetchall()
 
     candidate_rows = []
+    seen_candidate_keys = set()
     for candidate in approved_candidates:
         for day in _parse_days_of_week(candidate.get('days_of_week')):
-            candidate_rows.append(
-                {
-                    'candidate_id': candidate['special_candidate_id'],
-                    'description': candidate.get('description'),
-                    'type': candidate.get('type'),
-                    'day_of_week': day,
-                    'start_time': candidate.get('start_time'),
-                    'end_time': candidate.get('end_time'),
-                    'all_day': candidate.get('all_day'),
-                }
+            row = {
+                'candidate_id': candidate['special_candidate_id'],
+                'description': candidate.get('description'),
+                'type': candidate.get('type'),
+                'day_of_week': day,
+                'start_time': candidate.get('start_time'),
+                'end_time': candidate.get('end_time'),
+                'all_day': candidate.get('all_day'),
+            }
+            dedupe_key = (
+                _normalize_day_of_week(row.get('day_of_week')),
+                _normalize_all_day(row.get('all_day')),
+                _normalize_time_value(row.get('start_time')),
+                _normalize_time_value(row.get('end_time')),
+                _normalize_description(row.get('description')),
+                row.get('type') or 'unknown',
             )
+            if dedupe_key in seen_candidate_keys:
+                continue
+            seen_candidate_keys.add(dedupe_key)
+            candidate_rows.append(row)
 
     cursor.execute(
         """
