@@ -785,6 +785,12 @@ def _group_specials_for_insert(items):
 
 
 def generate_from_crawl(homepage_url, bar_name, neighborhood):
+    stats = {
+        'web_crawl_candidate_links': 0,
+        'web_crawl_keyword_matches': 0,
+        'web_crawl_prompt_char_count': 0,
+        'web_crawl_ai_parse_attempted': 'N',
+    }
     started_at = time.perf_counter()
     LOGGER.info(
         'Starting crawl flow bar_name=%s neighborhood=%s homepage_url=%s',
@@ -796,16 +802,17 @@ def generate_from_crawl(homepage_url, bar_name, neighborhood):
         homepage_html = fetch_html(homepage_url)
     except requests.RequestException:
         LOGGER.exception('Failed fetching homepage for crawl; falling back to web_search: %s', homepage_url)
-        return []
+        return [], stats
     except Exception:
         LOGGER.exception('Unexpected homepage crawl error; falling back to web_search: %s', homepage_url)
-        return []
+        return [], stats
     if not homepage_html:
         LOGGER.info('Homepage was non-HTML or empty; returning empty crawl result')
-        return []
+        return [], stats
     links = extract_links(homepage_url, homepage_html)
     LOGGER.info('Extracted %d same-domain links from homepage', len(links))
     top_links = choose_candidate_links(links)
+    stats['web_crawl_candidate_links'] = len(top_links)
     candidate_links = [homepage_url] + [url for url in top_links if url != homepage_url]
     LOGGER.info('Selected %d initial candidate links for crawl', len(candidate_links))
 
@@ -837,17 +844,24 @@ def generate_from_crawl(homepage_url, bar_name, neighborhood):
 
     if not page_payloads:
         LOGGER.info('No crawl text payloads available; returning empty list')
-        return []
+        return [], stats
+
+    stats['web_crawl_keyword_matches'] = sum(
+        _get_keyword_hit_stats(page.get('text')).get('total_hits', 0)
+        for page in page_payloads
+    )
 
     prompt = build_crawl_prompt(bar_name, neighborhood, homepage_url, page_payloads)
     if not prompt:
         LOGGER.info('No keyword-matching crawl page content found; skipping OpenAI crawl call')
-        return []
+        return [], stats
+    stats['web_crawl_prompt_char_count'] = len(prompt)
     payload = {
         'model': OPENAI_MODEL,
         'input': prompt,
         'temperature': 0
     }
+    stats['web_crawl_ai_parse_attempted'] = 'Y'
     raw_response = call_openai(payload)
     raw_text = extract_output_text(raw_response)
     items = parse_json_array(raw_text)
@@ -869,19 +883,25 @@ def generate_from_crawl(homepage_url, bar_name, neighborhood):
         elapsed,
         len(normalized)
     )
-    return normalized
+    return normalized, stats
 
 
 def generate_from_search(bar_name, neighborhood):
+    stats = {
+        'web_ai_search_prompt_char_count': 0,
+        'web_ai_search_attempted': 'N',
+    }
     started_at = time.perf_counter()
     LOGGER.info('Starting direct web_search flow bar_name=%s neighborhood=%s', bar_name, neighborhood)
     prompt = build_search_prompt(bar_name, neighborhood)
+    stats['web_ai_search_prompt_char_count'] = len(prompt)
     payload = {
         'model': OPENAI_MODEL,
         'tools': [{'type': 'web_search'}],
         'input': prompt,
         'temperature': 0
     }
+    stats['web_ai_search_attempted'] = 'Y'
     raw_response = call_openai(payload)
     raw_text = extract_output_text(raw_response)
     items = parse_json_array(raw_text)
@@ -902,7 +922,7 @@ def generate_from_search(bar_name, neighborhood):
         elapsed,
         len(normalized)
     )
-    return normalized
+    return normalized, stats
 
 
 def lambda_handler(event, context):
@@ -940,13 +960,19 @@ def lambda_handler(event, context):
 
             processed_bars += 1
             try:
-                specials = generate_from_crawl(homepage_url, bar_name, bar_neighborhood)
+                specials, crawl_stats = generate_from_crawl(homepage_url, bar_name, bar_neighborhood)
             except Exception:
                 LOGGER.exception(
                     'Crawl flow crashed for bar_name=%s; falling back to OpenAI web_search',
                     bar.get('bar_name')
                 )
                 specials = []
+                crawl_stats = {
+                    'web_crawl_candidate_links': 0,
+                    'web_crawl_keyword_matches': 0,
+                    'web_crawl_prompt_char_count': 0,
+                    'web_crawl_ai_parse_attempted': 'N',
+                }
             has_fallback_confidence = any(
                 isinstance(special.get('confidence'), (int, float))
                 and special.get('confidence', 0) >= WEB_SCRAPE_FALLBACK_THRESHOLD
@@ -958,7 +984,12 @@ def lambda_handler(event, context):
                     WEB_SCRAPE_FALLBACK_THRESHOLD,
                     bar_name
                 )
-                specials = generate_from_search(bar_name, bar_neighborhood)
+                specials, search_stats = generate_from_search(bar_name, bar_neighborhood)
+            else:
+                search_stats = {
+                    'web_ai_search_prompt_char_count': 0,
+                    'web_ai_search_attempted': 'N',
+                }
             specials = _group_specials_for_insert(specials)
 
             bar_candidates = []
@@ -985,11 +1016,12 @@ def lambda_handler(event, context):
                 'total_candidates': len(bar_candidates),
                 'web_crawl_candidates': bar_crawl_specials_count,
                 'web_ai_search_candidates': bar_web_ai_search_specials_count,
-                'web_crawl_candidate_links': 0,
-                'web_crawl_keyword_matches': 0,
-                'web_crawl_prompt_char_count': 0,
-                'web_crawl_ai_parse_attempted': 'Y' if bar_crawl_specials_count > 0 else 'N',
-                'web_ai_search_attempted': 'Y' if bar_web_ai_search_specials_count > 0 else 'N',
+                'web_crawl_candidate_links': crawl_stats.get('web_crawl_candidate_links', 0),
+                'web_crawl_keyword_matches': crawl_stats.get('web_crawl_keyword_matches', 0),
+                'web_crawl_prompt_char_count': crawl_stats.get('web_crawl_prompt_char_count', 0),
+                'web_ai_search_prompt_char_count': search_stats.get('web_ai_search_prompt_char_count', 0),
+                'web_crawl_ai_parse_attempted': crawl_stats.get('web_crawl_ai_parse_attempted', 'N'),
+                'web_ai_search_attempted': search_stats.get('web_ai_search_attempted', 'N'),
                 'started_at': run_started_at,
                 'completed_at': datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
             }
