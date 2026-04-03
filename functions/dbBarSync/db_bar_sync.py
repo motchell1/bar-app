@@ -210,6 +210,7 @@ def insert_special_candidate_run(cursor, run: Dict) -> int:
             web_crawl_candidate_links,
             web_crawl_keyword_matches,
             web_crawl_prompt_char_count,
+            web_ai_search_prompt_char_count,
             web_crawl_ai_parse_attempted,
             web_ai_search_attempted,
             auto_publish,
@@ -217,7 +218,7 @@ def insert_special_candidate_run(cursor, run: Dict) -> int:
             completed_at,
             published_at
         )
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """,
         (
             run['bar_id'],
@@ -228,6 +229,7 @@ def insert_special_candidate_run(cursor, run: Dict) -> int:
             run.get('web_crawl_candidate_links', 0),
             run.get('web_crawl_keyword_matches', 0),
             run.get('web_crawl_prompt_char_count', 0),
+            run.get('web_ai_search_prompt_char_count', 0),
             'Y' if run.get('web_crawl_ai_parse_attempted') == 'Y' else 'N',
             'Y' if run.get('web_ai_search_attempted') == 'Y' else 'N',
             'N',
