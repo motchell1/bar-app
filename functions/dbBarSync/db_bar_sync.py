@@ -2,7 +2,7 @@ import json
 import logging
 import os
 from difflib import SequenceMatcher
-from datetime import datetime
+from datetime import datetime, time, timedelta
 from typing import Dict, List
 
 import pymysql
@@ -187,12 +187,53 @@ def _parse_days_of_week(raw_days) -> List[str]:
     return [day for day in raw_days if isinstance(day, str) and day.strip()]
 
 
+def _normalize_day_of_week(value) -> str:
+    if value is None:
+        return ''
+    return str(value).strip().upper()
+
+
+def _normalize_yn_flag(value) -> str:
+    if value in {'Y', 'N'}:
+        return value
+
+    normalized = str(value or '').strip().upper()
+    if normalized in {'Y', 'YES', 'TRUE', 'T', '1'}:
+        return 'Y'
+    if normalized in {'N', 'NO', 'FALSE', 'F', '0'}:
+        return 'N'
+    return normalized
+
+
+def _normalize_time_value(value) -> str:
+    if value is None:
+        return ''
+
+    if isinstance(value, timedelta):
+        total_seconds = int(value.total_seconds()) % (24 * 60 * 60)
+        hours, remainder = divmod(total_seconds, 3600)
+        minutes, seconds = divmod(remainder, 60)
+        return f'{hours:02d}:{minutes:02d}:{seconds:02d}'
+
+    if isinstance(value, time):
+        return value.strftime('%H:%M:%S')
+
+    normalized = str(value).strip()
+    if not normalized:
+        return ''
+
+    if len(normalized) == 5 and normalized.count(':') == 1:
+        return f'{normalized}:00'
+
+    return normalized
+
+
 def _is_candidate_same_as_special(candidate_row: Dict, special_row: Dict) -> bool:
     return (
-        candidate_row.get('day_of_week') == special_row.get('day_of_week')
-        and candidate_row.get('all_day') == special_row.get('all_day')
-        and candidate_row.get('start_time') == special_row.get('start_time')
-        and candidate_row.get('end_time') == special_row.get('end_time')
+        _normalize_day_of_week(candidate_row.get('day_of_week')) == _normalize_day_of_week(special_row.get('day_of_week'))
+        and _normalize_yn_flag(candidate_row.get('all_day')) == _normalize_yn_flag(special_row.get('all_day'))
+        and _normalize_time_value(candidate_row.get('start_time')) == _normalize_time_value(special_row.get('start_time'))
+        and _normalize_time_value(candidate_row.get('end_time')) == _normalize_time_value(special_row.get('end_time'))
         and _descriptions_match(candidate_row.get('description'), special_row.get('description'))
     )
 
