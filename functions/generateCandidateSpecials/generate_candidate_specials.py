@@ -725,65 +725,6 @@ def _apply_crawl_quality_rules(items):
     return filtered
 
 
-def _dedupe_preserve_order(values):
-    seen = set()
-    result = []
-    for value in values:
-        normalized = (value or '').strip()
-        if not normalized or normalized in seen:
-            continue
-        seen.add(normalized)
-        result.append(normalized)
-    return result
-
-
-def _group_specials_for_insert(items):
-    grouped = {}
-    ordered_keys = []
-
-    for item in items:
-        if not isinstance(item, dict):
-            continue
-
-        days = tuple(sorted(day for day in (item.get('days_of_week') or []) if day in DAY_KEYS))
-        key = (
-            days,
-            item.get('start_time') or None,
-            item.get('end_time') or None,
-            'Y' if item.get('all_day') == 'Y' else 'N',
-            item.get('type') or 'unknown',
-            item.get('is_recurring') or 'Y',
-            item.get('date') or None,
-        )
-
-        if key not in grouped:
-            grouped[key] = {
-                **item,
-                'days_of_week': list(days),
-                '_descriptions': _dedupe_preserve_order([item.get('description')]),
-                '_notes': _dedupe_preserve_order([item.get('notes')]),
-            }
-            ordered_keys.append(key)
-            continue
-
-        target = grouped[key]
-        target['_descriptions'] = _dedupe_preserve_order(target['_descriptions'] + [item.get('description')])
-        target['_notes'] = _dedupe_preserve_order(target['_notes'] + [item.get('notes')])
-        target['confidence'] = max(
-            float(target.get('confidence') or 0.0),
-            float(item.get('confidence') or 0.0)
-        )
-
-    merged = []
-    for key in ordered_keys:
-        item = grouped[key]
-        item['description'] = '; '.join(item.pop('_descriptions'))
-        item['notes'] = ' | '.join(item.pop('_notes'))
-        merged.append(item)
-
-    return merged
-
-
 def generate_from_crawl(homepage_url, bar_name, neighborhood):
     stats = {
         'web_crawl_candidate_links': 0,
@@ -990,8 +931,6 @@ def lambda_handler(event, context):
                     'web_ai_search_prompt_char_count': 0,
                     'web_ai_search_attempted': 'N',
                 }
-            specials = _group_specials_for_insert(specials)
-
             bar_candidates = []
             bar_crawl_specials_count = 0
             bar_web_ai_search_specials_count = 0
