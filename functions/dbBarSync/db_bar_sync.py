@@ -391,7 +391,23 @@ def publish_candidate_specials(cursor, bar_id: int, run_id: int, auto_publish: s
     )
     existing_specials = cursor.fetchall()
 
+    approved_candidate_ids = [
+        candidate['special_candidate_id']
+        for candidate in approved_candidates
+        if candidate.get('special_candidate_id')
+    ]
+    for candidate_id in approved_candidate_ids:
+        cursor.execute(
+            """
+            UPDATE special_candidate
+            SET approved_special_id = NULL
+            WHERE special_candidate_id = %s
+            """,
+            (candidate_id,),
+        )
+
     matched_special_ids = set()
+    candidate_to_special_ids = {}
     unmatched_candidates = []
     for candidate in candidate_rows:
         matched_id = None
@@ -404,6 +420,7 @@ def publish_candidate_specials(cursor, bar_id: int, run_id: int, auto_publish: s
 
         if matched_id is not None:
             matched_special_ids.add(matched_id)
+            candidate_to_special_ids.setdefault(candidate['candidate_id'], set()).add(matched_id)
         else:
             unmatched_candidates.append(candidate)
 
@@ -439,6 +456,18 @@ def publish_candidate_specials(cursor, bar_id: int, run_id: int, auto_publish: s
             ),
         )
         inserted_special_count += 1
+        candidate_to_special_ids.setdefault(candidate['candidate_id'], set()).add(cursor.lastrowid)
+
+    for candidate_id, special_ids in candidate_to_special_ids.items():
+        approved_special_id = min(special_ids) if special_ids else None
+        cursor.execute(
+            """
+            UPDATE special_candidate
+            SET approved_special_id = %s
+            WHERE special_candidate_id = %s
+            """,
+            (approved_special_id, candidate_id),
+        )
 
     deactivated_special_count = len(existing_specials) - len(matched_special_ids)
     cursor.execute(
