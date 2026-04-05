@@ -16,6 +16,7 @@ DB_PASSWORD = os.environ['DB_PASSWORD']
 DB_NAME = os.environ['DB_NAME']
 WEB_SCRAPE_AUTO_APPROVAL_THRESHOLD = .5
 WEB_AI_SEARCH_AUTO_APPROVAL_THRESHOLD = .8
+IGNORE_MANUAL_SPECIALS_ON_PUBLISH = 'Y'
 
 
 def get_connection():
@@ -380,14 +381,21 @@ def publish_candidate_specials(cursor, bar_id: int, run_id: int, auto_publish: s
                 }
             )
 
-    cursor.execute(
-        """
+    existing_specials_query = """
         SELECT special_id, day_of_week, all_day, start_time, end_time, description
         FROM special
         WHERE bar_id = %s
             AND is_active = 'Y'
-        """,
-        (bar_id,),
+    """
+    existing_specials_params = [bar_id]
+    if IGNORE_MANUAL_SPECIALS_ON_PUBLISH == 'Y':
+        existing_specials_query += """
+            AND insert_method <> 'MANUAL'
+        """
+
+    cursor.execute(
+        existing_specials_query,
+        tuple(existing_specials_params),
     )
     existing_specials = cursor.fetchall()
 
