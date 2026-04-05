@@ -114,6 +114,53 @@ function sortBarsBySpecials(bars, dayKey, isToday) {
   });
 }
 
+function groupSpecialsForUI(specials) {
+  const groups = new Map();
+
+  specials.forEach((special) => {
+    if (!special) return;
+    const specialType = special.special_type || special.type || '';
+    const key = [
+      specialType,
+      special.all_day ? 'all-day' : 'timed',
+      special.start_time || '',
+      special.end_time || ''
+    ].join('|');
+
+    if (!groups.has(key)) {
+      groups.set(key, []);
+    }
+    groups.get(key).push(special);
+  });
+
+  return Array.from(groups.values()).map((group) => {
+    const baseSpecial = { ...group[0] };
+    const uniqueDescriptions = Array.from(
+      new Set(
+        group
+          .map((special) => (special.description || '').trim())
+          .filter(Boolean)
+      )
+    );
+
+    baseSpecial.description = uniqueDescriptions.join(' • ');
+    baseSpecial.grouped_special_ids = group
+      .map((special) => special.special_id || null)
+      .filter(Boolean);
+    baseSpecial.group_size = group.length;
+
+    const hasLive = group.some((special) => special.current_status === 'live' || special.current_status === 'active');
+    const hasUpcoming = group.some((special) => special.current_status === 'upcoming');
+    const hasPast = group.some((special) => special.current_status === 'past');
+
+    if (hasLive) baseSpecial.current_status = 'live';
+    else if (hasUpcoming) baseSpecial.current_status = 'upcoming';
+    else if (hasPast) baseSpecial.current_status = 'past';
+
+    return baseSpecial;
+  });
+}
+
 function buildSpecialItem(special, { isToday = false, clickable = false, onClick = null, neutralTimeBadgeStyle = false } = {}) {
   const item = document.createElement('div');
   item.className = 'special-item';

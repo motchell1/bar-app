@@ -129,15 +129,20 @@ function renderBarDetailContent(selectedBar, detailPayload) {
     content.className = 'day-content expanded';
 
     if (specialIds.length > 0) {
-      specialIds.forEach((specialId) => {
-        const specialData = detailPayload?.specials?.[String(specialId)];
-        if (!specialData) return;
+      const specialsForDay = specialIds
+        .map((specialId) => {
+          const specialData = detailPayload?.specials?.[String(specialId)];
+          if (!specialData) return null;
+          return {
+            special_id: String(specialId),
+            ...specialData
+          };
+        })
+        .filter(Boolean);
 
-        const special = {
-          special_id: String(specialId),
-          ...specialData
-        };
+      const groupedSpecials = groupSpecialsForUI(specialsForDay);
 
+      groupedSpecials.forEach((special) => {
         const div = buildSpecialItem(special, {
           neutralTimeBadgeStyle: true,
           clickable: true,
