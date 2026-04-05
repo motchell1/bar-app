@@ -131,6 +131,10 @@ body {
   display: none;
 }
 
+.screen-animate-in {
+  animation: screenFadeSlideIn 220ms ease-out;
+}
+
 
 .bars-search-wrap {
   padding: 0 16px 8px;
@@ -169,6 +173,16 @@ body {
   box-shadow: 0 4px 10px rgba(0,0,0,0.08);
   padding: 8px 10px;
   cursor: pointer;
+}
+
+.tap-pressable {
+  transition: transform 0.16s ease, box-shadow 0.16s ease, opacity 0.16s ease;
+  transform-origin: center;
+}
+
+.tap-pressable.tap-press-active {
+  transform: scale(0.98);
+  opacity: 0.92;
 }
 
 .bars-list-thumb {
@@ -376,6 +390,17 @@ body {
 @keyframes fadePulse {
   0%, 100% { opacity: 0; }
   50% { opacity: 1; }
+}
+
+@keyframes screenFadeSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* ===== Open Hours ===== */
@@ -1119,4 +1144,15 @@ body {
 
 #favorites-list .special-day-badge {
   margin: 8px 0 14px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tap-pressable,
+  .tap-pressable.tap-press-active,
+  .screen-animate-in {
+    transition: none !important;
+    animation: none !important;
+    transform: none !important;
+    opacity: 1 !important;
+  }
 }

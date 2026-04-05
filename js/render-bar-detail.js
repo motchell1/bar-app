@@ -203,6 +203,7 @@ async function showDetail(barOrId, previousScreen = currentTab) {
   document.getElementById('special-screen').style.display = 'none';
   document.getElementById('detail-screen').style.display = 'block';
   setScreenLayout(false);
+  animateScreenIn('detail-screen');
 
   document.getElementById('detail-image').src = selectedBar.image_url || '';
   document.getElementById('detail-name').textContent = (selectedBar.name || '').toUpperCase();

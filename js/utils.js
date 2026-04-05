@@ -209,9 +209,40 @@ function buildSpecialItem(special, { isToday = false, clickable = false, onClick
   }
 
   if (clickable && typeof onClick === 'function') {
-    item.classList.add('clickable-special');
-    item.onclick = onClick;
+    item.classList.add('clickable-special', 'tap-pressable');
+    item.onclick = (event) => animateTapAndNavigate(item, () => onClick(event));
   }
 
   return item;
+}
+
+function userPrefersReducedMotion() {
+  return window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
+function animateTapAndNavigate(element, navigate) {
+  if (typeof navigate !== 'function') return;
+  if (!element || userPrefersReducedMotion()) {
+    navigate();
+    return;
+  }
+
+  element.classList.add('tap-press-active');
+  setTimeout(() => {
+    element.classList.remove('tap-press-active');
+    navigate();
+  }, 120);
+}
+
+function animateScreenIn(screenId) {
+  const targetScreen = document.getElementById(screenId);
+  if (!targetScreen || userPrefersReducedMotion()) return;
+
+  targetScreen.classList.remove('screen-animate-in');
+  requestAnimationFrame(() => {
+    targetScreen.classList.add('screen-animate-in');
+    setTimeout(() => {
+      targetScreen.classList.remove('screen-animate-in');
+    }, 220);
+  });
 }
