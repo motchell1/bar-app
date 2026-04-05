@@ -16,6 +16,7 @@ DB_PASSWORD = os.environ['DB_PASSWORD']
 DB_NAME = os.environ['DB_NAME']
 WEB_SCRAPE_AUTO_APPROVAL_THRESHOLD = .5
 WEB_AI_SEARCH_AUTO_APPROVAL_THRESHOLD = .8
+IGNORE_MANUAL_SPECIALS_ON_PUBLISH = 'Y'
 
 
 def get_connection():
@@ -255,11 +256,12 @@ def insert_special_candidate_run(cursor, run: Dict) -> int:
             web_crawl_ai_parse_attempted,
             web_ai_search_attempted,
             auto_publish,
+            is_published,
             started_at,
             completed_at,
             published_at
         )
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """,
         (
             run['bar_id'],
@@ -273,6 +275,7 @@ def insert_special_candidate_run(cursor, run: Dict) -> int:
             run.get('web_ai_search_prompt_char_count', 0),
             'Y' if run.get('web_crawl_ai_parse_attempted') == 'Y' else 'N',
             'Y' if run.get('web_ai_search_attempted') == 'Y' else 'N',
+            'N',
             'N',
             run.get('started_at') or datetime.utcnow(),
             run.get('completed_at') or datetime.utcnow(),
@@ -338,6 +341,7 @@ def insert_special_candidates(cursor, run: Dict, candidates: List[Dict]) -> Dict
         UPDATE special_candidate_run
         SET total_candidates = %s,
             auto_approved_candidates = %s,
+            is_published = 'N',
             completed_at = COALESCE(%s, NOW())
         WHERE run_id = %s
         """,
@@ -380,12 +384,14 @@ def publish_candidate_specials(cursor, bar_id: int, run_id: int, auto_publish: s
                 }
             )
 
+    manual_filter_clause = "AND insert_method <> 'MANUAL'" if IGNORE_MANUAL_SPECIALS_ON_PUBLISH == 'Y' else ''
     cursor.execute(
-        """
+        f"""
         SELECT special_id, day_of_week, all_day, start_time, end_time, description
         FROM special
         WHERE bar_id = %s
             AND is_active = 'Y'
+            {manual_filter_clause}
         """,
         (bar_id,),
     )
@@ -474,6 +480,7 @@ def publish_candidate_specials(cursor, bar_id: int, run_id: int, auto_publish: s
         """
         UPDATE special_candidate_run
         SET auto_publish = %s,
+            is_published = 'Y',
             published_at = NOW()
         WHERE run_id = %s
         """,
