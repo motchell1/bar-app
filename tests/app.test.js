@@ -515,6 +515,48 @@ test('renderBarsWeek shows today through next 6 days and open status only for to
   assert.equal(cards[1].querySelector('.active-dot'), null, 'future all-day special should not render active dot');
 });
 
+test('renderBarsWeek groups specials with matching day, time, and type into one row', () => {
+  const document = new DocumentMock();
+  mountBaseNodes(document);
+  const ctx = loadAppWithoutBoot(document);
+
+  vm.runInContext(`
+    startupPayload = {
+      general_data: { current_day: 'MON' },
+      bars: {
+        '1': { name: 'Group Bar', neighborhood: 'Downtown', image_url: null, currently_open: true }
+      },
+      open_hours: {
+        '1': { MON: { display_text: '4:00 PM - 2:00 AM' } }
+      },
+      specials: {
+        '11': { bar_id: 1, description: '$5 Lager', special_type: 'drink', all_day: false, start_time: '16:00', end_time: '18:00', current_status: 'upcoming' },
+        '12': { bar_id: 1, description: '$6 IPA', special_type: 'drink', all_day: false, start_time: '16:00', end_time: '18:00', current_status: 'upcoming' },
+        '13': { bar_id: 1, description: '$8 Burger', special_type: 'food', all_day: false, start_time: '16:00', end_time: '18:00', current_status: 'upcoming' }
+      },
+      specials_by_day: {
+        MON: [{ bar_id: 1, specials: ['11', '12', '13'] }],
+        TUE: [],
+        WED: [],
+        THU: [],
+        FRI: [],
+        SAT: [],
+        SUN: []
+      }
+    };
+    currentTab = 'specials';
+    activeFilters.types = [];
+    activeFilters.neighborhoods = [];
+  `, ctx);
+
+  ctx.renderBarsWeek();
+
+  const card = document.querySelector('.bar-card');
+  const items = card.querySelectorAll('.special-item');
+  assert.equal(items.length, 2, 'groups drink specials that share the same time slot');
+  assert.equal(items[0].querySelector('.special-description').textContent, '$5 Lager • $6 IPA');
+});
+
 
 test('showDetail reuses startup payload details when has_special_this_week is true', async () => {
   const document = new DocumentMock();

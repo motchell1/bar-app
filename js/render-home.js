@@ -21,17 +21,23 @@ function buildHomeBarSpecials(bar, specialIds, dayKey, dayLabel) {
 
   const isToday = dayKey === startupPayload?.general_data?.current_day;
 
-  specialIds.forEach((specialId) => {
-    const special = specialsLookup[specialId];
-    if (!special) return;
+  const specialsForDisplay = specialIds
+    .map((specialId) => ({
+      special_id: String(specialId),
+      ...specialsLookup[specialId]
+    }))
+    .filter((special) => Boolean(special && special.description));
 
-    const typePass = activeFilters.types.length === 0 || activeFilters.types.includes(special.special_type);
+  const groupedSpecials = groupSpecialsForUI(specialsForDisplay);
+
+  groupedSpecials.forEach((special) => {
+    const specialType = special.special_type || special.type;
+    const typePass = activeFilters.types.length === 0 || activeFilters.types.includes(specialType);
     if (!typePass) return;
 
     const li = buildSpecialItem(special, {
       isToday,
       clickable: true,
-      status: special.current_status,
       onClick: (event) => {
         event.stopPropagation();
         showSpecialDetail(bar, special, { previousScreen: currentTab, dayLabel });
