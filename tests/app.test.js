@@ -676,3 +676,55 @@ test('showDetail fetches and renders bar-specific hours and specials', async () 
   await ctx.showDetail(1, 'bars');
   assert.equal(calls.length, 1, 'reuses cached bar details on second open');
 });
+
+test('detail and special screens receive fade-in class when opened', async () => {
+  const document = new DocumentMock();
+  mountBaseNodes(document);
+  const ctx = loadAppWithoutBoot(document);
+
+  vm.runInContext(`
+    startupPayload = {
+      general_data: { current_day: 'MON' },
+      bars: {
+        '1': { name: 'Fade Bar', neighborhood: 'Downtown', image_url: 'bar.jpg', is_open_now: false, has_special_this_week: true }
+      },
+      open_hours: {
+        '1': { MON: { display_text: '4:00 PM – 10:00 PM', open_time: '16:00', close_time: '22:00' } }
+      },
+      specials: {
+        '11': {
+          bar_id: 1,
+          day: 'MON',
+          special_type: 'drink',
+          description: '$5 Beer',
+          all_day: false,
+          start_time: '16:00',
+          end_time: '18:00',
+          current_status: 'active'
+        }
+      },
+      specials_by_day: {
+        MON: [{ bar_id: 1, specials: ['11'] }],
+        TUE: [],
+        WED: [],
+        THU: [],
+        FRI: [],
+        SAT: [],
+        SUN: []
+      }
+    };
+  `, ctx);
+
+  await ctx.showDetail(1, 'bars');
+  const detailScreen = document.getElementById('detail-screen');
+  await new Promise((resolve) => setTimeout(resolve, 5));
+  assert.equal(detailScreen.classList.contains('screen-animate-in'), true, 'detail screen starts fade-in animation');
+
+  await new Promise((resolve) => setTimeout(resolve, 240));
+  assert.equal(detailScreen.classList.contains('screen-animate-in'), false, 'detail screen fade class is cleaned up after animation');
+
+  ctx.showSpecialDetail({ bar_id: 1 }, { special_id: '11' }, { previousScreen: 'specials', dayLabel: 'Monday' });
+  const specialScreen = document.getElementById('special-screen');
+  await new Promise((resolve) => setTimeout(resolve, 5));
+  assert.equal(specialScreen.classList.contains('screen-animate-in'), true, 'special screen starts fade-in animation');
+});

@@ -139,8 +139,8 @@ function renderBarsWeek() {
       };
 
       const card = document.createElement('div');
-      card.className = 'bar-card';
-      card.onclick = () => showDetail(bar, currentTab);
+      card.className = 'bar-card tap-pressable';
+      card.onclick = () => animateTapAndNavigate(card, () => showDetail(bar, currentTab));
 
       if (bar.image_url && bar.image_url !== 'null') {
         const img = document.createElement('img');
@@ -205,8 +205,8 @@ function renderBarsList(bars) {
 
   sortedBars.forEach((bar) => {
     const card = document.createElement('div');
-    card.className = 'bars-list-card';
-    card.onclick = () => showDetail(bar, currentTab);
+    card.className = 'bars-list-card tap-pressable';
+    card.onclick = () => animateTapAndNavigate(card, () => showDetail(bar, currentTab));
 
     const img = document.createElement('img');
     img.className = 'bars-list-thumb';

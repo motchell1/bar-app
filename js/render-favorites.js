@@ -123,8 +123,8 @@ function renderFavorites(items = getFavoriteSpecialEntries()) {
 
   items.forEach((item) => {
     const card = document.createElement('div');
-    card.className = 'bar-card';
-    card.onclick = () => showSpecialDetail(item.bar, item.special, { previousScreen: 'favorites', dayLabel: item.dayLabel });
+    card.className = 'bar-card tap-pressable';
+    card.onclick = () => animateTapAndNavigate(card, () => showSpecialDetail(item.bar, item.special, { previousScreen: 'favorites', dayLabel: item.dayLabel }));
 
     const content = document.createElement('div');
     content.className = 'card-content';

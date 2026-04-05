@@ -42,6 +42,7 @@ function showSpecialDetail(bar, special, { previousScreen = 'specials', returnTo
   document.getElementById('detail-screen').style.display = 'none';
   document.getElementById('special-screen').style.display = 'block';
   setScreenLayout(false);
+  animateScreenIn('special-screen');
 
   const barImage = document.getElementById('special-bar-image');
   barImage.src = (selectedBar.image_url && selectedBar.image_url !== 'null') ? selectedBar.image_url : 'https://placehold.co/640x360?text=Bar';
