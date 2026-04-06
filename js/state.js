@@ -6,6 +6,7 @@ let currentTab = 'specials';
 let barsSearchQuery = '';
 let previousScreenState = null;
 let currentSpecialContext = null;
+let currentBarContext = null;
 let isInitialDataLoading = true;
 const activeFilters = {
   types: [],

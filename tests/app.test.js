@@ -267,6 +267,31 @@ function mountSpecialReportNodes(document) {
   document.body.appendChild(form);
 }
 
+function mountBarReportNodes(document) {
+  const toggle = document.createElement('button');
+  toggle.setAttribute('id', 'bar-report-toggle');
+  toggle.textContent = 'Mark for review';
+  document.body.appendChild(toggle);
+
+  const form = document.createElement('form');
+  form.setAttribute('id', 'bar-report-form');
+
+  const reason = document.createElement('select');
+  reason.setAttribute('id', 'bar-report-reason');
+  form.appendChild(reason);
+
+  const comment = document.createElement('textarea');
+  comment.setAttribute('id', 'bar-report-comment');
+  form.appendChild(comment);
+
+  const submit = document.createElement('button');
+  submit.className = 'special-report-submit';
+  submit.textContent = 'Submit';
+  form.appendChild(submit);
+
+  document.body.appendChild(form);
+}
+
 test('initSpecialReport scrolls submit button into view when report form opens', async () => {
   const document = new DocumentMock();
   mountBaseNodes(document);
@@ -395,6 +420,8 @@ test('submitSpecialReport posts special report payload and resets form', async (
   assert.equal(fetchCalls[0].options.method, 'POST');
 
   const body = JSON.parse(fetchCalls[0].options.body);
+  assert.equal(body.report_type, 'special');
+  assert.equal(body.bar_id, 12);
   assert.equal(body.reason, 'Special details are inaccurate');
   assert.equal(body.comment, 'Menu says different price');
   assert.equal(typeof body.special_id, 'string');
@@ -416,7 +443,6 @@ test('resetSpecialReportForm clears success mode for the next special', () => {
   reportButton.textContent = 'Thanks for your feedback!';
   reportButton.disabled = true;
   reportButton.classList.add('reported');
-
   document.getElementById('special-report-form').classList.add('open');
   document.getElementById('special-report-reason').value = 'Other';
   document.getElementById('special-report-comment').value = 'Some comment';
@@ -453,7 +479,45 @@ test('submitSpecialReport sends null comment when left blank', async () => {
   await ctx.submitSpecialReport({ preventDefault() {} });
 
   const body = JSON.parse(fetchCalls[0].options.body);
+  assert.equal(body.report_type, 'special');
+  assert.equal(body.bar_id, 12);
   assert.equal(body.comment, null);
+});
+
+test('submitBarReport posts bar report payload and resets form', async () => {
+  const document = new DocumentMock();
+  mountBaseNodes(document);
+  mountBarReportNodes(document);
+
+  const fetchCalls = [];
+  const ctx = loadAppWithoutBoot(document);
+  ctx.fetch = async (url, options) => {
+    fetchCalls.push({ url, options });
+    return { json: async () => ({ ok: true }) };
+  };
+
+  const bar = { id: 23, name: 'Bar Report Target' };
+  const special = { special_id: 'sp-999', day: 'MON', start_time: '16:00', end_time: '18:00', description: 'Half off', type: 'drink', all_day: false };
+  vm.runInContext(`currentBarContext = ${JSON.stringify(bar)};`, ctx);
+
+  document.getElementById('bar-report-reason').value = 'Missing special';
+  document.getElementById('bar-report-comment').value = 'This bar has another happy hour not listed.';
+
+  await ctx.submitBarReport({ preventDefault() {} });
+
+  assert.equal(fetchCalls.length, 1, 'calls fetch once');
+  const body = JSON.parse(fetchCalls[0].options.body);
+  assert.equal(body.report_type, 'bar');
+  assert.equal(body.bar_id, 23);
+  assert.equal(body.special_id, null);
+  assert.equal(body.reason, 'Missing special');
+  assert.equal(body.comment, 'This bar has another happy hour not listed.');
+  assert.equal(document.getElementById('bar-report-form').classList.contains('open'), false, 'bar form is closed after submit');
+  assert.equal(document.getElementById('bar-report-reason').value, '', 'bar reason reset');
+  assert.equal(document.getElementById('bar-report-comment').value, '', 'bar comment reset');
+  assert.equal(document.getElementById('bar-report-toggle').textContent, 'Thanks for your feedback!', 'bar report button shows success state');
+  assert.equal(document.getElementById('bar-report-toggle').disabled, true, 'bar report button disabled after submit');
+  assert.equal(document.getElementById('bar-report-toggle').classList.contains('reported'), true, 'bar reported style applied');
 });
 
 

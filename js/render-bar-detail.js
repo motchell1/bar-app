@@ -60,6 +60,54 @@ function buildBarDetailPayloadFromStartup(barId) {
   };
 }
 
+function resetBarReportForm() {
+  const form = document.getElementById('bar-report-form');
+  const reasonSelect = document.getElementById('bar-report-reason');
+  const commentInput = document.getElementById('bar-report-comment');
+  const reportButton = document.getElementById('bar-report-toggle');
+  if (!form || !reasonSelect) return;
+
+  if (reportButton) {
+    reportButton.textContent = 'Mark for review';
+    reportButton.disabled = false;
+    reportButton.classList.remove('reported');
+  }
+
+  form.classList.remove('open');
+  reasonSelect.value = '';
+  if (commentInput) commentInput.value = '';
+}
+
+function initBarReport() {
+  const toggleButton = document.getElementById('bar-report-toggle');
+  const reportForm = document.getElementById('bar-report-form');
+
+  if (!toggleButton || !reportForm) return;
+
+  toggleButton.addEventListener('click', () => {
+    const isOpen = reportForm.classList.contains('open');
+    reportForm.classList.toggle('open', !isOpen);
+    if (!isOpen) {
+      requestAnimationFrame(() => {
+        const submitButton = reportForm.querySelector('.special-report-submit');
+        const scrollTarget = submitButton || reportForm;
+        if (scrollTarget && typeof scrollTarget.scrollIntoView === 'function') {
+          scrollTarget.scrollIntoView({ block: 'nearest' });
+        }
+      });
+    }
+  });
+}
+
+function showBarReportSuccess() {
+  const reportButton = document.getElementById('bar-report-toggle');
+  if (reportButton) {
+    reportButton.textContent = 'Thanks for your feedback!';
+    reportButton.disabled = true;
+    reportButton.classList.add('reported');
+  }
+}
+
 function renderBarDetailContent(selectedBar, detailPayload) {
   const todayKey = detailPayload?.general_data?.current_day || startupPayload?.general_data?.current_day || getDayKeyFromName(DAYS_FULL[new Date().getDay()]);
   const orderedDays = getOrderedDaysForDetail(todayKey);
@@ -207,6 +255,8 @@ async function showDetail(barOrId, previousScreen = currentTab) {
 
   document.getElementById('detail-image').src = selectedBar.image_url || '';
   document.getElementById('detail-name').textContent = (selectedBar.name || '').toUpperCase();
+  currentBarContext = selectedBar;
+  resetBarReportForm();
 
   const startupDetailPayload = buildBarDetailPayloadFromStartup(selectedBar.bar_id);
   if (startupDetailPayload) {
