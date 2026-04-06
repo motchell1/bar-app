@@ -395,6 +395,8 @@ test('submitSpecialReport posts special report payload and resets form', async (
   assert.equal(fetchCalls[0].options.method, 'POST');
 
   const body = JSON.parse(fetchCalls[0].options.body);
+  assert.equal(body.report_type, 'special');
+  assert.equal(body.bar_id, 12);
   assert.equal(body.reason, 'Special details are inaccurate');
   assert.equal(body.comment, 'Menu says different price');
   assert.equal(typeof body.special_id, 'string');
@@ -453,6 +455,8 @@ test('submitSpecialReport sends null comment when left blank', async () => {
   await ctx.submitSpecialReport({ preventDefault() {} });
 
   const body = JSON.parse(fetchCalls[0].options.body);
+  assert.equal(body.report_type, 'special');
+  assert.equal(body.bar_id, 12);
   assert.equal(body.comment, null);
 });
 

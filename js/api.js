@@ -140,7 +140,10 @@ async function submitSpecialReport(event) {
   const commentText = commentInput?.value.trim() || '';
   try {
     await Promise.allSettled(specialIdsToReport.map((id) => {
+      const barId = currentSpecialContext?.bar?.bar_id ?? currentSpecialContext?.bar?.id ?? null;
       const payload = {
+        report_type: 'special',
+        bar_id: barId,
         special_id: id,
         reason: reasonSelect.value,
         comment: commentText === '' ? null : commentText,
