@@ -13,16 +13,47 @@ def lambda_handler(event, context):
         body = json.loads(event['body'])
         print(body)
 
+        report_type = (body.get('report_type') or '').strip().lower()
+        bar_id = body.get('bar_id')
         special_id = body.get('special_id')
         reason = body.get('reason')
         user_identifier = body.get('user_identifier')
         comment = body.get('comment')
-        print("Parsed objects: " + json.dumps({"special_id": special_id, "reason": reason, "user_identifier": user_identifier, "comment": comment}))
-        if not special_id or not user_identifier or not reason:
+        print("Parsed objects: " + json.dumps({
+            "report_type": report_type,
+            "bar_id": bar_id,
+            "special_id": special_id,
+            "reason": reason,
+            "user_identifier": user_identifier,
+            "comment": comment
+        }))
+
+        if report_type not in ('special', 'bar'):
             return {
                 "statusCode": 400,
-                "body": json.dumps({"error": "Missing required fields"})
+                "body": json.dumps({"error": "Invalid report_type. Expected 'special' or 'bar'."})
             }
+
+        if not user_identifier or not reason:
+            return {
+                "statusCode": 400,
+                "body": json.dumps({"error": "Missing required fields: reason and user_identifier"})
+            }
+
+        if not bar_id:
+            return {
+                "statusCode": 400,
+                "body": json.dumps({"error": "Missing required field: bar_id"})
+            }
+
+        if report_type == 'special' and not special_id:
+            return {
+                "statusCode": 400,
+                "body": json.dumps({"error": "Missing required field: special_id for special reports"})
+            }
+
+        if report_type == 'bar':
+            special_id = None
 
         connection = pymysql.connect(
             host=DB_HOST,
@@ -34,10 +65,10 @@ def lambda_handler(event, context):
 
         with connection.cursor() as cursor:
             sql = """
-                INSERT INTO report (special_id, reason, user_identifier, comment)
-                VALUES (%s, %s, %s, %s)
+                INSERT INTO report (report_type, bar_id, special_id, reason, comment, user_identifier)
+                VALUES (%s, %s, %s, %s, %s, %s)
             """
-            cursor.execute(sql, (special_id, reason, user_identifier, comment))
+            cursor.execute(sql, (report_type, bar_id, special_id, reason, comment, user_identifier))
 
         connection.commit()
         connection.close()
