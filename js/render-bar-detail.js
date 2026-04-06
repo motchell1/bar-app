@@ -94,7 +94,11 @@ function initBarReport() {
         const submitButton = reportForm.querySelector('.special-report-submit');
         const scrollTarget = submitButton || reportForm;
         if (scrollTarget && typeof scrollTarget.scrollIntoView === 'function') {
-          scrollTarget.scrollIntoView({ block: 'nearest' });
+          scrollTarget.scrollIntoView({
+            block: 'end',
+            inline: 'nearest',
+            behavior: 'smooth'
+          });
         }
       });
     }
