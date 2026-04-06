@@ -162,5 +162,42 @@ async function submitSpecialReport(event) {
     console.error('Failed to submit special report:', err);
   }
   resetSpecialReportForm();
-  showReportSuccess();
+  showReportSuccess('special');
+}
+
+async function submitBarReport(event) {
+  event.preventDefault();
+
+  const reasonSelect = document.getElementById('bar-report-reason');
+  const commentInput = document.getElementById('bar-report-comment');
+  if (!reasonSelect || !reasonSelect.value || !currentSpecialContext) return;
+
+  const barId = currentSpecialContext?.bar?.bar_id ?? currentSpecialContext?.bar?.id ?? null;
+  if (barId === null || barId === undefined) return;
+
+  const commentText = commentInput?.value.trim() || '';
+
+  try {
+    const payload = {
+      report_type: 'bar',
+      bar_id: barId,
+      special_id: null,
+      reason: reasonSelect.value,
+      comment: commentText === '' ? null : commentText,
+      user_identifier: userIdentifier
+    };
+
+    await fetch(SPECIAL_REPORT_API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'text/plain'
+      },
+      body: JSON.stringify(payload)
+    });
+  } catch (err) {
+    console.error('Failed to submit bar report:', err);
+  }
+
+  resetSpecialReportForm();
+  showReportSuccess('bar');
 }

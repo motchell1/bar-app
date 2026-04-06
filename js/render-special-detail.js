@@ -110,11 +110,11 @@ function showPreviousScreen() {
   setScreenLayout(true);
 }
 
-function resetSpecialReportForm() {
-  const form = document.getElementById('special-report-form');
-  const reasonSelect = document.getElementById('special-report-reason');
-  const commentInput = document.getElementById('special-report-comment');
-  const reportButton = document.getElementById('special-report-toggle');
+function resetReportForm(prefix) {
+  const form = document.getElementById(`${prefix}-report-form`);
+  const reasonSelect = document.getElementById(`${prefix}-report-reason`);
+  const commentInput = document.getElementById(`${prefix}-report-comment`);
+  const reportButton = document.getElementById(`${prefix}-report-toggle`);
   if (!form || !reasonSelect) return;
 
   if (reportButton) {
@@ -128,9 +128,14 @@ function resetSpecialReportForm() {
   if (commentInput) commentInput.value = '';
 }
 
-function initSpecialReport() {
-  const toggleButton = document.getElementById('special-report-toggle');
-  const reportForm = document.getElementById('special-report-form');
+function resetSpecialReportForm() {
+  resetReportForm('special');
+  resetReportForm('bar');
+}
+
+function initReportToggle(prefix) {
+  const toggleButton = document.getElementById(`${prefix}-report-toggle`);
+  const reportForm = document.getElementById(`${prefix}-report-form`);
 
   if (!toggleButton || !reportForm) return;
 
@@ -149,8 +154,13 @@ function initSpecialReport() {
   });
 }
 
-function showReportSuccess() {
-  const reportButton = document.getElementById('special-report-toggle');
+function initSpecialReport() {
+  initReportToggle('special');
+  initReportToggle('bar');
+}
+
+function showReportSuccess(prefix = 'special') {
+  const reportButton = document.getElementById(`${prefix}-report-toggle`);
   if (reportButton) {
     reportButton.textContent = 'Thanks for your feedback!';
     reportButton.disabled = true;

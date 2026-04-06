@@ -123,6 +123,29 @@
           <button class="special-report-submit" type="submit">Submit</button>
         </form>
       </div>
+
+      <div class="special-report-section">
+        <h3>Report this bar</h3>
+        <p class="special-report-copy">
+          Think this bar information is inaccurate, unavailable, or out of date?
+        </p>
+        <button id="bar-report-toggle" class="special-report-toggle" type="button">
+          Mark for review
+        </button>
+
+        <form id="bar-report-form" class="special-report-form" onsubmit="submitBarReport(event)">
+          <label for="bar-report-reason" class="special-report-label">Reason for review</label>
+          <select id="bar-report-reason" class="special-report-select" required>
+            <option value="" selected disabled>Select a reason</option>
+            <option value="Missing special">Missing special</option>
+            <option value="Outdated bar information">Outdated bar information</option>
+            <option value="Other">Other</option>
+          </select>
+          <label for="bar-report-comment" class="special-report-label">Comments (optional)</label>
+          <textarea id="bar-report-comment" class="special-report-comment" rows="3" placeholder="Add any details here"></textarea>
+          <button class="special-report-submit" type="submit">Submit</button>
+        </form>
+      </div>
     </div>
   </div>
 </div>

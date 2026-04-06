@@ -243,28 +243,33 @@ function mountBaseNodes(document) {
 }
 
 function mountSpecialReportNodes(document) {
-  const toggle = document.createElement('button');
-  toggle.setAttribute('id', 'special-report-toggle');
-  toggle.textContent = 'Mark for review';
-  document.body.appendChild(toggle);
+  const addReportNodes = (prefix) => {
+    const toggle = document.createElement('button');
+    toggle.setAttribute('id', `${prefix}-report-toggle`);
+    toggle.textContent = 'Mark for review';
+    document.body.appendChild(toggle);
 
-  const form = document.createElement('form');
-  form.setAttribute('id', 'special-report-form');
+    const form = document.createElement('form');
+    form.setAttribute('id', `${prefix}-report-form`);
 
-  const reason = document.createElement('select');
-  reason.setAttribute('id', 'special-report-reason');
-  form.appendChild(reason);
+    const reason = document.createElement('select');
+    reason.setAttribute('id', `${prefix}-report-reason`);
+    form.appendChild(reason);
 
-  const comment = document.createElement('textarea');
-  comment.setAttribute('id', 'special-report-comment');
-  form.appendChild(comment);
+    const comment = document.createElement('textarea');
+    comment.setAttribute('id', `${prefix}-report-comment`);
+    form.appendChild(comment);
 
-  const submit = document.createElement('button');
-  submit.className = 'special-report-submit';
-  submit.textContent = 'Submit';
-  form.appendChild(submit);
+    const submit = document.createElement('button');
+    submit.className = 'special-report-submit';
+    submit.textContent = 'Submit';
+    form.appendChild(submit);
 
-  document.body.appendChild(form);
+    document.body.appendChild(form);
+  };
+
+  addReportNodes('special');
+  addReportNodes('bar');
 }
 
 test('initSpecialReport scrolls submit button into view when report form opens', async () => {
@@ -418,19 +423,32 @@ test('resetSpecialReportForm clears success mode for the next special', () => {
   reportButton.textContent = 'Thanks for your feedback!';
   reportButton.disabled = true;
   reportButton.classList.add('reported');
+  const barReportButton = document.getElementById('bar-report-toggle');
+  barReportButton.textContent = 'Thanks for your feedback!';
+  barReportButton.disabled = true;
+  barReportButton.classList.add('reported');
 
   document.getElementById('special-report-form').classList.add('open');
+  document.getElementById('bar-report-form').classList.add('open');
   document.getElementById('special-report-reason').value = 'Other';
   document.getElementById('special-report-comment').value = 'Some comment';
+  document.getElementById('bar-report-reason').value = 'Other';
+  document.getElementById('bar-report-comment').value = 'Some comment';
 
   ctx.resetSpecialReportForm();
 
   assert.equal(reportButton.textContent, 'Mark for review');
   assert.equal(reportButton.disabled, false);
   assert.equal(reportButton.classList.contains('reported'), false);
+  assert.equal(barReportButton.textContent, 'Mark for review');
+  assert.equal(barReportButton.disabled, false);
+  assert.equal(barReportButton.classList.contains('reported'), false);
   assert.equal(document.getElementById('special-report-form').classList.contains('open'), false);
+  assert.equal(document.getElementById('bar-report-form').classList.contains('open'), false);
   assert.equal(document.getElementById('special-report-reason').value, '');
   assert.equal(document.getElementById('special-report-comment').value, '');
+  assert.equal(document.getElementById('bar-report-reason').value, '');
+  assert.equal(document.getElementById('bar-report-comment').value, '');
 });
 
 test('submitSpecialReport sends null comment when left blank', async () => {
@@ -458,6 +476,42 @@ test('submitSpecialReport sends null comment when left blank', async () => {
   assert.equal(body.report_type, 'special');
   assert.equal(body.bar_id, 12);
   assert.equal(body.comment, null);
+});
+
+test('submitBarReport posts bar report payload and resets form', async () => {
+  const document = new DocumentMock();
+  mountBaseNodes(document);
+  mountSpecialReportNodes(document);
+
+  const fetchCalls = [];
+  const ctx = loadAppWithoutBoot(document);
+  ctx.fetch = async (url, options) => {
+    fetchCalls.push({ url, options });
+    return { json: async () => ({ ok: true }) };
+  };
+
+  const bar = { id: 23, name: 'Bar Report Target' };
+  const special = { special_id: 'sp-999', day: 'MON', start_time: '16:00', end_time: '18:00', description: 'Half off', type: 'drink', all_day: false };
+  vm.runInContext(`currentSpecialContext = ${JSON.stringify({ bar, special, dayLabel: 'Monday' })};`, ctx);
+
+  document.getElementById('bar-report-reason').value = 'Missing special';
+  document.getElementById('bar-report-comment').value = 'This bar has another happy hour not listed.';
+
+  await ctx.submitBarReport({ preventDefault() {} });
+
+  assert.equal(fetchCalls.length, 1, 'calls fetch once');
+  const body = JSON.parse(fetchCalls[0].options.body);
+  assert.equal(body.report_type, 'bar');
+  assert.equal(body.bar_id, 23);
+  assert.equal(body.special_id, null);
+  assert.equal(body.reason, 'Missing special');
+  assert.equal(body.comment, 'This bar has another happy hour not listed.');
+  assert.equal(document.getElementById('bar-report-form').classList.contains('open'), false, 'bar form is closed after submit');
+  assert.equal(document.getElementById('bar-report-reason').value, '', 'bar reason reset');
+  assert.equal(document.getElementById('bar-report-comment').value, '', 'bar comment reset');
+  assert.equal(document.getElementById('bar-report-toggle').textContent, 'Thanks for your feedback!', 'bar report button shows success state');
+  assert.equal(document.getElementById('bar-report-toggle').disabled, true, 'bar report button disabled after submit');
+  assert.equal(document.getElementById('bar-report-toggle').classList.contains('reported'), true, 'bar reported style applied');
 });
 
 
