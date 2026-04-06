@@ -18,11 +18,24 @@ function resolveSpecialId(special, bar) {
 }
 
 function showSpecialDetail(bar, special, { previousScreen = 'specials', returnTo = 'specials', dayLabel = '' } = {}) {
+  const groupedSpecialIds = Array.isArray(special?.grouped_special_ids)
+    ? special.grouped_special_ids
+      .map((specialId) => String(specialId))
+      .filter(Boolean)
+    : [];
+  const hasGroupedSpecials = groupedSpecialIds.length > 1;
+
   const specialId = resolveSpecialId(special, bar);
   const payloadSpecial = specialId ? startupPayload?.specials?.[specialId] : null;
-  const selectedSpecial = payloadSpecial
-    ? { special_id: specialId, ...payloadSpecial }
-    : special;
+  const selectedSpecial = hasGroupedSpecials
+    ? {
+      ...(payloadSpecial ? { special_id: specialId, ...payloadSpecial } : {}),
+      ...special,
+      grouped_special_ids: groupedSpecialIds
+    }
+    : (payloadSpecial
+      ? { special_id: specialId, ...payloadSpecial }
+      : special);
 
   const barId = selectedSpecial?.bar_id ?? bar?.bar_id;
   const payloadBar = barId !== undefined && barId !== null

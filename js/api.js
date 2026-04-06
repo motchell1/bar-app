@@ -127,23 +127,34 @@ async function submitSpecialReport(event) {
     currentSpecialContext.special,
     currentSpecialContext.dayLabel || ''
   );
+  const groupedSpecialIds = Array.isArray(currentSpecialContext.special?.grouped_special_ids)
+    ? currentSpecialContext.special.grouped_special_ids
+      .map((id) => String(id))
+      .filter(Boolean)
+    : [];
+  const specialIdsToReport = groupedSpecialIds.length > 0
+    ? Array.from(new Set(groupedSpecialIds))
+    : (specialId ? [String(specialId)] : []);
+  if (specialIdsToReport.length === 0) return;
 
   const commentText = commentInput?.value.trim() || '';
-  const payload = {
-    special_id: specialId,
-    reason: reasonSelect.value,
-    comment: commentText === '' ? null : commentText,
-    user_identifier: userIdentifier
-  };
-
   try {
-    await fetch(SPECIAL_REPORT_API_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'text/plain'
-      },
-      body: JSON.stringify(payload)
-    });
+    await Promise.allSettled(specialIdsToReport.map((id) => {
+      const payload = {
+        special_id: id,
+        reason: reasonSelect.value,
+        comment: commentText === '' ? null : commentText,
+        user_identifier: userIdentifier
+      };
+
+      return fetch(SPECIAL_REPORT_API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'text/plain'
+        },
+        body: JSON.stringify(payload)
+      });
+    }));
   } catch (err) {
     console.error('Failed to submit special report:', err);
   }
