@@ -22,9 +22,15 @@ def get_connection():
 # Query helpers
 def query_bars(cursor):
     cursor.execute("""
-        SELECT bar_id, name, neighborhood, image_file
-        FROM bar
-        WHERE is_active = 'Y'
+        SELECT b.bar_id, b.name, b.neighborhood, b.image_file
+        FROM bar b
+        WHERE b.is_active = 'Y'
+          AND EXISTS (
+              SELECT 1
+              FROM special s
+              WHERE s.bar_id = b.bar_id
+                AND s.is_active = 'Y'
+          )
         ORDER BY neighborhood, name
     """)
     return cursor.fetchall()
@@ -40,13 +46,20 @@ def query_open_hours(cursor, bar_ids=None):
         cursor.execute("SELECT bar_id, day_of_week, open_time, close_time, is_closed FROM open_hours")
     return cursor.fetchall()
 
-def query_specials(cursor):
-    cursor.execute("""
+def query_specials(cursor, bar_ids=None):
+    base_sql = """
         SELECT special_id, bar_id, day_of_week, all_day, start_time, end_time, description, type
         FROM special
         WHERE is_active = 'Y'
-        ORDER BY day_of_week, bar_id, all_day DESC, start_time, special_id
-    """)
+    """
+    params = ()
+    if bar_ids:
+        placeholders = ', '.join(['%s'] * len(bar_ids))
+        base_sql += f" AND bar_id IN ({placeholders})"
+        params = tuple(bar_ids)
+    base_sql += " ORDER BY day_of_week, bar_id, all_day DESC, start_time, special_id"
+
+    cursor.execute(base_sql, params)
     return cursor.fetchall()
 
 def query_device_favorite_special_ids(cursor, device_id):
@@ -192,11 +205,11 @@ def build_startup_payload(device_id=None):
     try:
         with conn.cursor(pymysql.cursors.DictCursor) as cursor:
             bars = query_bars(cursor)
-            hours = query_open_hours(cursor)
-            specials = query_specials(cursor)
+            active_bar_ids = [bar['bar_id'] for bar in bars]
+            hours = query_open_hours(cursor, active_bar_ids)
+            specials = query_specials(cursor, active_bar_ids)
             favorite_special_ids = query_device_favorite_special_ids(cursor, device_id)
-
-        active_bar_ids = {bar['bar_id'] for bar in bars}
+        active_bar_ids = set(active_bar_ids)
 
         now = datetime.now(EASTERN_TZ)
         effective_now = get_effective_now(now)
