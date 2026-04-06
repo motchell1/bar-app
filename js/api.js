@@ -162,7 +162,7 @@ async function submitSpecialReport(event) {
     console.error('Failed to submit special report:', err);
   }
   resetSpecialReportForm();
-  showReportSuccess('special');
+  showReportSuccess();
 }
 
 async function submitBarReport(event) {
@@ -170,9 +170,9 @@ async function submitBarReport(event) {
 
   const reasonSelect = document.getElementById('bar-report-reason');
   const commentInput = document.getElementById('bar-report-comment');
-  if (!reasonSelect || !reasonSelect.value || !currentSpecialContext) return;
+  if (!reasonSelect || !reasonSelect.value || !currentBarContext) return;
 
-  const barId = currentSpecialContext?.bar?.bar_id ?? currentSpecialContext?.bar?.id ?? null;
+  const barId = currentBarContext?.bar_id ?? currentBarContext?.id ?? null;
   if (barId === null || barId === undefined) return;
 
   const commentText = commentInput?.value.trim() || '';
@@ -198,6 +198,6 @@ async function submitBarReport(event) {
     console.error('Failed to submit bar report:', err);
   }
 
-  resetSpecialReportForm();
-  showReportSuccess('bar');
+  resetBarReportForm();
+  showBarReportSuccess();
 }

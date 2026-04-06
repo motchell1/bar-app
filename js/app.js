@@ -237,6 +237,7 @@ initTaskbar();
 initBarsSearch();
 initHomeScrollCapture();
 initSpecialReport();
+initBarReport();
 initSpecialFavoriteButton();
 showTab(currentTab);
 setScreenLayout(true);
