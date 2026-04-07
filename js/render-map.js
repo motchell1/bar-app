@@ -118,7 +118,7 @@ function renderMapTab() {
       if (!barsMap) {
         const mapId = startupPayload?.general_data?.google_map_id || 'DEMO_MAP_ID';
         barsMap = new google.maps.Map(mapContainer, {
-          center: { lat: 39.5, lng: -98.35 },
+          center: { lat: 40.438723047481425, lng: -79.99697911133545 },
           zoom: 4,
           mapId,
           mapTypeControl: false,
