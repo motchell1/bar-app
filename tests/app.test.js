@@ -83,6 +83,9 @@ class Element {
       this.ownerDocument._idMap.set(this.id, this);
     }
   }
+  removeAttribute(name) {
+    delete this.attributes[name];
+  }
   getAttribute(name) { return this.attributes[name]; }
   addEventListener(type, cb) {
     if (!this.eventListeners[type]) this.eventListeners[type] = [];
@@ -233,6 +236,13 @@ function mountBaseNodes(document) {
   const detailSpecials = document.createElement('div');
   detailSpecials.setAttribute('id', 'detail-specials');
   detail.appendChild(detailSpecials);
+
+  const detailLocationSection = document.createElement('section');
+  detailLocationSection.setAttribute('id', 'detail-location-section');
+  const detailLocationMap = document.createElement('iframe');
+  detailLocationMap.setAttribute('id', 'detail-location-map');
+  detailLocationSection.appendChild(detailLocationMap);
+  detail.appendChild(detailLocationSection);
 
   const special = document.createElement('div');
   special.setAttribute('id', 'special-screen');
@@ -691,9 +701,9 @@ test('showDetail reuses startup payload details when has_special_this_week is tr
 
   vm.runInContext(`
     startupPayload = {
-      general_data: { current_day: 'MON' },
+      general_data: { current_day: 'MON', google_api_key: 'client-google-key' },
       bars: {
-        '1': { name: 'Startup Bar', neighborhood: 'Downtown', image_url: 'bar.jpg', is_open_now: false, has_special_this_week: true }
+        '1': { name: 'Startup Bar', neighborhood: 'Downtown', image_url: 'bar.jpg', google_place_id: 'abc123', is_open_now: false, has_special_this_week: true }
       },
       open_hours: {
         '1': { MON: { display_text: '4:00 PM – 10:00 PM', open_time: '16:00', close_time: '22:00' } }
@@ -728,6 +738,52 @@ test('showDetail reuses startup payload details when has_special_this_week is tr
   assert.equal(document.getElementById('detail-name').textContent, 'STARTUP BAR');
   assert.equal(document.getElementById('detail-hours').children.length > 0, true, 'renders startup open hours');
   assert.equal(document.querySelectorAll('.special-item').length > 0, true, 'renders startup specials');
+  const mapSrc = document.getElementById('detail-location-map').getAttribute('src');
+  assert.equal(mapSrc, 'https://www.google.com/maps/embed/v1/place?key=client-google-key&q=place_id%3Aabc123');
+});
+
+test('showDetail hides location map when google_api_key is missing from startup general_data', async () => {
+  const document = new DocumentMock();
+  mountBaseNodes(document);
+  const ctx = loadAppWithoutBoot(document);
+
+  vm.runInContext(`
+    startupPayload = {
+      general_data: { current_day: 'MON' },
+      bars: {
+        '1': { name: 'No Key Bar', neighborhood: 'Downtown', image_url: 'bar.jpg', google_place_id: 'abc123', is_open_now: false, has_special_this_week: true }
+      },
+      open_hours: {
+        '1': { MON: { display_text: '4:00 PM – 10:00 PM', open_time: '16:00', close_time: '22:00' } }
+      },
+      specials: {
+        '11': {
+          bar_id: 1,
+          day: 'MON',
+          special_type: 'drink',
+          description: '$5 Beer',
+          all_day: false,
+          start_time: '16:00',
+          end_time: '18:00',
+          current_status: 'active'
+        }
+      },
+      specials_by_day: {
+        MON: [{ bar_id: 1, specials: ['11'] }],
+        TUE: [],
+        WED: [],
+        THU: [],
+        FRI: [],
+        SAT: [],
+        SUN: []
+      }
+    };
+  `, ctx);
+
+  await ctx.showDetail(1, 'bars');
+
+  assert.equal(document.getElementById('detail-location-section').style.display, 'none');
+  assert.equal(document.getElementById('detail-location-map').getAttribute('src'), undefined);
 });
 
 
