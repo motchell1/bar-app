@@ -9,6 +9,7 @@ let mapSelectedBarSheetState = {
   startY: 0,
   currentOffset: 0
 };
+let mapDismissListenersBound = false;
 
 function getMapSelectedDayKey() {
   if (mapSelectedDayKey && MAP_DAY_KEYS.includes(mapSelectedDayKey)) {
@@ -86,6 +87,7 @@ function dismissMapSelectedBarSheet() {
   sheet.style.transform = '';
   sheet.style.opacity = '';
   sheet.classList.remove('map-sheet-dragging');
+  sheet.classList.remove('map-sheet-enter');
   content.innerHTML = '';
   mapSelectedBarSheetState.barId = null;
   mapSelectedBarSheetState.pointerId = null;
@@ -116,6 +118,7 @@ function bindMapSheetDragToDismiss(sheet) {
   const pointerUp = (event) => {
     if (event.pointerId !== mapSelectedBarSheetState.pointerId) return;
     sheet.classList.remove('map-sheet-dragging');
+    sheet.classList.remove('map-sheet-enter');
     const shouldDismiss = mapSelectedBarSheetState.currentOffset > 80;
     if (shouldDismiss) {
       dismissMapSelectedBarSheet();
@@ -165,7 +168,26 @@ function showMapSelectedBarSheet(bar, specialIds, dayKey, dayLabel) {
   sheet.style.display = '';
   sheet.style.transform = '';
   sheet.style.opacity = '';
+  sheet.classList.remove('map-sheet-enter');
+  // restart animation for repeated marker taps
+  void sheet.offsetWidth;
+  sheet.classList.add('map-sheet-enter');
   mapSelectedBarSheetState.barId = String(bar.bar_id);
+}
+
+
+function bindMapInteractionDismiss() {
+  if (!barsMap || mapDismissListenersBound) return;
+
+  const dismissIfOpen = () => {
+    if (!mapSelectedBarSheetState.barId) return;
+    dismissMapSelectedBarSheet();
+  };
+
+  barsMap.addListener('click', dismissIfOpen);
+  barsMap.addListener('dragstart', dismissIfOpen);
+  barsMap.addListener('zoom_changed', dismissIfOpen);
+  mapDismissListenersBound = true;
 }
 
 function renderMapTab() {
@@ -233,6 +255,8 @@ function renderMapTab() {
           fullscreenControl: false
         });
       }
+
+      bindMapInteractionDismiss();
 
       clearMapMarkers();
 

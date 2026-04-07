@@ -303,7 +303,7 @@ async function showDetail(barOrId, previousScreen = currentTab) {
   const mapScreen = document.getElementById('map-screen');
   if (mapScreen) mapScreen.style.display = 'none';
   document.getElementById('special-screen').style.display = 'none';
-  document.getElementById('detail-screen').style.display = 'block';
+  document.getElementById('detail-screen').style.display = 'flex';
   setScreenLayout(false);
   animateScreenIn('detail-screen');
 
