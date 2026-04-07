@@ -54,7 +54,7 @@ function loadGoogleMapsApi() {
 
   googleMapsLoaderPromise = new Promise((resolve, reject) => {
     const script = document.createElement('script');
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}`;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}&v=weekly&libraries=marker`;
     script.async = true;
     script.defer = true;
     script.onload = () => resolve();
@@ -66,7 +66,9 @@ function loadGoogleMapsApi() {
 }
 
 function clearMapMarkers() {
-  barsMapMarkers.forEach((marker) => marker.setMap(null));
+  barsMapMarkers.forEach((marker) => {
+    marker.map = null;
+  });
   barsMapMarkers = [];
 }
 
@@ -114,8 +116,11 @@ function renderMapTab() {
       emptyState.style.display = 'none';
 
       const bounds = new google.maps.LatLngBounds();
+      const AdvancedMarkerElement = google.maps.marker?.AdvancedMarkerElement;
       barsWithCoordinates.forEach((bar) => {
-        const marker = new google.maps.Marker({
+        if (!AdvancedMarkerElement) return;
+
+        const marker = new AdvancedMarkerElement({
           position: { lat: bar.latitude, lng: bar.longitude },
           map: barsMap,
           title: bar.name
@@ -130,8 +135,14 @@ function renderMapTab() {
         });
 
         barsMapMarkers.push(marker);
-        bounds.extend(marker.getPosition());
+        bounds.extend(marker.position);
       });
+
+      if (barsMapMarkers.length === 0) {
+        emptyState.style.display = '';
+        emptyState.textContent = 'Advanced markers are unavailable. Please try again later.';
+        return;
+      }
 
       barsMap.fitBounds(bounds);
       if (barsWithCoordinates.length === 1) {
