@@ -65,6 +65,7 @@ function resetFilterInputs() {
 function resetFilters() {
   activeFilters.types = [];
   activeFilters.neighborhoods = [];
+  activeFilters.favoritesOnly = false;
   resetFilterInputs();
 }
 
@@ -81,7 +82,8 @@ function getFilteredFavorites() {
     const specialType = item.special.special_type || item.special.type;
     const typePass = activeFilters.types.length === 0 || activeFilters.types.includes(specialType);
     const neighborhoodPass = activeFilters.neighborhoods.length === 0 || activeFilters.neighborhoods.includes(item.bar.neighborhood);
-    return typePass && neighborhoodPass;
+    const favoritesPass = !activeFilters.favoritesOnly || item.special.favorite === true || item.bar.favorite === true;
+    return typePass && neighborhoodPass && favoritesPass;
   });
 }
 
@@ -183,6 +185,8 @@ function initSidebarFilters() {
   applyButton.addEventListener('click', () => {
     activeFilters.types = currentTab === 'bars' ? [] : getSelectedTypesFromFilters();
     activeFilters.neighborhoods = getSelectedNeighborhoodsFromFilters();
+    const favoritesCheckbox = document.getElementById('favoritesFilter');
+    activeFilters.favoritesOnly = Boolean(favoritesCheckbox?.checked);
     renderCurrentTabData();
     sideMenu.classList.remove('open');
     menuOverlay.classList.remove('active');

@@ -13,6 +13,23 @@ function isFavoriteSpecial(bar, special, dayLabel = '') {
   return startupPayload?.specials?.[String(specialId)]?.favorite === true;
 }
 
+function isFavoriteBar(bar) {
+  const barId = bar?.bar_id;
+  if (barId === null || barId === undefined) return false;
+  return startupPayload?.bars?.[String(barId)]?.favorite === true;
+}
+
+function toggleFavoriteBar(bar) {
+  const barId = bar?.bar_id;
+  if (barId === null || barId === undefined || !startupPayload?.bars?.[String(barId)]) return false;
+
+  const barRecord = startupPayload.bars[String(barId)];
+  const nowFavorited = !barRecord.favorite;
+  barRecord.favorite = nowFavorited;
+  void persistFavoriteChangeInBackground({ barId: Number(barId), isFavorited: nowFavorited });
+  return nowFavorited;
+}
+
 function toggleFavoriteSpecial(bar, special, dayLabel = 'Day unavailable') {
   const specialId = getSpecialId(bar, special, dayLabel);
   if (!specialId || !startupPayload?.specials?.[String(specialId)]) return false;
@@ -21,7 +38,7 @@ function toggleFavoriteSpecial(bar, special, dayLabel = 'Day unavailable') {
   const nowFavorited = !specialRecord.favorite;
   specialRecord.favorite = nowFavorited;
 
-  void persistFavoriteChangeInBackground(specialId, nowFavorited);
+  void persistFavoriteChangeInBackground({ specialId: Number(specialId), isFavorited: nowFavorited });
 
   return nowFavorited;
 }

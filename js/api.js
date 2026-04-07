@@ -32,6 +32,7 @@ function buildLegacyBarsData(payload) {
       name: bar.name,
       neighborhood: bar.neighborhood,
       image_url: bar.image_url,
+      favorite: bar.favorite,
       hours_by_day: openHoursLookup[barId] || {},
       specials_by_day: barSpecialsByDay
     };
@@ -89,12 +90,14 @@ async function loadBarDetails(barId) {
   return payload;
 }
 
-async function persistFavoriteChangeInBackground(specialId, isFavorited) {
-  if (!deviceId || specialId === null || specialId === undefined) return;
+async function persistFavoriteChangeInBackground({ specialId = null, barId = null, isFavorited = false } = {}) {
+  if (!deviceId) return;
+  if (specialId === null && barId === null) return;
 
   const payload = {
     device_id: deviceId,
-    special_id: Number(specialId),
+    special_id: specialId === null ? null : Number(specialId),
+    bar_id: barId === null ? null : Number(barId),
     is_favorite: Boolean(isFavorited)
   };
 

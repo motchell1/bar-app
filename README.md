@@ -64,7 +64,7 @@ The folders inside `functions/` each correspond to an AWS Lambda function.
   - `S3_DATA_FOLDER`
 
 - **`updateDeviceFavorite`**  
-  Updates records in `device_favorite` for a given `device_id` and `special_id`. Pass `is_favorite: true` to insert (or keep) a favorite row, and `is_favorite: false` to delete the row.
+  Updates records in either `device_special_favorite` or `device_bar_favorite`. Provide exactly one of `special_id` or `bar_id`. Pass `is_favorite: true` to insert (or keep) a favorite row, and `is_favorite: false` to delete the row.
 
   Example payload:
 
@@ -72,6 +72,16 @@ The folders inside `functions/` each correspond to an AWS Lambda function.
   {
     "device_id": "abc123",
     "special_id": 28,
+    "is_favorite": true
+  }
+  ```
+
+  Or for a bar:
+
+  ```json
+  {
+    "device_id": "abc123",
+    "bar_id": 14,
     "is_favorite": true
   }
   ```

@@ -29,11 +29,13 @@ function buildHomeBarSpecials(bar, specialIds, dayKey, dayLabel) {
     .filter((special) => Boolean(special && special.description));
 
   const groupedSpecials = groupSpecialsForUI(specialsForDisplay);
+  const isBarFavorite = startupPayload?.bars?.[String(bar.bar_id)]?.favorite === true;
 
   groupedSpecials.forEach((special) => {
     const specialType = special.special_type || special.type;
     const typePass = activeFilters.types.length === 0 || activeFilters.types.includes(specialType);
-    if (!typePass) return;
+    const favoritesPass = !activeFilters.favoritesOnly || special.favorite === true || isBarFavorite;
+    if (!typePass || !favoritesPass) return;
 
     const li = buildSpecialItem(special, {
       isToday,
@@ -127,6 +129,10 @@ function renderBarsWeek() {
       if (!barInfo) return;
 
       if (activeFilters.neighborhoods.length > 0 && !activeFilters.neighborhoods.includes(barInfo.neighborhood)) return;
+      if (activeFilters.favoritesOnly) {
+        const hasFavoriteSpecial = (entry.specials || []).some((specialId) => startupPayload?.specials?.[String(specialId)]?.favorite === true);
+        if (!hasFavoriteSpecial && barInfo.favorite !== true) return;
+      }
 
       const bar = {
         bar_id: Number(barId),
@@ -184,6 +190,7 @@ function getSortedFilteredBars(bars) {
     .filter((bar) => {
       const neighborhoodPass = selectedNeighborhoods.length === 0 || selectedNeighborhoods.includes(bar.neighborhood);
       if (!neighborhoodPass) return false;
+      if (activeFilters.favoritesOnly && bar.favorite !== true) return false;
       if (!query) return true;
       const name = (bar.name || '').toLowerCase();
       return name.includes(query);

@@ -497,6 +497,13 @@ body {
   cursor: pointer;
 }
 
+.detail-header .detail-favorite-button {
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
 .detail-content {
   padding: 16px;
   background-color: #ffffff;
@@ -947,7 +954,8 @@ body {
 }
 
 .special-card .special-favorite-button,
-#favorites-list .special-favorite-button {
+#favorites-list .special-favorite-button,
+.detail-header .special-favorite-button {
   width: 32px;
   height: 32px;
   border: none;
@@ -963,17 +971,20 @@ body {
 }
 
 .special-card .special-favorite-button.active,
-#favorites-list .special-favorite-button.active {
+#favorites-list .special-favorite-button.active,
+.detail-header .special-favorite-button.active {
   color: #f4c542;
 }
 
 .special-card .special-favorite-button.active svg,
-#favorites-list .special-favorite-button.active svg {
+#favorites-list .special-favorite-button.active svg,
+.detail-header .special-favorite-button.active svg {
   fill: currentColor;
 }
 
 .special-card .special-favorite-button:active,
-#favorites-list .special-favorite-button:active {
+#favorites-list .special-favorite-button:active,
+.detail-header .special-favorite-button:active {
   transform: scale(0.95);
 }
 

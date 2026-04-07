@@ -33,13 +33,17 @@ def lambda_handler(event, context):
 
         device_id = body.get('device_id')
         special_id = body.get('special_id')
+        bar_id = body.get('bar_id')
         is_favorite = body.get('is_favorite')
 
-        if not device_id or special_id is None or not isinstance(is_favorite, bool):
+        has_special_id = special_id is not None
+        has_bar_id = bar_id is not None
+
+        if not device_id or not isinstance(is_favorite, bool) or has_special_id == has_bar_id:
             return {
                 'statusCode': 400,
                 'body': json.dumps({
-                    'error': 'Missing or invalid required fields: device_id, special_id, is_favorite (boolean)'
+                    'error': 'Missing or invalid required fields: device_id, is_favorite (boolean), and exactly one of special_id or bar_id'
                 })
             }
 
@@ -52,25 +56,46 @@ def lambda_handler(event, context):
         )
 
         with connection.cursor() as cursor:
-            if is_favorite:
-                cursor.execute(
-                    """
-                    INSERT INTO device_favorite (device_id, special_id)
-                    VALUES (%s, %s)
-                    ON DUPLICATE KEY UPDATE device_id = VALUES(device_id)
-                    """,
-                    (device_id, special_id)
-                )
-                message = 'Favorite added'
+            if has_special_id:
+                if is_favorite:
+                    cursor.execute(
+                        """
+                        INSERT INTO device_special_favorite (device_id, special_id)
+                        VALUES (%s, %s)
+                        ON DUPLICATE KEY UPDATE device_id = VALUES(device_id)
+                        """,
+                        (device_id, special_id)
+                    )
+                    message = 'Special favorite added'
+                else:
+                    cursor.execute(
+                        """
+                        DELETE FROM device_special_favorite
+                        WHERE device_id = %s AND special_id = %s
+                        """,
+                        (device_id, special_id)
+                    )
+                    message = 'Special favorite removed'
             else:
-                cursor.execute(
-                    """
-                    DELETE FROM device_favorite
-                    WHERE device_id = %s AND special_id = %s
-                    """,
-                    (device_id, special_id)
-                )
-                message = 'Favorite removed'
+                if is_favorite:
+                    cursor.execute(
+                        """
+                        INSERT INTO device_bar_favorite (device_id, bar_id)
+                        VALUES (%s, %s)
+                        ON DUPLICATE KEY UPDATE device_id = VALUES(device_id)
+                        """,
+                        (device_id, bar_id)
+                    )
+                    message = 'Bar favorite added'
+                else:
+                    cursor.execute(
+                        """
+                        DELETE FROM device_bar_favorite
+                        WHERE device_id = %s AND bar_id = %s
+                        """,
+                        (device_id, bar_id)
+                    )
+                    message = 'Bar favorite removed'
 
         connection.commit()
         connection.close()
