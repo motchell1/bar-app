@@ -3,6 +3,12 @@ const MAP_DAY_KEYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 let barsMap = null;
 let barsMapMarkers = [];
 let googleMapsLoaderPromise = null;
+let mapSelectedBarSheetState = {
+  barId: null,
+  pointerId: null,
+  startY: 0,
+  currentOffset: 0
+};
 
 function getMapSelectedDayKey() {
   if (mapSelectedDayKey && MAP_DAY_KEYS.includes(mapSelectedDayKey)) {
@@ -72,6 +78,96 @@ function clearMapMarkers() {
   barsMapMarkers = [];
 }
 
+function dismissMapSelectedBarSheet() {
+  const sheet = document.getElementById('map-selected-card-sheet');
+  const content = document.getElementById('map-selected-card-content');
+  if (!sheet || !content) return;
+  sheet.style.display = 'none';
+  sheet.style.transform = '';
+  sheet.style.opacity = '';
+  sheet.classList.remove('map-sheet-dragging');
+  content.innerHTML = '';
+  mapSelectedBarSheetState.barId = null;
+  mapSelectedBarSheetState.pointerId = null;
+  mapSelectedBarSheetState.startY = 0;
+  mapSelectedBarSheetState.currentOffset = 0;
+}
+
+function bindMapSheetDragToDismiss(sheet) {
+  if (!sheet || sheet.dataset.bound === 'true') return;
+
+  const pointerDown = (event) => {
+    mapSelectedBarSheetState.pointerId = event.pointerId;
+    mapSelectedBarSheetState.startY = event.clientY;
+    mapSelectedBarSheetState.currentOffset = 0;
+    sheet.classList.add('map-sheet-dragging');
+    sheet.setPointerCapture(event.pointerId);
+  };
+
+  const pointerMove = (event) => {
+    if (event.pointerId !== mapSelectedBarSheetState.pointerId) return;
+    const deltaY = Math.max(0, event.clientY - mapSelectedBarSheetState.startY);
+    mapSelectedBarSheetState.currentOffset = deltaY;
+    sheet.style.transform = `translateY(${deltaY}px)`;
+    const opacity = Math.max(0.45, 1 - (deltaY / 220));
+    sheet.style.opacity = String(opacity);
+  };
+
+  const pointerUp = (event) => {
+    if (event.pointerId !== mapSelectedBarSheetState.pointerId) return;
+    sheet.classList.remove('map-sheet-dragging');
+    const shouldDismiss = mapSelectedBarSheetState.currentOffset > 80;
+    if (shouldDismiss) {
+      dismissMapSelectedBarSheet();
+    } else {
+      sheet.style.transform = '';
+      sheet.style.opacity = '';
+    }
+    mapSelectedBarSheetState.pointerId = null;
+    mapSelectedBarSheetState.startY = 0;
+    mapSelectedBarSheetState.currentOffset = 0;
+  };
+
+  sheet.addEventListener('pointerdown', pointerDown);
+  sheet.addEventListener('pointermove', pointerMove);
+  sheet.addEventListener('pointerup', pointerUp);
+  sheet.addEventListener('pointercancel', pointerUp);
+  sheet.dataset.bound = 'true';
+}
+
+function showMapSelectedBarSheet(bar, specialIds, dayKey, dayLabel) {
+  const sheet = document.getElementById('map-selected-card-sheet');
+  const content = document.getElementById('map-selected-card-content');
+  if (!sheet || !content) return;
+
+  content.innerHTML = '';
+  const card = document.createElement('div');
+  card.className = 'bar-card tap-pressable';
+  card.onclick = () => animateTapAndNavigate(card, () => showDetail(bar, currentTab));
+
+  if (bar.image_url && bar.image_url !== 'null') {
+    const image = document.createElement('img');
+    image.className = 'card-image';
+    image.src = bar.image_url;
+    image.alt = bar.name;
+    card.appendChild(image);
+  }
+
+  const cardContent = buildHomeBarSpecials(bar, specialIds, dayKey, dayLabel);
+  if (!cardContent) {
+    dismissMapSelectedBarSheet();
+    return;
+  }
+
+  card.appendChild(cardContent);
+  content.appendChild(card);
+  bindMapSheetDragToDismiss(sheet);
+  sheet.style.display = '';
+  sheet.style.transform = '';
+  sheet.style.opacity = '';
+  mapSelectedBarSheetState.barId = String(bar.bar_id);
+}
+
 function renderMapTab() {
   const mapContainer = document.getElementById('bars-map');
   const dayLabelNode = document.getElementById('map-day-label');
@@ -103,15 +199,26 @@ function renderMapTab() {
     });
   });
 
+  dismissMapSelectedBarSheet();
+
   const barsWithCoordinates = filteredBarsForDay
-    .map((entry) => startupPayload?.bars?.[String(entry.bar_id)])
-    .filter((bar) => Boolean(bar && Number.isFinite(Number(bar.latitude)) && Number.isFinite(Number(bar.longitude))))
-    .map((bar) => ({
-      name: bar.name,
-      neighborhood: bar.neighborhood,
-      latitude: Number(bar.latitude),
-      longitude: Number(bar.longitude)
-    }));
+    .map((entry) => {
+      const bar = startupPayload?.bars?.[String(entry.bar_id)];
+      if (!bar) return null;
+      if (!Number.isFinite(Number(bar.latitude)) || !Number.isFinite(Number(bar.longitude))) return null;
+      return {
+        bar_id: Number(entry.bar_id),
+        name: bar.name,
+        neighborhood: bar.neighborhood,
+        image_url: bar.image_url,
+        currently_open: bar.currently_open,
+        is_open_now: bar.is_open_now,
+        latitude: Number(bar.latitude),
+        longitude: Number(bar.longitude),
+        specialIds: Array.isArray(entry.specials) ? entry.specials.map((specialId) => String(specialId)) : []
+      };
+    })
+    .filter(Boolean);
 
   loadGoogleMapsApi()
     .then(() => {
@@ -151,12 +258,9 @@ function renderMapTab() {
           gmpClickable: true
         });
 
-        const infoWindow = new google.maps.InfoWindow({
-          content: `<strong>${bar.name}</strong><br>${bar.neighborhood || ''}`
-        });
-
         marker.addEventListener('gmp-click', () => {
-          infoWindow.open({ map: barsMap, anchor: marker });
+          const dayLabel = getMapDayLabel(selectedDayKey);
+          showMapSelectedBarSheet(bar, bar.specialIds, selectedDayKey, dayLabel);
         });
 
         barsMapMarkers.push(marker);

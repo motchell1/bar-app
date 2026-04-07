@@ -1249,6 +1249,40 @@ body {
   background: #e9edf5;
 }
 
+.bars-map-wrap {
+  position: relative;
+  flex: 1;
+  min-height: 280px;
+}
+
+.map-selected-card-sheet {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 10px;
+  z-index: 4;
+  border-radius: 14px;
+  padding: 8px 0 0;
+  touch-action: pan-y;
+  transition: transform 220ms ease, opacity 220ms ease;
+}
+
+.map-sheet-handle {
+  width: 38px;
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(129, 137, 152, 0.5);
+  margin: 0 auto 8px;
+}
+
+.map-selected-card-sheet .bar-card {
+  box-shadow: 0 6px 14px rgba(0,0,0,0.18);
+}
+
+.map-selected-card-sheet.map-sheet-dragging {
+  transition: none;
+}
+
 .map-empty-state {
   background: #fff;
   border-radius: 10px;
