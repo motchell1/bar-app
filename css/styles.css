@@ -970,6 +970,21 @@ body {
   transition: background-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
 }
 
+.detail-header .special-favorite-button {
+  width: 36px;
+  height: 36px;
+  border-radius: 0;
+  background: transparent;
+  color: #fff;
+  transition: opacity 0.2s ease;
+}
+
+.detail-header .special-favorite-button svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+}
+
 .special-card .special-favorite-button.active,
 #favorites-list .special-favorite-button.active,
 .detail-header .special-favorite-button.active {
@@ -986,6 +1001,23 @@ body {
 #favorites-list .special-favorite-button:active,
 .detail-header .special-favorite-button:active {
   transform: scale(0.95);
+}
+
+.detail-header .special-favorite-button.active {
+  animation: favoriteFade 220ms ease-in;
+}
+
+.detail-header .special-favorite-button:active {
+  transform: translateY(-50%);
+}
+
+@keyframes favoriteFade {
+  from {
+    opacity: 0.45;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 .special-meta {

@@ -71,10 +71,13 @@ function resetFilters() {
 
 function updateFilterSectionVisibility() {
   const typeSection = document.getElementById('special-type-filters');
-  if (!typeSection) return;
+  const favoritesSection = document.getElementById('favorites-filters');
+  if (!typeSection || !favoritesSection) return;
 
   const showTypeFilters = currentTab !== 'bars';
+  const showFavoritesFilter = currentTab === 'bars';
   typeSection.style.display = showTypeFilters ? '' : 'none';
+  favoritesSection.style.display = showFavoritesFilter ? '' : 'none';
 }
 
 function getFilteredFavorites() {
@@ -161,16 +164,22 @@ function initSidebarFilters() {
   const menuOverlay = document.getElementById('side-menu-overlay');
   const applyButton = document.getElementById('applyFiltersBtn');
 
-  const typeRows = document.querySelectorAll('#special-type-filters .filter-row');
-  typeRows.forEach((row) => {
+  const bindFilterRowToggle = (row) => {
+    if (!row || row.dataset.bound === 'true') return;
     const checkbox = row.querySelector('input[type="checkbox"]');
+    if (!checkbox) return;
     checkbox.checked = false;
     row.classList.toggle('selected', checkbox.checked);
     row.addEventListener('click', () => {
       checkbox.checked = !checkbox.checked;
       row.classList.toggle('selected', checkbox.checked);
     });
-  });
+    row.dataset.bound = 'true';
+  };
+
+  const typeRows = document.querySelectorAll('#special-type-filters .filter-row');
+  typeRows.forEach(bindFilterRowToggle);
+  bindFilterRowToggle(document.querySelector('#favorites-filters .filter-row'));
 
   hamburgerButton.addEventListener('click', () => {
     sideMenu.classList.add('open');
@@ -186,7 +195,7 @@ function initSidebarFilters() {
     activeFilters.types = currentTab === 'bars' ? [] : getSelectedTypesFromFilters();
     activeFilters.neighborhoods = getSelectedNeighborhoodsFromFilters();
     const favoritesCheckbox = document.getElementById('favoritesFilter');
-    activeFilters.favoritesOnly = Boolean(favoritesCheckbox?.checked);
+    activeFilters.favoritesOnly = currentTab === 'bars' && Boolean(favoritesCheckbox?.checked);
     renderCurrentTabData();
     sideMenu.classList.remove('open');
     menuOverlay.classList.remove('active');
