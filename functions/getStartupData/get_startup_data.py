@@ -67,10 +67,21 @@ def query_device_favorite_special_ids(cursor, device_id):
         return set()
 
     cursor.execute(
-        "SELECT special_id FROM device_favorite WHERE device_id = %s",
+        "SELECT special_id FROM device_special_favorite WHERE device_id = %s",
         (device_id,)
     )
     return {str(row['special_id']) for row in cursor.fetchall()}
+
+
+def query_device_favorite_bar_ids(cursor, device_id):
+    if not device_id:
+        return set()
+
+    cursor.execute(
+        "SELECT bar_id FROM device_bar_favorite WHERE device_id = %s",
+        (device_id,)
+    )
+    return {str(row['bar_id']) for row in cursor.fetchall()}
 
 def to_time_string(value):
     if value is None:
@@ -209,6 +220,7 @@ def build_startup_payload(device_id=None):
             hours = query_open_hours(cursor, active_bar_ids)
             specials = query_specials(cursor, active_bar_ids)
             favorite_special_ids = query_device_favorite_special_ids(cursor, device_id)
+            favorite_bar_ids = query_device_favorite_bar_ids(cursor, device_id)
         active_bar_ids = set(active_bar_ids)
 
         now = datetime.now(EASTERN_TZ)
@@ -237,7 +249,8 @@ def build_startup_payload(device_id=None):
                 'neighborhood': bar['neighborhood'],
                 'image_url': build_bar_image_url(bar['image_file']),
                 'is_open_now': False,
-                'has_special_this_week': False
+                'has_special_this_week': False,
+                'favorite': str(bar['bar_id']) in favorite_bar_ids
             }
 
         bars_with_specials = {row['bar_id'] for row in specials if row['bar_id'] in active_bar_ids}

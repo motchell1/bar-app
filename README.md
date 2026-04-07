@@ -91,7 +91,8 @@ The folders inside `functions/` each correspond to an AWS Lambda function.
 
 ## Front-end integration
 
-- Favorites are now persisted in the background whenever a user favorites/unfavorites a special.
+- Favorites are now persisted in the background whenever a user favorites/unfavorites a special or bar.
+- `getStartupData` reads `device_special_favorite` and `device_bar_favorite` (when `device_id` is provided) and marks payload items with `favorite`.
 - Endpoint used by the web app:
   - `https://qz5rs9i9ya.execute-api.us-east-2.amazonaws.com/default/updateDeviceFavorite`
 
