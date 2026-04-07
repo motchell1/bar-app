@@ -38,7 +38,13 @@
       <div id="map-day-label" class="map-day-label">Today</div>
       <button id="map-day-next" class="map-day-button" type="button" aria-label="Next day">→</button>
     </div>
-    <div id="bars-map" class="bars-map" aria-label="Bars map"></div>
+    <div class="bars-map-wrap">
+      <div id="bars-map" class="bars-map" aria-label="Bars map"></div>
+      <div id="map-selected-card-sheet" class="map-selected-card-sheet" style="display:none;" aria-live="polite">
+        <div class="map-sheet-handle" aria-hidden="true"></div>
+        <div id="map-selected-card-content"></div>
+      </div>
+    </div>
     <div id="map-empty-state" class="map-empty-state" style="display:none;"></div>
   </div>
   

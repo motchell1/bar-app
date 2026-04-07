@@ -52,6 +52,8 @@ function showSpecialDetail(bar, special, { previousScreen = 'specials', returnTo
   document.getElementById('home-screen').style.display = 'none';
   document.getElementById('bars-screen').style.display = 'none';
   document.getElementById('favorites-screen').style.display = 'none';
+  const mapScreen = document.getElementById('map-screen');
+  if (mapScreen) mapScreen.style.display = 'none';
   document.getElementById('detail-screen').style.display = 'none';
   document.getElementById('special-screen').style.display = 'block';
   setScreenLayout(false);

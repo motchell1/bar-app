@@ -34,6 +34,10 @@ function showTab(tabName) {
   if (favoritesScreen) favoritesScreen.style.display = tabName === 'favorites' ? 'flex' : 'none';
   if (mapScreen) mapScreen.style.display = tabName === 'map' ? 'flex' : 'none';
 
+  if (tabName !== 'map' && typeof dismissMapSelectedBarSheet === 'function') {
+    dismissMapSelectedBarSheet();
+  }
+
   renderCurrentTabData();
 
   document.querySelectorAll('.taskbar-tab').forEach((btn) => {
