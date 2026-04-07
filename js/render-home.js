@@ -184,6 +184,7 @@ function getSortedFilteredBars(bars) {
     .filter((bar) => {
       const neighborhoodPass = selectedNeighborhoods.length === 0 || selectedNeighborhoods.includes(bar.neighborhood);
       if (!neighborhoodPass) return false;
+      if (activeFilters.favoritesOnly && bar.favorite !== true) return false;
       if (!query) return true;
       const name = (bar.name || '').toLowerCase();
       return name.includes(query);

@@ -65,15 +65,19 @@ function resetFilterInputs() {
 function resetFilters() {
   activeFilters.types = [];
   activeFilters.neighborhoods = [];
+  activeFilters.favoritesOnly = false;
   resetFilterInputs();
 }
 
 function updateFilterSectionVisibility() {
   const typeSection = document.getElementById('special-type-filters');
-  if (!typeSection) return;
+  const favoritesSection = document.getElementById('favorites-filters');
+  if (!typeSection || !favoritesSection) return;
 
   const showTypeFilters = currentTab !== 'bars';
+  const showFavoritesFilter = currentTab === 'bars';
   typeSection.style.display = showTypeFilters ? '' : 'none';
+  favoritesSection.style.display = showFavoritesFilter ? '' : 'none';
 }
 
 function getFilteredFavorites() {
@@ -159,9 +163,10 @@ function initSidebarFilters() {
   const menuOverlay = document.getElementById('side-menu-overlay');
   const applyButton = document.getElementById('applyFiltersBtn');
 
-  const typeRows = document.querySelectorAll('#special-type-filters .filter-row');
-  typeRows.forEach((row) => {
+  const staticRows = document.querySelectorAll('#special-type-filters .filter-row, #favorites-filters .filter-row');
+  staticRows.forEach((row) => {
     const checkbox = row.querySelector('input[type="checkbox"]');
+    if (!checkbox) return;
     checkbox.checked = false;
     row.classList.toggle('selected', checkbox.checked);
     row.addEventListener('click', () => {
@@ -183,6 +188,8 @@ function initSidebarFilters() {
   applyButton.addEventListener('click', () => {
     activeFilters.types = currentTab === 'bars' ? [] : getSelectedTypesFromFilters();
     activeFilters.neighborhoods = getSelectedNeighborhoodsFromFilters();
+    const favoritesCheckbox = document.getElementById('favoritesFilter');
+    activeFilters.favoritesOnly = currentTab === 'bars' ? Boolean(favoritesCheckbox?.checked) : false;
     renderCurrentTabData();
     sideMenu.classList.remove('open');
     menuOverlay.classList.remove('active');

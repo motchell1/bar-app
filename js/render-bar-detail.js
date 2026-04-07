@@ -116,6 +116,39 @@ function showBarReportSuccess() {
   }
 }
 
+function updateBarFavoriteButton(isFavorited, { animate = false } = {}) {
+  const button = document.getElementById('detail-favorite-button');
+  if (!button) return;
+  button.classList.toggle('active', isFavorited);
+  if (animate) {
+    button.classList.remove('fade-toggle');
+    requestAnimationFrame(() => {
+      button.classList.add('fade-toggle');
+    });
+    setTimeout(() => {
+      button.classList.remove('fade-toggle');
+    }, 240);
+  }
+  button.setAttribute('aria-pressed', isFavorited ? 'true' : 'false');
+}
+
+function initBarFavoriteButton() {
+  const button = document.getElementById('detail-favorite-button');
+  if (!button || button.dataset.bound === 'true') return;
+  button.dataset.bound = 'true';
+
+  button.addEventListener('click', (event) => {
+    event.stopPropagation();
+    if (!currentBarContext) return;
+    const nowFavorited = toggleFavoriteBar(currentBarContext);
+    updateBarFavoriteButton(nowFavorited, { animate: true });
+    if (currentTab === 'specials' || currentTab === 'favorites') {
+      renderCurrentTabData();
+    }
+    lucide.createIcons();
+  });
+}
+
 function renderBarDetailContent(selectedBar, detailPayload) {
   const todayKey = detailPayload?.general_data?.current_day || startupPayload?.general_data?.current_day || getDayKeyFromName(DAYS_FULL[new Date().getDay()]);
   const orderedDays = getOrderedDaysForDetail(todayKey);
@@ -263,6 +296,8 @@ async function showDetail(barOrId, previousScreen = currentTab) {
 
   document.getElementById('detail-image').src = selectedBar.image_url || '';
   document.getElementById('detail-name').textContent = (selectedBar.name || '').toUpperCase();
+  initBarFavoriteButton();
+  updateBarFavoriteButton(isFavoriteBar(selectedBar));
   initBarReport();
   currentBarContext = selectedBar;
   resetBarReportForm();

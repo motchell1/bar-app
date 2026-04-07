@@ -497,6 +497,49 @@ body {
   cursor: pointer;
 }
 
+.detail-header .detail-favorite-button {
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  width: auto;
+  height: auto;
+  padding: 0;
+  color: #ffffff;
+  opacity: 0.92;
+  transition: color 0.25s ease, opacity 0.25s ease;
+}
+
+.detail-header .detail-favorite-button svg {
+  width: 20px;
+  height: 20px;
+  stroke: currentColor;
+  fill: transparent;
+  transition: fill 0.25s ease, opacity 0.25s ease;
+}
+
+.detail-header .detail-favorite-button.active {
+  color: #f4c542;
+  opacity: 1;
+}
+
+.detail-header .detail-favorite-button.active svg {
+  fill: currentColor;
+}
+
+.detail-header .detail-favorite-button.fade-toggle,
+.detail-header .detail-favorite-button.fade-toggle svg {
+  animation: detail-star-fade 220ms ease;
+}
+
+@keyframes detail-star-fade {
+  0% { opacity: 0.45; }
+  100% { opacity: 1; }
+}
+
 .detail-content {
   padding: 16px;
   background-color: #ffffff;
