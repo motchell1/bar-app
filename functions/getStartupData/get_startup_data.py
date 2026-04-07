@@ -22,7 +22,7 @@ def get_connection():
 # Query helpers
 def query_bars(cursor):
     cursor.execute("""
-        SELECT b.bar_id, b.name, b.neighborhood, b.image_file
+        SELECT b.bar_id, b.name, b.neighborhood, b.image_file, b.google_place_id
         FROM bar b
         WHERE b.is_active = 'Y'
           AND EXISTS (
@@ -248,6 +248,7 @@ def build_startup_payload(device_id=None):
                 'name': bar['name'],
                 'neighborhood': bar['neighborhood'],
                 'image_url': build_bar_image_url(bar['image_file']),
+                'google_place_id': bar.get('google_place_id'),
                 'is_open_now': False,
                 'has_special_this_week': False,
                 'favorite': str(bar['bar_id']) in favorite_bar_ids
