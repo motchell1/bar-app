@@ -153,8 +153,9 @@ function updateBarLocationSection(selectedBar) {
     return;
   }
 
-  const encodedPlaceId = encodeURIComponent(`place_id:${placeId}`);
-  mapFrame.src = `https://maps.google.com/maps?output=embed&q=${encodedPlaceId}`;
+  const query = encodeURIComponent(selectedBar?.name || 'Bar');
+  const encodedPlaceId = encodeURIComponent(placeId);
+  mapFrame.src = `https://www.google.com/maps/search/?api=1&output=embed&query=${query}&query_place_id=${encodedPlaceId}`;
   section.style.display = '';
 }
 
