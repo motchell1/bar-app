@@ -646,6 +646,37 @@ test('renderBarsWeek groups specials with matching day, time, and type into one 
   assert.equal(items[0].querySelector('.special-description').textContent, '$5 Lager • $6 IPA');
 });
 
+test('buildSpecialItem clickable rows stop parent click handling and navigate to special detail', async () => {
+  const document = new DocumentMock();
+  mountBaseNodes(document);
+  const ctx = loadAppWithoutBoot(document);
+
+  let stopPropagationCalled = false;
+  let onClickCalled = false;
+
+  const item = ctx.buildSpecialItem({
+    description: '$5 Beer',
+    special_type: 'drink',
+    all_day: true
+  }, {
+    clickable: true,
+    onClick: () => {
+      onClickCalled = true;
+    }
+  });
+
+  item.onclick({
+    stopPropagation() {
+      stopPropagationCalled = true;
+    }
+  });
+
+  await new Promise((resolve) => setTimeout(resolve, 150));
+
+  assert.equal(stopPropagationCalled, true, 'clickable specials prevent parent card click handlers from firing');
+  assert.equal(onClickCalled, true, 'clickable specials still execute their own navigation handler');
+});
+
 
 test('showDetail reuses startup payload details when has_special_this_week is true', async () => {
   const document = new DocumentMock();
