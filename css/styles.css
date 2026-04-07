@@ -1255,6 +1255,8 @@ body {
   position: relative;
   flex: 1;
   min-height: 280px;
+  display: flex;
+  flex-direction: column;
 }
 
 .map-selected-card-sheet {
@@ -1288,6 +1290,10 @@ body {
 
 .map-selected-card-sheet.map-sheet-enter {
   animation: mapSheetSlideUp 220ms ease-out;
+}
+
+.map-selected-card-sheet.map-sheet-dismissing {
+  pointer-events: none;
 }
 
 .map-selected-card-sheet.map-sheet-dragging {
