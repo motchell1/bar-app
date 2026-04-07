@@ -76,7 +76,7 @@ function updateFilterSectionVisibility() {
   const favoritesSection = document.getElementById('favorites-filters');
   if (!typeSection || !favoritesSection) return;
 
-  const showTypeFilters = currentTab !== 'bars' && currentTab !== 'map';
+  const showTypeFilters = currentTab !== 'bars';
   const showFavoritesFilter = currentTab === 'bars';
   typeSection.style.display = showTypeFilters ? '' : 'none';
   favoritesSection.style.display = showFavoritesFilter ? '' : 'none';

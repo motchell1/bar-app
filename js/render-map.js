@@ -83,7 +83,27 @@ function renderMapTab() {
   dayLabelNode.textContent = getMapDayLabel(selectedDayKey);
 
   const barsForDay = startupPayload?.specials_by_day?.[selectedDayKey] || [];
-  const barsWithCoordinates = barsForDay
+  const filteredBarsForDay = barsForDay.filter((entry) => {
+    const bar = startupPayload?.bars?.[String(entry.bar_id)];
+    if (!bar) return false;
+
+    if (activeFilters.neighborhoods.length > 0 && !activeFilters.neighborhoods.includes(bar.neighborhood)) {
+      return false;
+    }
+
+    if (activeFilters.types.length === 0) {
+      return true;
+    }
+
+    const specialIds = Array.isArray(entry.specials) ? entry.specials : [];
+    return specialIds.some((specialId) => {
+      const special = startupPayload?.specials?.[String(specialId)];
+      const specialType = special?.special_type || special?.type;
+      return Boolean(specialType && activeFilters.types.includes(specialType));
+    });
+  });
+
+  const barsWithCoordinates = filteredBarsForDay
     .map((entry) => startupPayload?.bars?.[String(entry.bar_id)])
     .filter((bar) => Boolean(bar && Number.isFinite(Number(bar.latitude)) && Number.isFinite(Number(bar.longitude))))
     .map((bar) => ({
@@ -96,9 +116,11 @@ function renderMapTab() {
   loadGoogleMapsApi()
     .then(() => {
       if (!barsMap) {
+        const mapId = startupPayload?.general_data?.google_map_id || 'DEMO_MAP_ID';
         barsMap = new google.maps.Map(mapContainer, {
           center: { lat: 39.5, lng: -98.35 },
           zoom: 4,
+          mapId,
           mapTypeControl: false,
           streetViewControl: false,
           fullscreenControl: false
@@ -109,7 +131,9 @@ function renderMapTab() {
 
       if (barsWithCoordinates.length === 0) {
         emptyState.style.display = '';
-        emptyState.textContent = 'No bars with specials and map coordinates for this day.';
+        emptyState.textContent = filteredBarsForDay.length === 0
+          ? 'No bars match your current day and filters.'
+          : 'No bars with specials and map coordinates for this day.';
         return;
       }
 
@@ -123,14 +147,15 @@ function renderMapTab() {
         const marker = new AdvancedMarkerElement({
           position: { lat: bar.latitude, lng: bar.longitude },
           map: barsMap,
-          title: bar.name
+          title: bar.name,
+          gmpClickable: true
         });
 
         const infoWindow = new google.maps.InfoWindow({
           content: `<strong>${bar.name}</strong><br>${bar.neighborhood || ''}`
         });
 
-        marker.addListener('click', () => {
+        marker.addEventListener('gmp-click', () => {
           infoWindow.open({ map: barsMap, anchor: marker });
         });
 
