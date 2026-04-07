@@ -11,6 +11,7 @@ DB_PASSWORD = os.environ['DB_PASSWORD']
 DB_NAME = os.environ['DB_NAME']
 BAR_IMAGE_FOLDER_URL = os.environ['BAR_IMAGE_FOLDER_URL'].rstrip('/')
 GOOGLE_API_KEY = os.environ['GOOGLE_API_KEY']
+GOOGLE_MAP_ID = os.environ.get('GOOGLE_MAP_ID', 'DEMO_MAP_ID')
 
 DAY_KEYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']
 DAY_INDEX = {day: idx for idx, day in enumerate(DAY_KEYS)}
@@ -23,7 +24,7 @@ def get_connection():
 # Query helpers
 def query_bars(cursor):
     cursor.execute("""
-        SELECT b.bar_id, b.name, b.neighborhood, b.image_file, b.google_place_id
+        SELECT b.bar_id, b.name, b.neighborhood, b.image_file, b.google_place_id, b.latitude, b.longitude
         FROM bar b
         WHERE b.is_active = 'Y'
           AND EXISTS (
@@ -250,6 +251,8 @@ def build_startup_payload(device_id=None):
                 'neighborhood': bar['neighborhood'],
                 'image_url': build_bar_image_url(bar['image_file']),
                 'google_place_id': bar.get('google_place_id'),
+                'latitude': float(bar['latitude']) if bar.get('latitude') is not None else None,
+                'longitude': float(bar['longitude']) if bar.get('longitude') is not None else None,
                 'is_open_now': False,
                 'has_special_this_week': False,
                 'favorite': str(bar['bar_id']) in favorite_bar_ids
@@ -323,7 +326,8 @@ def build_startup_payload(device_id=None):
                 'general_data': {
                     'current_day': current_day_key,
                     'generated_at': now.isoformat(),
-                    'google_api_key': GOOGLE_API_KEY
+                    'google_api_key': GOOGLE_API_KEY,
+                    'google_map_id': GOOGLE_MAP_ID
                 },
                 'bars': bars_lookup,
                 'open_hours': open_hours_lookup,
