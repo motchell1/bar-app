@@ -976,7 +976,7 @@ body {
   border-radius: 0;
   background: transparent;
   color: #fff;
-  transition: opacity 0.2s ease, color 0.2s ease;
+  transition: opacity 0.2s ease;
 }
 
 .detail-header .special-favorite-button svg {
@@ -1008,7 +1008,7 @@ body {
 }
 
 .detail-header .special-favorite-button:active {
-  transform: none;
+  transform: translateY(-50%);
 }
 
 @keyframes favoriteFade {
