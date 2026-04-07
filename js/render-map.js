@@ -85,6 +85,7 @@ function dismissMapSelectedBarSheet() {
   sheet.style.display = 'none';
   sheet.style.transform = '';
   sheet.style.opacity = '';
+  sheet.classList.remove('map-sheet-enter');
   sheet.classList.remove('map-sheet-dragging');
   content.innerHTML = '';
   mapSelectedBarSheetState.barId = null;
@@ -165,6 +166,10 @@ function showMapSelectedBarSheet(bar, specialIds, dayKey, dayLabel) {
   sheet.style.display = '';
   sheet.style.transform = '';
   sheet.style.opacity = '';
+  sheet.classList.remove('map-sheet-enter');
+  requestAnimationFrame(() => {
+    sheet.classList.add('map-sheet-enter');
+  });
   mapSelectedBarSheetState.barId = String(bar.bar_id);
 }
 
