@@ -140,6 +140,25 @@ function initBarFavoriteButton() {
   });
 }
 
+
+function updateBarLocationSection(selectedBar) {
+  const section = document.getElementById('detail-location-section');
+  const mapFrame = document.getElementById('detail-location-map');
+  if (!section || !mapFrame) return;
+
+  const placeId = selectedBar?.google_place_id;
+  if (!placeId) {
+    section.style.display = 'none';
+    mapFrame.removeAttribute('src');
+    return;
+  }
+
+  const query = encodeURIComponent(selectedBar?.name || 'Bar');
+  const encodedPlaceId = encodeURIComponent(placeId);
+  mapFrame.src = `https://www.google.com/maps/search/?api=1&output=embed&query=${query}&query_place_id=${encodedPlaceId}`;
+  section.style.display = '';
+}
+
 function renderBarDetailContent(selectedBar, detailPayload) {
   const todayKey = detailPayload?.general_data?.current_day || startupPayload?.general_data?.current_day || getDayKeyFromName(DAYS_FULL[new Date().getDay()]);
   const orderedDays = getOrderedDaysForDetail(todayKey);
@@ -292,6 +311,7 @@ async function showDetail(barOrId, previousScreen = currentTab) {
   initBarReport();
   currentBarContext = selectedBar;
   resetBarReportForm();
+  updateBarLocationSection(selectedBar);
 
   const startupDetailPayload = buildBarDetailPayloadFromStartup(selectedBar.bar_id);
   if (startupDetailPayload) {
