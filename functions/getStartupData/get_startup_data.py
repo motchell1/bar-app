@@ -10,6 +10,7 @@ DB_USER = os.environ['DB_USER']
 DB_PASSWORD = os.environ['DB_PASSWORD']
 DB_NAME = os.environ['DB_NAME']
 BAR_IMAGE_FOLDER_URL = os.environ['BAR_IMAGE_FOLDER_URL'].rstrip('/')
+GOOGLE_API_KEY = os.environ['GOOGLE_API_KEY']
 
 DAY_KEYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']
 DAY_INDEX = {day: idx for idx, day in enumerate(DAY_KEYS)}
@@ -321,7 +322,8 @@ def build_startup_payload(device_id=None):
             'startup_payload': {
                 'general_data': {
                     'current_day': current_day_key,
-                    'generated_at': now.isoformat()
+                    'generated_at': now.isoformat(),
+                    'google_api_key': GOOGLE_API_KEY
                 },
                 'bars': bars_lookup,
                 'open_hours': open_hours_lookup,

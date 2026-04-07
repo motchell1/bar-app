@@ -147,15 +147,16 @@ function updateBarLocationSection(selectedBar) {
   if (!section || !mapFrame) return;
 
   const placeId = selectedBar?.google_place_id;
-  if (!placeId) {
+  const googleApiKey = startupPayload?.general_data?.google_api_key;
+  if (!placeId || !googleApiKey) {
     section.style.display = 'none';
     mapFrame.removeAttribute('src');
     return;
   }
 
-  const query = encodeURIComponent(selectedBar?.name || 'Bar');
-  const encodedPlaceId = encodeURIComponent(placeId);
-  mapFrame.src = `https://www.google.com/maps/search/?api=1&output=embed&query=${query}&query_place_id=${encodedPlaceId}`;
+  const encodedPlaceQuery = encodeURIComponent(`place_id:${placeId}`);
+  const encodedApiKey = encodeURIComponent(googleApiKey);
+  mapFrame.setAttribute('src', `https://www.google.com/maps/embed/v1/place?key=${encodedApiKey}&q=${encodedPlaceQuery}`);
   section.style.display = '';
 }
 
