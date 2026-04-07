@@ -90,7 +90,7 @@ function initBarReport() {
     const isOpen = reportForm.classList.contains('open');
     reportForm.classList.toggle('open', !isOpen);
     if (!isOpen) {
-      requestAnimationFrame(() => {
+      const scrollToReport = () => {
         const submitButton = reportForm.querySelector('.special-report-submit');
         const scrollTarget = submitButton || reportForm;
         if (scrollTarget && typeof scrollTarget.scrollIntoView === 'function') {
@@ -100,7 +100,9 @@ function initBarReport() {
             behavior: 'smooth'
           });
         }
-      });
+      };
+      requestAnimationFrame(scrollToReport);
+      setTimeout(scrollToReport, 260);
     }
   });
 }
