@@ -31,6 +31,8 @@ function buildLegacyBarsData(payload) {
       bar_id: Number(barId),
       name: bar.name,
       neighborhood: bar.neighborhood,
+      latitude: bar.latitude,
+      longitude: bar.longitude,
       image_url: bar.image_url,
       favorite: bar.favorite,
       hours_by_day: openHoursLookup[barId] || {},
@@ -60,6 +62,7 @@ async function loadBars() {
     const parsed = typeof data.body === 'string' ? JSON.parse(data.body) : data;
     startupPayload = parsed.startup_payload || null;
     barDetailsById = {};
+    mapSelectedDayKey = startupPayload?.general_data?.current_day || null;
 
     barsData = startupPayload ? buildLegacyBarsData(startupPayload) : [];
     generateNeighborhoodFilters();
