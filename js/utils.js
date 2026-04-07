@@ -210,7 +210,10 @@ function buildSpecialItem(special, { isToday = false, clickable = false, onClick
 
   if (clickable && typeof onClick === 'function') {
     item.classList.add('clickable-special', 'tap-pressable');
-    item.onclick = (event) => animateTapAndNavigate(item, () => onClick(event));
+    item.onclick = (event) => {
+      if (event && typeof event.stopPropagation === 'function') event.stopPropagation();
+      animateTapAndNavigate(item, () => onClick(event));
+    };
   }
 
   return item;
