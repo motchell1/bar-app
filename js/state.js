@@ -10,7 +10,8 @@ let currentBarContext = null;
 let isInitialDataLoading = true;
 const activeFilters = {
   types: [],
-  neighborhoods: []
+  neighborhoods: [],
+  favoritesOnly: false
 };
 
 let userIdentifier = localStorage.getItem('userIdentifier');

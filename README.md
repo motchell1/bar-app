@@ -64,7 +64,7 @@ The folders inside `functions/` each correspond to an AWS Lambda function.
   - `S3_DATA_FOLDER`
 
 - **`updateDeviceFavorite`**  
-  Updates records in `device_favorite` for a given `device_id` and `special_id`. Pass `is_favorite: true` to insert (or keep) a favorite row, and `is_favorite: false` to delete the row.
+  Updates records in either `device_special_favorite` or `device_bar_favorite`. Provide exactly one of `special_id` or `bar_id`. Pass `is_favorite: true` to insert (or keep) a favorite row, and `is_favorite: false` to delete the row.
 
   Example payload:
 
@@ -76,12 +76,23 @@ The folders inside `functions/` each correspond to an AWS Lambda function.
   }
   ```
 
+  Or for a bar:
+
+  ```json
+  {
+    "device_id": "abc123",
+    "bar_id": 14,
+    "is_favorite": true
+  }
+  ```
+
 - **`generateCandidateSpecials`**  
   Generates and stores candidate specials for all bars in a neighborhood. It accepts `neighborhood`, invokes `dbBarSync` to fetch bars (`bar_id`, `bar_name`, `neighborhood`, `website_url`), runs crawl-first + OpenAI fallback extraction per bar, and invokes `dbBarSync` again to insert results into `special_candidate`.
 
 ## Front-end integration
 
-- Favorites are now persisted in the background whenever a user favorites/unfavorites a special.
+- Favorites are now persisted in the background whenever a user favorites/unfavorites a special or bar.
+- `getStartupData` reads `device_special_favorite` and `device_bar_favorite` (when `device_id` is provided) and marks payload items with `favorite`.
 - Endpoint used by the web app:
   - `https://qz5rs9i9ya.execute-api.us-east-2.amazonaws.com/default/updateDeviceFavorite`
 
