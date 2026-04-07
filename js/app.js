@@ -18,6 +18,7 @@ function showTab(tabName) {
   const homeScreen = document.getElementById('home-screen');
   const barsScreen = document.getElementById('bars-screen');
   const favoritesScreen = document.getElementById('favorites-screen');
+  const mapScreen = document.getElementById('map-screen');
   const previousTab = currentTab;
 
   currentTab = tabName;
@@ -31,6 +32,7 @@ function showTab(tabName) {
   if (homeScreen) homeScreen.style.display = tabName === 'specials' ? 'flex' : 'none';
   if (barsScreen) barsScreen.style.display = tabName === 'bars' ? 'flex' : 'none';
   if (favoritesScreen) favoritesScreen.style.display = tabName === 'favorites' ? 'flex' : 'none';
+  if (mapScreen) mapScreen.style.display = tabName === 'map' ? 'flex' : 'none';
 
   renderCurrentTabData();
 
@@ -74,7 +76,7 @@ function updateFilterSectionVisibility() {
   const favoritesSection = document.getElementById('favorites-filters');
   if (!typeSection || !favoritesSection) return;
 
-  const showTypeFilters = currentTab !== 'bars';
+  const showTypeFilters = currentTab !== 'bars' && currentTab !== 'map';
   const showFavoritesFilter = currentTab === 'bars';
   typeSection.style.display = showTypeFilters ? '' : 'none';
   favoritesSection.style.display = showFavoritesFilter ? '' : 'none';
@@ -105,6 +107,13 @@ function renderCurrentTabData() {
 
   if (currentTab === 'favorites') {
     renderFavorites(getFilteredFavorites());
+    return;
+  }
+
+  if (currentTab === 'map') {
+    if (typeof renderMapTab === 'function') {
+      renderMapTab();
+    }
   }
 }
 
@@ -249,6 +258,9 @@ initSidebarFilters();
 initTaskbar();
 initBarsSearch();
 initHomeScrollCapture();
+if (typeof initMapDayController === 'function') {
+  initMapDayController();
+}
 initSpecialReport();
 initBarReport();
 initSpecialFavoriteButton();

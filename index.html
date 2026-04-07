@@ -31,6 +31,16 @@
   <div id="favorites-screen" style="display:none;">
     <div id="favorites-list"></div>
   </div>
+
+  <div id="map-screen" style="display:none;">
+    <div class="map-day-controller">
+      <button id="map-day-prev" class="map-day-button" type="button" aria-label="Previous day">←</button>
+      <div id="map-day-label" class="map-day-label">Today</div>
+      <button id="map-day-next" class="map-day-button" type="button" aria-label="Next day">→</button>
+    </div>
+    <div id="bars-map" class="bars-map" aria-label="Bars map"></div>
+    <div id="map-empty-state" class="map-empty-state" style="display:none;"></div>
+  </div>
   
   <div id="side-menu-overlay" class="side-menu-overlay"></div>
   
@@ -183,6 +193,10 @@
     <span class="taskbar-icon" data-lucide="star"></span>
     <span class="taskbar-label">Favorites</span>
   </button>
+  <button class="taskbar-tab" type="button" aria-label="Map" data-tab="map">
+    <span class="taskbar-icon" data-lucide="map-pin"></span>
+    <span class="taskbar-label">Map</span>
+  </button>
 </nav>
 <script src="https://cdn.jsdelivr.net/npm/lucide@0.575.0/dist/umd/lucide.js"></script>
 <script> lucide.createIcons();</script>
@@ -190,6 +204,7 @@
 <script src="js/state.js"></script>
 <script src="js/utils.js"></script>
 <script src="js/render-home.js"></script>
+<script src="js/render-map.js"></script>
 <script src="js/render-bar-detail.js"></script>
 <script src="js/render-favorites.js"></script>
 <script src="js/render-special-detail.js"></script>

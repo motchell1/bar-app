@@ -8,6 +8,7 @@ let previousScreenState = null;
 let currentSpecialContext = null;
 let currentBarContext = null;
 let isInitialDataLoading = true;
+let mapSelectedDayKey = null;
 const activeFilters = {
   types: [],
   neighborhoods: [],
