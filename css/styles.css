@@ -552,6 +552,24 @@ body {
   margin-top: 12px;
 }
 
+.detail-location-map-wrap {
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid #e6ecf5;
+}
+
+.detail-location-map {
+  width: 100%;
+  height: 220px;
+  border: 0;
+}
+
+#detail-screen .bar-report-section {
+  box-shadow: none;
+  border: 1px solid #e6ecf5;
+}
+
+
 /* ===== Collapsible Specials by Day ===== */
 .day-group {
   margin-bottom: 16px;

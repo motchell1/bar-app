@@ -60,6 +60,15 @@ function showSpecialDetail(bar, special, { previousScreen = 'specials', returnTo
   const barImage = document.getElementById('special-bar-image');
   barImage.src = (selectedBar.image_url && selectedBar.image_url !== 'null') ? selectedBar.image_url : 'https://placehold.co/640x360?text=Bar';
 
+  if (barImage.dataset.bound !== 'true') {
+    barImage.dataset.bound = 'true';
+    barImage.addEventListener('click', () => {
+      if (!currentSpecialContext?.bar) return;
+      showDetail(currentSpecialContext.bar, previousScreenState?.returnTo || 'specials');
+    });
+  }
+  barImage.style.cursor = 'pointer';
+
   const specialCard = document.getElementById('special-card');
   specialCard.innerHTML = '';
 
