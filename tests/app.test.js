@@ -314,6 +314,31 @@ test('initSpecialReport scrolls submit button into view when report form opens',
   assert.equal(scrolled, true, 'scrolls the submit button into view when opening');
 });
 
+test('initBarReport toggles bar report form open on bar detail screen and scrolls to reveal it', async () => {
+  const document = new DocumentMock();
+  mountBaseNodes(document);
+  mountBarReportNodes(document);
+  const ctx = loadAppWithoutBoot(document);
+
+  const barForm = document.getElementById('bar-report-form');
+  barForm.classList.remove('open');
+  const submitButton = barForm.querySelector('.special-report-submit');
+  let scrolled = false;
+  submitButton.scrollIntoView = () => {
+    scrolled = true;
+  };
+
+  ctx.initBarReport();
+  document.getElementById('bar-report-toggle').click();
+  await new Promise((resolve) => setTimeout(resolve, 5));
+
+  assert.equal(barForm.classList.contains('open'), true, 'opens bar report form on first click');
+  assert.equal(scrolled, true, 'scrolls to keep expanded bar report form visible');
+
+  document.getElementById('bar-report-toggle').click();
+  assert.equal(barForm.classList.contains('open'), false, 'closes bar report form on second click');
+});
+
 test('favorites cards render star in header and omit neighborhood label', () => {
   const document = new DocumentMock();
   mountBaseNodes(document);
