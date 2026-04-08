@@ -9,6 +9,8 @@ let mapSelectedBarSheetState = {
   startY: 0,
   currentOffset: 0
 };
+let mapDismissListenersBound = false;
+let mapSheetDismissTimer = null;
 
 function getMapSelectedDayKey() {
   if (mapSelectedDayKey && MAP_DAY_KEYS.includes(mapSelectedDayKey)) {
@@ -86,11 +88,36 @@ function dismissMapSelectedBarSheet() {
   sheet.style.transform = '';
   sheet.style.opacity = '';
   sheet.classList.remove('map-sheet-dragging');
+  sheet.classList.remove('map-sheet-enter');
+  sheet.classList.remove('map-sheet-dismissing');
   content.innerHTML = '';
   mapSelectedBarSheetState.barId = null;
   mapSelectedBarSheetState.pointerId = null;
   mapSelectedBarSheetState.startY = 0;
   mapSelectedBarSheetState.currentOffset = 0;
+  if (mapSheetDismissTimer) {
+    clearTimeout(mapSheetDismissTimer);
+    mapSheetDismissTimer = null;
+  }
+}
+
+function dismissMapSelectedBarSheetAnimated() {
+  const sheet = document.getElementById('map-selected-card-sheet');
+  if (!sheet || sheet.style.display === 'none' || !mapSelectedBarSheetState.barId) {
+    dismissMapSelectedBarSheet();
+    return;
+  }
+
+  sheet.classList.remove('map-sheet-enter');
+  sheet.classList.add('map-sheet-dismissing');
+  sheet.style.transform = 'translateY(110px)';
+  sheet.style.opacity = '0';
+
+  if (mapSheetDismissTimer) clearTimeout(mapSheetDismissTimer);
+  mapSheetDismissTimer = setTimeout(() => {
+    mapSheetDismissTimer = null;
+    dismissMapSelectedBarSheet();
+  }, 230);
 }
 
 function bindMapSheetDragToDismiss(sheet) {
@@ -116,6 +143,7 @@ function bindMapSheetDragToDismiss(sheet) {
   const pointerUp = (event) => {
     if (event.pointerId !== mapSelectedBarSheetState.pointerId) return;
     sheet.classList.remove('map-sheet-dragging');
+    sheet.classList.remove('map-sheet-enter');
     const shouldDismiss = mapSelectedBarSheetState.currentOffset > 80;
     if (shouldDismiss) {
       dismissMapSelectedBarSheet();
@@ -165,7 +193,27 @@ function showMapSelectedBarSheet(bar, specialIds, dayKey, dayLabel) {
   sheet.style.display = '';
   sheet.style.transform = '';
   sheet.style.opacity = '';
+  sheet.classList.remove('map-sheet-enter');
+  sheet.classList.remove('map-sheet-dismissing');
+  // restart animation for repeated marker taps
+  void sheet.offsetWidth;
+  sheet.classList.add('map-sheet-enter');
   mapSelectedBarSheetState.barId = String(bar.bar_id);
+}
+
+
+function bindMapInteractionDismiss() {
+  if (!barsMap || mapDismissListenersBound) return;
+
+  const dismissIfOpen = () => {
+    if (!mapSelectedBarSheetState.barId) return;
+    dismissMapSelectedBarSheetAnimated();
+  };
+
+  barsMap.addListener('click', dismissIfOpen);
+  barsMap.addListener('dragstart', dismissIfOpen);
+  barsMap.addListener('zoom_changed', dismissIfOpen);
+  mapDismissListenersBound = true;
 }
 
 function renderMapTab() {
@@ -233,6 +281,8 @@ function renderMapTab() {
           fullscreenControl: false
         });
       }
+
+      bindMapInteractionDismiss();
 
       clearMapMarkers();
 

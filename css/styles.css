@@ -456,6 +456,7 @@ body {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  flex-direction: column;
 }
 
 .detail-image {
@@ -896,6 +897,7 @@ body {
   overflow-y: auto;
   overflow-x: hidden;
   background: #f5f5f5;
+  flex-direction: column;
 }
 
 .special-toolbar {
@@ -1253,6 +1255,8 @@ body {
   position: relative;
   flex: 1;
   min-height: 280px;
+  display: flex;
+  flex-direction: column;
 }
 
 .map-selected-card-sheet {
@@ -1279,8 +1283,32 @@ body {
   box-shadow: 0 6px 14px rgba(0,0,0,0.18);
 }
 
+.map-selected-card-sheet .bar-card:hover {
+  transform: none;
+  box-shadow: 0 6px 14px rgba(0,0,0,0.18);
+}
+
+.map-selected-card-sheet.map-sheet-enter {
+  animation: mapSheetSlideUp 220ms ease-out;
+}
+
+.map-selected-card-sheet.map-sheet-dismissing {
+  pointer-events: none;
+}
+
 .map-selected-card-sheet.map-sheet-dragging {
   transition: none;
+}
+
+@keyframes mapSheetSlideUp {
+  from {
+    transform: translateY(18px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
 }
 
 .map-empty-state {
@@ -1294,7 +1322,8 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .tap-pressable,
   .tap-pressable.tap-press-active,
-  .screen-animate-in {
+  .screen-animate-in,
+  .map-selected-card-sheet.map-sheet-enter {
     transition: none !important;
     animation: none !important;
     transform: none !important;
