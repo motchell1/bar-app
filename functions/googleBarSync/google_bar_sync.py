@@ -44,6 +44,25 @@ DAY_MAP = {
 ALL_DAYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']
 
 NEIGHBORHOOD_CONFIGS = {
+    'bellevue': {
+        'neighborhood_name': 'Bellevue',
+        'search_rectangles': [
+            {
+                'low': {'lat': 40.485252, 'lng': -80.06302},
+                'high': {'lat': 40.507640, 'lng': -80.044057},
+            },
+        ],
+        'polygon': [
+            {'lat': 40.501808, 'lng': -80.0784740},
+            {'lat': 40.483033, 'lng': -80.052554},
+            {'lat': 40.493673, 'lng': -80.043714},
+            {'lat': 40.496476, 'lng': -80.05126},
+            {'lat': 40.502269, 'lng': -80.048128},
+            {'lat': 40.5083611, 'lng': -80.060691},
+            {'lat': 40.505453, 'lng': -80.07798},
+            {'lat': 40.501808, 'lng': -80.0784740}
+        ],
+    },
     'downtown': {
         'neighborhood_name': 'Downtown',
         'search_rectangles': [
@@ -79,6 +98,24 @@ NEIGHBORHOOD_CONFIGS = {
             {'lat': 40.446700, 'lng': -79.999300},
             {'lat': 40.445000, 'lng': -80.017800},
             {'lat': 40.451900, 'lng': -80.024900},
+        ],
+    },
+    'oakland': {
+        'neighborhood_name': 'Oakland',
+        'search_rectangles': [
+            {
+                'low': {'lat': 40.433545, 'lng': -79.968321},
+                'high': {'lat': 40.453603, 'lng':  -79.947593},
+            },
+        ],
+        'polygon': [
+            {'lat': 40.435042, 'lng': -79.966763},
+            {'lat': 40.432084, 'lng': -79.949551},
+            {'lat': 40.441329, 'lng': -79.949194},
+            {'lat': 40.441018, 'lng': -79.943836},
+            {'lat': 40.453919, 'lng': -79.946538},
+            {'lat': 40.449968, 'lng': -79.957996},
+            {'lat': 40.435042, 'lng': -79.966763}
         ],
     },
 }
@@ -247,6 +284,8 @@ def build_candidate_bar(place: Dict, neighborhood_name: str) -> Optional[Dict]:
         'google_place_id': place_id,
         'name': name,
         'address': address,
+        'latitude': lat,
+        'longitude': lng,
         'website_url': place.get('websiteUri'),
         'neighborhood': neighborhood_name,
         'business_status': place.get('businessStatus'),
