@@ -247,6 +247,8 @@ def build_candidate_bar(place: Dict, neighborhood_name: str) -> Optional[Dict]:
         'google_place_id': place_id,
         'name': name,
         'address': address,
+        'latitude': lat,
+        'longitude': lng,
         'website_url': place.get('websiteUri'),
         'neighborhood': neighborhood_name,
         'business_status': place.get('businessStatus'),
