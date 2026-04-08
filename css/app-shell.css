@@ -1,0 +1,118 @@
+/* ===== App Shell: Header + Container + Bottom Nav ===== */
+.home-toolbar {
+  position: fixed;
+  top: 0;
+  width: 100%;
+  z-index: 100;
+  background-color: #007bff;
+  color: #fff;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+}
+
+.toolbar-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 48px;
+  padding: 0 16px;
+  box-sizing: border-box;
+}
+
+.app-title {
+  position: fixed;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  height: 48px;
+  line-height: 48px;
+  font-weight: bold;
+  text-transform: uppercase;
+  text-align: center;
+}
+
+.hamburger-button {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5em;
+  background: transparent;
+  border: none;
+  color: #fff;
+  cursor: pointer;
+}
+
+.app-container {
+  max-width: 480px;
+  margin: 48px auto 0;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 116px);
+  height: calc(100dvh - 116px);
+}
+
+.app-container.detail-mode {
+  margin-top: 0;
+  height: calc(100vh - 68px);
+  height: calc(100dvh - 68px);
+}
+
+.bottom-taskbar {
+  position: fixed;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 480px;
+  height: 68px;
+  padding-bottom: env(safe-area-inset-bottom, 0);
+  background: rgba(248, 248, 248, 0.92);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-top: 1px solid rgba(60, 60, 67, 0.2);
+  display: flex;
+  justify-content: space-around;
+  align-items: flex-start;
+  z-index: 120;
+  box-sizing: border-box;
+}
+
+.taskbar-tab {
+  flex: 1;
+  border: none;
+  background: transparent;
+  color: #8e8e93;
+  font-size: 0.65rem;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  height: 100%;
+  padding-top: 4px;
+}
+
+.taskbar-icon {
+  width: 20px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.taskbar-icon svg {
+  width: 20px;
+  height: 20px;
+  stroke-width: 1.8;
+}
+
+.taskbar-tab.active {
+  color: #007aff;
+}

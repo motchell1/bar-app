@@ -1,0 +1,40 @@
+/* ===== Tab: Favorite ===== */
+#favorites-screen {
+  display: none;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+
+#favorites-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  padding: 16px;
+  box-sizing: border-box;
+}
+
+#favorites-list .bar-card {
+  transition: opacity 0.22s ease, transform 0.22s ease, height 0.48s ease, margin 0.48s ease, padding 0.48s ease;
+}
+
+#favorites-list .bar-card.is-removing {
+  opacity: 0;
+  transform: scale(0.98);
+}
+
+#favorites-list .bar-card.is-collapsing {
+  height: 0 !important;
+  margin-top: 0;
+  margin-bottom: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  border-width: 0;
+}
+
+#favorites-list .special-day-badge {
+  margin: 8px 0 14px;
+}
