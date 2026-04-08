@@ -1,0 +1,103 @@
+/* ===== Tab: Bar ===== */
+#bars-screen {
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+#bars-screen::-webkit-scrollbar {
+  display: none;
+}
+
+.bars-search-wrap {
+  padding: 0 16px 8px;
+}
+
+.bars-search-input {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #e1e1e6;
+  background: #fff;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  padding: 10px 12px;
+  outline: none;
+}
+
+.bars-search-input:focus {
+  border-color: #007aff;
+  box-shadow: 0 0 0 2px rgba(0, 122, 255, 0.15);
+}
+
+#bars-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+}
+
+.bars-list-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+  padding: 8px 10px;
+  cursor: pointer;
+}
+
+.tap-pressable {
+  transition: transform 0.16s ease, box-shadow 0.16s ease, opacity 0.16s ease;
+  transform-origin: center;
+}
+
+.tap-pressable.tap-press-active {
+  transform: scale(0.98);
+  opacity: 0.92;
+}
+
+.bars-list-thumb {
+  width: 58px;
+  height: 58px;
+  border-radius: 10px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.bars-list-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.bars-list-name {
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.bars-list-neighborhood {
+  font-size: 0.7rem;
+  color: #777;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+}
+
+.bars-list-chevron {
+  margin-left: auto;
+  width: 16px;
+  height: 16px;
+  color: #b0b0b7;
+  display: inline-flex;
+}
+
+.bars-list-chevron svg {
+  width: 16px;
+  height: 16px;
+  stroke-width: 2.25;
+}
