@@ -313,14 +313,6 @@ body {
   animation: fadePulse 1.2s infinite;
 }
 
-/* ===== Badges Column ===== */
-.badges-column {
-  display: flex;
-  flex-direction: row;   /* horizontal */
-  gap: 6px;              /* space between icon and badge */
-  align-items: center;   /* vertically center items */
-}
-
 /* ===== Time Badge (restore fully rounded like before) ===== */
 .time-badge {
   display: inline-flex;
@@ -431,23 +423,6 @@ body {
   padding: 10px 0;
   border-bottom: 1px solid #ccc;
   color: #636366;
-}
-
-.today-divider {
-  display: flex;
-  align-items: center;
-  text-align: center;
-  margin: 16px 0;
-  color: #555;
-  font-size: 14px;
-}
-
-.today-divider::before,
-.today-divider::after {
-  content: '';
-  flex: 1;
-  border-bottom: 1px solid #ccc;
-  margin: 0 10px;
 }
 
 /* ===== Detail Screen ===== */
