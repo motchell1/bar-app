@@ -86,7 +86,6 @@ function dismissMapSelectedBarSheet() {
   if (!sheet || !content) return;
   sheet.style.display = 'none';
   sheet.style.transform = '';
-  sheet.style.opacity = '';
   sheet.classList.remove('map-sheet-dragging');
   sheet.classList.remove('map-sheet-enter');
   sheet.classList.remove('map-sheet-dismissing');
@@ -111,7 +110,6 @@ function dismissMapSelectedBarSheetAnimated() {
   sheet.classList.remove('map-sheet-enter');
   sheet.classList.add('map-sheet-dismissing');
   sheet.style.transform = 'translateY(110px)';
-  sheet.style.opacity = '0';
 
   if (mapSheetDismissTimer) clearTimeout(mapSheetDismissTimer);
   mapSheetDismissTimer = setTimeout(() => {
@@ -136,8 +134,6 @@ function bindMapSheetDragToDismiss(sheet) {
     const deltaY = Math.max(0, event.clientY - mapSelectedBarSheetState.startY);
     mapSelectedBarSheetState.currentOffset = deltaY;
     sheet.style.transform = `translateY(${deltaY}px)`;
-    const opacity = Math.max(0.45, 1 - (deltaY / 220));
-    sheet.style.opacity = String(opacity);
   };
 
   const pointerUp = (event) => {
@@ -146,10 +142,9 @@ function bindMapSheetDragToDismiss(sheet) {
     sheet.classList.remove('map-sheet-enter');
     const shouldDismiss = mapSelectedBarSheetState.currentOffset > 80;
     if (shouldDismiss) {
-      dismissMapSelectedBarSheet();
+      dismissMapSelectedBarSheetAnimated();
     } else {
       sheet.style.transform = '';
-      sheet.style.opacity = '';
     }
     mapSelectedBarSheetState.pointerId = null;
     mapSelectedBarSheetState.startY = 0;
@@ -192,7 +187,6 @@ function showMapSelectedBarSheet(bar, specialIds, dayKey, dayLabel) {
   bindMapSheetDragToDismiss(sheet);
   sheet.style.display = '';
   sheet.style.transform = '';
-  sheet.style.opacity = '';
   sheet.classList.remove('map-sheet-enter');
   sheet.classList.remove('map-sheet-dismissing');
   // restart animation for repeated marker taps
