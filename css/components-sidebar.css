@@ -71,6 +71,22 @@
   border-color: #1d4ed8;
 }
 
+.neighborhood-filter-select {
+  width: 100%;
+  min-height: 132px;
+  padding: 10px 12px;
+  border: 1.5px solid #d9d9d9;
+  border-radius: 5px;
+  background-color: #fff;
+  font-size: 0.95rem;
+}
+
+.neighborhood-filter-select:focus {
+  outline: none;
+  border-color: #1d4ed8;
+  box-shadow: 0 0 0 2px rgba(29, 78, 216, 0.16);
+}
+
 .side-menu-footer {
   margin-top: auto;
   padding: 16px;
