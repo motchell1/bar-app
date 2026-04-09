@@ -53,10 +53,10 @@ function getSelectedTypesFromFilters() {
 }
 
 function getSelectedNeighborhoodsFromFilters() {
-  const neighborhoodRows = Array.from(document.querySelectorAll('#neighborhood-filters .filter-row'));
-  return neighborhoodRows
-    .filter((row) => row.querySelector('input[type="checkbox"]').checked)
-    .map((row) => row.querySelector('input[type="checkbox"]').dataset.name);
+  const neighborhoodSelect = document.getElementById('neighborhoodFilterSelect');
+  if (!neighborhoodSelect) return [];
+  const selectedNeighborhood = neighborhoodSelect.value;
+  return selectedNeighborhood ? [selectedNeighborhood] : [];
 }
 
 function resetFilterInputs() {
@@ -66,6 +66,11 @@ function resetFilterInputs() {
     checkbox.checked = false;
     row.classList.remove('selected');
   });
+
+  const neighborhoodSelect = document.getElementById('neighborhoodFilterSelect');
+  if (neighborhoodSelect) {
+    neighborhoodSelect.value = '';
+  }
 }
 
 function resetFilters() {
@@ -216,32 +221,24 @@ function initSidebarFilters() {
 }
 
 function generateNeighborhoodFilters() {
-  const neighborhoodSection = document.getElementById('neighborhood-filters');
-  const oldRows = neighborhoodSection.querySelectorAll('.filter-row');
-  oldRows.forEach((row) => row.remove());
+  const neighborhoodSelect = document.getElementById('neighborhoodFilterSelect');
+  if (!neighborhoodSelect) return;
+  neighborhoodSelect.innerHTML = '';
+
+  const allNeighborhoodsOption = document.createElement('option');
+  allNeighborhoodsOption.value = '';
+  allNeighborhoodsOption.textContent = 'All neighborhoods';
+  neighborhoodSelect.appendChild(allNeighborhoodsOption);
 
   const neighborhoods = [...new Set(barsData.map((bar) => bar.neighborhood).filter(Boolean))].sort((a, b) =>
     a.toLowerCase().localeCompare(b.toLowerCase())
   );
 
   neighborhoods.forEach((name) => {
-    const row = document.createElement('div');
-    row.className = 'filter-row';
-    const checkbox = document.createElement('input');
-    checkbox.type = 'checkbox';
-    checkbox.dataset.name = name;
-    checkbox.id = `neigh-${name.replace(/\s+/g, '')}`;
-    checkbox.checked = false;
-    const label = document.createElement('label');
-    label.setAttribute('for', checkbox.id);
-    label.textContent = name;
-    row.appendChild(checkbox);
-    row.appendChild(label);
-    row.addEventListener('click', () => {
-      checkbox.checked = !checkbox.checked;
-      row.classList.toggle('selected', checkbox.checked);
-    });
-    neighborhoodSection.appendChild(row);
+    const option = document.createElement('option');
+    option.value = name;
+    option.textContent = name;
+    neighborhoodSelect.appendChild(option);
   });
 }
 
