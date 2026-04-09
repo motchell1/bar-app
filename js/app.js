@@ -55,7 +55,8 @@ function getSelectedTypesFromFilters() {
 function getSelectedNeighborhoodsFromFilters() {
   const neighborhoodSelect = document.getElementById('neighborhoodFilterSelect');
   if (!neighborhoodSelect) return [];
-  return Array.from(neighborhoodSelect.selectedOptions).map((option) => option.value);
+  const selectedNeighborhood = neighborhoodSelect.value;
+  return selectedNeighborhood ? [selectedNeighborhood] : [];
 }
 
 function resetFilterInputs() {
@@ -68,9 +69,7 @@ function resetFilterInputs() {
 
   const neighborhoodSelect = document.getElementById('neighborhoodFilterSelect');
   if (neighborhoodSelect) {
-    Array.from(neighborhoodSelect.options).forEach((option) => {
-      option.selected = false;
-    });
+    neighborhoodSelect.value = '';
   }
 }
 
@@ -225,6 +224,11 @@ function generateNeighborhoodFilters() {
   const neighborhoodSelect = document.getElementById('neighborhoodFilterSelect');
   if (!neighborhoodSelect) return;
   neighborhoodSelect.innerHTML = '';
+
+  const allNeighborhoodsOption = document.createElement('option');
+  allNeighborhoodsOption.value = '';
+  allNeighborhoodsOption.textContent = 'All neighborhoods';
+  neighborhoodSelect.appendChild(allNeighborhoodsOption);
 
   const neighborhoods = [...new Set(barsData.map((bar) => bar.neighborhood).filter(Boolean))].sort((a, b) =>
     a.toLowerCase().localeCompare(b.toLowerCase())
