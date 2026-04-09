@@ -100,13 +100,11 @@
 
 @keyframes mapSheetSlideUp {
   from {
-    transform: translateY(18px);
-    opacity: 0;
+    transform: translateY(calc(100% + 24px));
   }
 
   to {
     transform: translateY(0);
-    opacity: 1;
   }
 }
 
