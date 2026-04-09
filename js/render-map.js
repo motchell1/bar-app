@@ -109,7 +109,7 @@ function dismissMapSelectedBarSheetAnimated() {
 
   sheet.classList.remove('map-sheet-enter');
   sheet.classList.add('map-sheet-dismissing');
-  sheet.style.transform = 'translateY(110px)';
+  sheet.style.transform = 'translateY(calc(100% + 24px))';
 
   if (mapSheetDismissTimer) clearTimeout(mapSheetDismissTimer);
   mapSheetDismissTimer = setTimeout(() => {
