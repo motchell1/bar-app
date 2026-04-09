@@ -285,6 +285,7 @@ def build_startup_payload(device_id=None):
         specials_lookup = {}
         specials_by_day = {day: [] for day in ordered_day_keys}
         day_bar_entries = {day: {} for day in ordered_day_keys}
+        day_bar_sort_meta = {day: {} for day in ordered_day_keys}
 
         for row in specials:
             bar_id = str(row['bar_id'])
@@ -318,8 +319,27 @@ def build_startup_payload(device_id=None):
                 }
                 day_bar_entries[day_key][bar_id] = entry
                 specials_by_day[day_key].append(entry)
+                day_bar_sort_meta[day_key][bar_id] = {
+                    'has_timed': False,
+                    'earliest_timed_start': 10 ** 9
+                }
 
             day_bar_entries[day_key][bar_id]['specials'].append(row['special_id'])
+            if row['all_day'] != 'Y':
+                row_start_minutes = to_minutes(row['start_time'])
+                start_minutes = row_start_minutes if row_start_minutes is not None else 10 ** 9
+                meta = day_bar_sort_meta[day_key][bar_id]
+                meta['has_timed'] = True
+                meta['earliest_timed_start'] = min(meta['earliest_timed_start'], start_minutes)
+
+        for day_key in ordered_day_keys:
+            specials_by_day[day_key].sort(
+                key=lambda entry: (
+                    0 if day_bar_sort_meta.get(day_key, {}).get(str(entry['bar_id']), {}).get('has_timed') else 1,
+                    day_bar_sort_meta.get(day_key, {}).get(str(entry['bar_id']), {}).get('earliest_timed_start', 10 ** 9),
+                    entry['bar_id']
+                )
+            )
 
         payload = {
             'startup_payload': {

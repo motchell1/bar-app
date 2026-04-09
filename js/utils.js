@@ -87,33 +87,6 @@ function getOpenStatus(hours) {
   return { status: 'closed', label: 'Closed', color: 'red', time: hours.open_time };
 }
 
-function sortBarsBySpecials(bars, dayKey, isToday) {
-  return bars.slice().sort((a, b) => {
-    const specialsA = a.specials_by_day[dayKey] || [];
-    const specialsB = b.specials_by_day[dayKey] || [];
-    const getPriority = (specials) => {
-      if (specials.length === 0) return { priority: 4, sortTime: 0 };
-      const allDay = specials.filter((s) => s.all_day);
-      const timed = specials.filter((s) => !s.all_day);
-      if (isToday) {
-        const past = timed.filter((s) => isSpecialPast(s, true));
-        const upcoming = timed.filter((s) => !isSpecialPast(s, true));
-        if (past.length > 0) return { priority: 1, sortTime: Math.min(...past.map((s) => timeToMinutes(s.start_time))) };
-        if (upcoming.length > 0) return { priority: 2, sortTime: Math.min(...upcoming.map((s) => timeToMinutes(s.start_time))) };
-        if (allDay.length > 0) return { priority: 3, sortTime: 0 };
-      } else {
-        if (timed.length > 0) return { priority: 2, sortTime: Math.min(...timed.map((s) => timeToMinutes(s.start_time))) };
-        if (allDay.length > 0) return { priority: 3, sortTime: 0 };
-      }
-      return { priority: 4, sortTime: 0 };
-    };
-    const aData = getPriority(specialsA);
-    const bData = getPriority(specialsB);
-    if (aData.priority !== bData.priority) return aData.priority - bData.priority;
-    return aData.sortTime - bData.sortTime;
-  });
-}
-
 function groupSpecialsForUI(specials) {
   const groups = new Map();
 
