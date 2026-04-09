@@ -207,7 +207,10 @@
 }
 
 #detail-screen .type-icon {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
   vertical-align: middle;
   margin-left: auto;
   margin-right: 10px;
@@ -221,6 +224,11 @@
 #detail-screen .type-icon svg {
   width: 30px;
   height: 30px;
+}
+
+#detail-screen .type-icon.combo svg {
+  width: 16px;
+  height: 16px;
 }
 
 #detail-screen .no-specials-item {

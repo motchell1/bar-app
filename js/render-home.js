@@ -33,7 +33,7 @@ function buildHomeBarSpecials(bar, specialIds, dayKey, dayLabel) {
 
   groupedSpecials.forEach((special) => {
     const specialType = special.special_type || special.type;
-    const typePass = activeFilters.types.length === 0 || activeFilters.types.includes(specialType);
+    const typePass = specialMatchesTypeFilters(specialType, activeFilters.types);
     const favoritesPass = !activeFilters.favoritesOnly || special.favorite === true || isBarFavorite;
     if (!typePass || !favoritesPass) return;
 

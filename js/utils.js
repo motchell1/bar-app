@@ -134,6 +134,25 @@ function groupSpecialsForUI(specials) {
   });
 }
 
+function normalizeSpecialType(type) {
+  return String(type || '').trim().toLowerCase();
+}
+
+function specialMatchesTypeFilters(specialType, selectedTypes = []) {
+  if (!Array.isArray(selectedTypes) || selectedTypes.length === 0) return true;
+
+  const normalizedSpecialType = normalizeSpecialType(specialType);
+  const normalizedSelectedTypes = selectedTypes.map((type) => normalizeSpecialType(type));
+
+  if (normalizedSpecialType === 'combo') {
+    return normalizedSelectedTypes.includes('combo')
+      || normalizedSelectedTypes.includes('food')
+      || normalizedSelectedTypes.includes('drink');
+  }
+
+  return normalizedSelectedTypes.includes(normalizedSpecialType);
+}
+
 function buildSpecialItem(special, { isToday = false, clickable = false, onClick = null, neutralTimeBadgeStyle = false } = {}) {
   const item = document.createElement('div');
   item.className = 'special-item';
@@ -161,11 +180,20 @@ function buildSpecialItem(special, { isToday = false, clickable = false, onClick
     item.classList.add('live');
   }
 
-  const specialType = special.special_type || special.type || '';
+  const specialType = normalizeSpecialType(special.special_type || special.type || '');
   const typeIcon = document.createElement('span');
   typeIcon.className = `type-icon ${specialType}`;
-  if (specialType === 'food') typeIcon.setAttribute('data-lucide', 'utensils');
-  else if (specialType === 'drink') typeIcon.setAttribute('data-lucide', 'beer');
+
+  const icons = specialType === 'combo'
+    ? ['utensils', 'beer']
+    : (specialType === 'food' ? ['utensils'] : (specialType === 'drink' ? ['beer'] : []));
+
+  icons.forEach((iconName) => {
+    const icon = document.createElement('span');
+    icon.className = 'type-icon-glyph';
+    icon.setAttribute('data-lucide', iconName);
+    typeIcon.appendChild(icon);
+  });
 
   const desc = document.createElement('span');
   desc.className = 'special-description';

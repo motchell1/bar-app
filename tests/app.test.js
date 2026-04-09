@@ -687,6 +687,27 @@ test('buildSpecialItem clickable rows stop parent click handling and navigate to
   assert.equal(onClickCalled, true, 'clickable specials still execute their own navigation handler');
 });
 
+test('combo specials render both icons and pass food/drink type filters', () => {
+  const document = new DocumentMock();
+  mountBaseNodes(document);
+  const ctx = loadAppWithoutBoot(document);
+
+  const comboItem = ctx.buildSpecialItem({
+    description: 'Burger + Beer',
+    special_type: 'combo',
+    all_day: true
+  });
+
+  const iconGlyphs = comboItem.querySelectorAll('.type-icon-glyph');
+  assert.equal(iconGlyphs.length, 2, 'combo specials render two type icons');
+  assert.equal(iconGlyphs[0].getAttribute('data-lucide'), 'utensils');
+  assert.equal(iconGlyphs[1].getAttribute('data-lucide'), 'beer');
+
+  assert.equal(ctx.specialMatchesTypeFilters('combo', ['food']), true);
+  assert.equal(ctx.specialMatchesTypeFilters('combo', ['drink']), true);
+  assert.equal(ctx.specialMatchesTypeFilters('food', ['drink']), false);
+});
+
 
 test('showDetail reuses startup payload details when has_special_this_week is true', async () => {
   const document = new DocumentMock();
