@@ -1,13 +1,12 @@
 function setScreenLayout(isHome) {
   const toolbar = document.querySelector('.home-toolbar');
-  const adminToolbar = document.getElementById('admin-toolbar');
   const appContainer = document.querySelector('.app-container');
   const bottomTaskbar = document.querySelector('.bottom-taskbar');
-  const isAdmin = window.location.pathname === '/admin';
 
-  if (toolbar) toolbar.style.display = isHome && !isAdmin ? 'block' : 'none';
-  if (adminToolbar) adminToolbar.style.display = isAdmin ? 'block' : 'none';
-  if (bottomTaskbar) bottomTaskbar.style.display = isAdmin ? 'none' : 'flex';
+  if (window.AdminScreen?.syncChrome(isHome)) return;
+
+  if (toolbar) toolbar.style.display = isHome ? 'block' : 'none';
+  if (bottomTaskbar) bottomTaskbar.style.display = 'flex';
   if (appContainer) appContainer.classList.toggle('detail-mode', !isHome);
 }
 
@@ -20,7 +19,6 @@ function showHome() {
 }
 
 function showTab(tabName) {
-  const adminScreen = document.getElementById('admin-screen');
   const homeScreen = document.getElementById('home-screen');
   const barsScreen = document.getElementById('bars-screen');
   const favoritesScreen = document.getElementById('favorites-screen');
@@ -35,7 +33,9 @@ function showTab(tabName) {
 
   updateFilterSectionVisibility();
 
-  if (adminScreen) adminScreen.style.display = 'none';
+  if (window.AdminScreen?.hideAdminScreen) {
+    window.AdminScreen.hideAdminScreen();
+  }
   if (homeScreen) homeScreen.style.display = tabName === 'specials' ? 'flex' : 'none';
   if (barsScreen) barsScreen.style.display = tabName === 'bars' ? 'flex' : 'none';
   if (favoritesScreen) favoritesScreen.style.display = tabName === 'favorites' ? 'flex' : 'none';
@@ -50,41 +50,6 @@ function showTab(tabName) {
   document.querySelectorAll('.taskbar-tab').forEach((btn) => {
     btn.classList.toggle('active', btn.dataset.tab === tabName);
   });
-}
-
-function renderAdminScreen() {
-  const adminScreen = document.getElementById('admin-screen');
-  const homeScreen = document.getElementById('home-screen');
-  const barsScreen = document.getElementById('bars-screen');
-  const favoritesScreen = document.getElementById('favorites-screen');
-  const mapScreen = document.getElementById('map-screen');
-  const detailScreen = document.getElementById('detail-screen');
-  const specialScreen = document.getElementById('special-screen');
-  const sideMenu = document.getElementById('side-menu');
-  const menuOverlay = document.getElementById('side-menu-overlay');
-
-  if (adminScreen) adminScreen.style.display = 'flex';
-  if (homeScreen) homeScreen.style.display = 'none';
-  if (barsScreen) barsScreen.style.display = 'none';
-  if (favoritesScreen) favoritesScreen.style.display = 'none';
-  if (mapScreen) mapScreen.style.display = 'none';
-  if (detailScreen) detailScreen.style.display = 'none';
-  if (specialScreen) specialScreen.style.display = 'none';
-  if (sideMenu) sideMenu.classList.remove('open');
-  if (menuOverlay) menuOverlay.classList.remove('active');
-
-  setScreenLayout(false);
-}
-
-function showAdmin() {
-  window.history.pushState({}, '', '/admin');
-  renderAdminScreen();
-}
-
-function showHomeFromAdmin() {
-  window.history.pushState({}, '', '/');
-  showTab(currentTab || 'specials');
-  setScreenLayout(true);
 }
 
 function getSelectedTypesFromFilters() {
@@ -262,43 +227,6 @@ function initSidebarFilters() {
   });
 }
 
-function initAdminEasterEgg() {
-  const appTitle = document.querySelector('.app-title');
-  const adminHomeButton = document.getElementById('admin-home-button');
-  let tapCount = 0;
-  let tapTimer = null;
-
-  if (appTitle) {
-    appTitle.addEventListener('click', () => {
-      tapCount += 1;
-      if (tapTimer) clearTimeout(tapTimer);
-      tapTimer = setTimeout(() => {
-        tapCount = 0;
-      }, 1200);
-
-      if (tapCount >= 5) {
-        tapCount = 0;
-        if (tapTimer) clearTimeout(tapTimer);
-        showAdmin();
-      }
-    });
-  }
-
-  if (adminHomeButton) {
-    adminHomeButton.addEventListener('click', showHomeFromAdmin);
-  }
-
-  window.addEventListener('popstate', () => {
-    if (window.location.pathname === '/admin') {
-      renderAdminScreen();
-      return;
-    }
-
-    showTab(currentTab || 'specials');
-    setScreenLayout(true);
-  });
-}
-
 function generateNeighborhoodFilters() {
   const neighborhoodSelect = document.getElementById('neighborhoodFilterSelect');
   if (!neighborhoodSelect) return;
@@ -337,7 +265,9 @@ function hideInitialLoadingOverlay() {
 initSidebarFilters();
 initTaskbar();
 initBarsSearch();
-initAdminEasterEgg();
+if (window.AdminScreen?.init) {
+  window.AdminScreen.init();
+}
 initHomeScrollCapture();
 if (typeof initMapDayController === 'function') {
   initMapDayController();
@@ -346,8 +276,8 @@ initSpecialReport();
 initBarReport();
 initSpecialFavoriteButton();
 
-if (window.location.pathname === '/admin') {
-  renderAdminScreen();
+if (window.AdminScreen?.isAdminPath && window.AdminScreen.isAdminPath()) {
+  window.AdminScreen.renderAdminScreen();
 } else {
   showTab(currentTab);
   setScreenLayout(true);
