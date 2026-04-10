@@ -140,6 +140,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 4px;
   width: 40px;
   height: 40px;
   flex-shrink: 0;
@@ -153,7 +154,8 @@
 }
 
 .type-icon.food,
-.type-icon.drink {
+.type-icon.drink,
+.type-icon.combo {
   stroke: #8e8e93;
   stroke-width: 1.2;
 }
