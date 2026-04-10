@@ -656,7 +656,8 @@ def normalize_item(item, default_source):
         days = []
 
     normalized_days = [day for day in days if day in DAY_KEYS]
-    item_type = item.get('type') if item.get('type') in ('food', 'drink', 'unknown') else 'unknown'
+    raw_item_type = str(item.get('type') or '').strip().lower()
+    item_type = raw_item_type if raw_item_type in ('food', 'drink', 'combo', 'unknown') else 'unknown'
     text_blob = f"{item.get('description') or ''} {item.get('notes') or ''}"
     parsed_date = _parse_date_from_text(text_blob)
     if parsed_date and parsed_date < date.today():
@@ -703,7 +704,7 @@ def _contains_money_signal(text):
 
 
 def _mentions_food_or_drink(item):
-    if item.get('type') in ('food', 'drink'):
+    if item.get('type') in ('food', 'drink', 'combo'):
         return True
     blob = f"{item.get('description', '')} {item.get('notes', '')}".lower()
     return any(term in blob for term in FOOD_DRINK_CLUES)

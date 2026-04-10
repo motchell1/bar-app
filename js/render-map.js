@@ -237,7 +237,7 @@ function renderMapTab() {
     return specialIds.some((specialId) => {
       const special = startupPayload?.specials?.[String(specialId)];
       const specialType = special?.special_type || special?.type;
-      return Boolean(specialType && activeFilters.types.includes(specialType));
+      return specialMatchesTypeFilters(specialType, activeFilters.types);
     });
   });
 

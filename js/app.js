@@ -94,7 +94,7 @@ function updateFilterSectionVisibility() {
 function getFilteredFavorites() {
   return getFavoriteSpecialEntries().filter((item) => {
     const specialType = item.special.special_type || item.special.type;
-    const typePass = activeFilters.types.length === 0 || activeFilters.types.includes(specialType);
+    const typePass = specialMatchesTypeFilters(specialType, activeFilters.types);
     const neighborhoodPass = activeFilters.neighborhoods.length === 0 || activeFilters.neighborhoods.includes(item.bar.neighborhood);
     const favoritesPass = !activeFilters.favoritesOnly || item.special.favorite === true || item.bar.favorite === true;
     return typePass && neighborhoodPass && favoritesPass;
