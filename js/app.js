@@ -3,8 +3,6 @@ function setScreenLayout(isHome) {
   const appContainer = document.querySelector('.app-container');
   const bottomTaskbar = document.querySelector('.bottom-taskbar');
 
-  if (window.AdminScreen?.syncChrome(isHome)) return;
-
   if (toolbar) toolbar.style.display = isHome ? 'block' : 'none';
   if (bottomTaskbar) bottomTaskbar.style.display = 'flex';
   if (appContainer) appContainer.classList.toggle('detail-mode', !isHome);
@@ -33,9 +31,6 @@ function showTab(tabName) {
 
   updateFilterSectionVisibility();
 
-  if (window.AdminScreen?.hideAdminScreen) {
-    window.AdminScreen.hideAdminScreen();
-  }
   if (homeScreen) homeScreen.style.display = tabName === 'specials' ? 'flex' : 'none';
   if (barsScreen) barsScreen.style.display = tabName === 'bars' ? 'flex' : 'none';
   if (favoritesScreen) favoritesScreen.style.display = tabName === 'favorites' ? 'flex' : 'none';
@@ -265,9 +260,6 @@ function hideInitialLoadingOverlay() {
 initSidebarFilters();
 initTaskbar();
 initBarsSearch();
-if (window.AdminScreen?.init) {
-  window.AdminScreen.init();
-}
 initHomeScrollCapture();
 if (typeof initMapDayController === 'function') {
   initMapDayController();
@@ -276,10 +268,6 @@ initSpecialReport();
 initBarReport();
 initSpecialFavoriteButton();
 
-if (window.AdminScreen?.isAdminPath && window.AdminScreen.isAdminPath()) {
-  window.AdminScreen.renderAdminScreen();
-} else {
-  showTab(currentTab);
-  setScreenLayout(true);
-}
+showTab(currentTab);
+setScreenLayout(true);
 loadBars();
