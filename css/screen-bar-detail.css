@@ -214,7 +214,9 @@
   vertical-align: middle;
   margin-left: auto;
   margin-right: 10px;
-  width: 40px;
+  min-width: 40px;
+  width: auto;
+  padding: 0 6px;
   height: 40px;
   stroke: #8e8e93;
   stroke-width: 1;
