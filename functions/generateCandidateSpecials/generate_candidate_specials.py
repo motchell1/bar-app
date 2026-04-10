@@ -444,7 +444,7 @@ STRICT RULES:
 - If no specials are present, return an empty array []
 - If an item does not clearly mention food or drink, exclude it.
 - Confidence scoring should be determined based on inclusion of the following elements and only set as 1 if all three elements are included:
-  - Price or discount type
+  - Price or discount included in description
   - Food or drink item
   - Clear determination of day/time/recurrance for each item
 
@@ -461,7 +461,7 @@ Extraction strategy (important):
 
 For each special, return:
 - description (string; omit labels such as "happy hour" / "HH" and keep only the actual offer details)
-- type ("food", "drink", "both", or "unknown")
+- type ("food", "drink", "both" (if special is for both food and drink combined), or "unknown")
 - days_of_week (array of MON, TUE, WED, THU, FRI, SAT, SUN)
 - start_time (HH:MM 24-hour or null)
 - end_time (HH:MM 24-hour or null)
@@ -480,8 +480,8 @@ Normalization rules:
   - drinks/alcohol → "drink"
   - food/appetizers → "food"
   - food and drink → "both"
-- Confidence should be determined based on inclusion of the following elements:
-  - Price or discount type
+- Review the parsed special description/timing and rescore confidence based on inclusion of the following elements:
+  - Price or discount amount
   - Food or drink item
   - Clear determination of day/time/recurrance for each item
 
