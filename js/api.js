@@ -1,6 +1,6 @@
 const STARTUP_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaws.com/default/getStartupData';
 const BAR_DETAILS_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaws.com/default/getBarDetails';
-const SPECIAL_REPORT_API_URL = 'https://3kz7x6tvvi.execute-api.us-east-2.amazonaws.com/default/insertUserReport';
+const SPECIAL_REPORT_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaws.com/default/insertUserReport';
 const UPDATE_DEVICE_FAVORITE_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaws.com/default/updateDeviceFavorite';
 
 function buildLegacyBarsData(payload) {
