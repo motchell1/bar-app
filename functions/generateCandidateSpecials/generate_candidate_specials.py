@@ -15,6 +15,7 @@ OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
 OPENAI_MODEL = os.environ.get('OPENAI_MODEL', 'gpt-4.1-mini')
 OPENAI_RESPONSES_URL = 'https://api.openai.com/v1/responses'
 DB_BAR_SYNC_LAMBDA_NAME = os.environ.get('DB_BAR_SYNC_LAMBDA_NAME')
+DB_SPECIAL_SYNC_LAMBDA_NAME = os.environ.get('DB_SPECIAL_SYNC_LAMBDA_NAME')
 MAX_LINKS_TO_VISIT = 3
 MAX_TEXT_CHARS_PER_PAGE = 20000
 KEYWORD_MATCH_CHAR_WINDOW_SIZE = int(os.environ.get('KEYWORD_MATCH_CHAR_WINDOW_SIZE', '220'))
@@ -199,12 +200,12 @@ def parse_event(event):
     return {'mode': 'neighborhood', 'neighborhood': neighborhood}
 
 
-def invoke_db_bar_sync(payload):
-    if not DB_BAR_SYNC_LAMBDA_NAME:
-        raise RuntimeError('DB_BAR_SYNC_LAMBDA_NAME is required')
+def _invoke_lambda(function_name, payload, friendly_name):
+    if not function_name:
+        raise RuntimeError(f'{friendly_name} is required')
 
     response = LAMBDA_CLIENT.invoke(
-        FunctionName=DB_BAR_SYNC_LAMBDA_NAME,
+        FunctionName=function_name,
         InvocationType='RequestResponse',
         Payload=json.dumps(payload).encode('utf-8')
     )
@@ -215,9 +216,17 @@ def invoke_db_bar_sync(payload):
     body_json = json.loads(body) if isinstance(body, str) else (body or {})
 
     if status_code != 200:
-        raise RuntimeError(f"dbBarSync invocation failed payload={payload.get('mode')}: {body_json}")
+        raise RuntimeError(f"{friendly_name} invocation failed payload={payload.get('mode')}: {body_json}")
 
     return body_json
+
+
+def invoke_db_bar_sync(payload):
+    return _invoke_lambda(DB_BAR_SYNC_LAMBDA_NAME, payload, 'DB_BAR_SYNC_LAMBDA_NAME')
+
+
+def invoke_db_special_sync(payload):
+    return _invoke_lambda(DB_SPECIAL_SYNC_LAMBDA_NAME, payload, 'DB_SPECIAL_SYNC_LAMBDA_NAME')
 
 
 def fetch_html(url):
@@ -435,7 +444,7 @@ STRICT RULES:
 - If no specials are present, return an empty array []
 - If an item does not clearly mention food or drink, exclude it.
 - Confidence scoring should be determined based on inclusion of the following elements and only set as 1 if all three elements are included:
-  - Price or discount type
+  - Price or discount included in description
   - Food or drink item
   - Clear determination of day/time/recurrance for each item
 
@@ -452,7 +461,7 @@ Extraction strategy (important):
 
 For each special, return:
 - description (string; omit labels such as "happy hour" / "HH" and keep only the actual offer details)
-- type ("food", "drink", "both", or "unknown")
+- type ("food", "drink", "both" (if special is for both food and drink combined), or "unknown")
 - days_of_week (array of MON, TUE, WED, THU, FRI, SAT, SUN)
 - start_time (HH:MM 24-hour or null)
 - end_time (HH:MM 24-hour or null)
@@ -471,8 +480,8 @@ Normalization rules:
   - drinks/alcohol → "drink"
   - food/appetizers → "food"
   - food and drink → "both"
-- Confidence should be determined based on inclusion of the following elements:
-  - Price or discount type
+- Review the parsed special description/timing and rescore confidence based on inclusion of the following elements:
+  - Price or discount amount
   - Food or drink item
   - Clear determination of day/time/recurrance for each item
 
@@ -965,8 +974,8 @@ def lambda_handler(event, context):
                 'started_at': run_started_at,
                 'completed_at': datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
             }
-            insert_result = invoke_db_bar_sync({
-                'mode': 'insert_special_candidates',
+            insert_result = invoke_db_special_sync({
+                'mode': 'insert_special_candidate',
                 'run': run_payload,
                 'candidates': bar_candidates
             })
@@ -976,8 +985,8 @@ def lambda_handler(event, context):
             run_id = insert_result.get('run_id')
 
             if insert_result.get('all_auto_approved') and run_id:
-                invoke_db_bar_sync({
-                    'mode': 'publish_candidate_specials',
+                invoke_db_special_sync({
+                    'mode': 'publish_special_candidate_run',
                     'bar_id': bar['bar_id'],
                     'run_id': run_id,
                     'auto_publish': 'Y'

@@ -1,8 +1,8 @@
 import json
 import logging
 import os
-from difflib import SequenceMatcher
 from datetime import datetime, time, timedelta
+from difflib import SequenceMatcher
 from typing import Dict, List
 
 import pymysql
@@ -14,8 +14,8 @@ RDS_HOST = os.environ['RDS_HOST']
 DB_USER = os.environ['DB_USER']
 DB_PASSWORD = os.environ['DB_PASSWORD']
 DB_NAME = os.environ['DB_NAME']
-WEB_SCRAPE_AUTO_APPROVAL_THRESHOLD = .5
-WEB_AI_SEARCH_AUTO_APPROVAL_THRESHOLD = .8
+WEB_SCRAPE_AUTO_APPROVAL_THRESHOLD = 0.5
+WEB_AI_SEARCH_AUTO_APPROVAL_THRESHOLD = 0.8
 IGNORE_MANUAL_SPECIALS_ON_PUBLISH = 'Y'
 
 
@@ -29,132 +29,6 @@ def get_connection():
         cursorclass=pymysql.cursors.DictCursor,
         autocommit=False,
     )
-
-
-def categorize_bars(cursor, bars: List[Dict]) -> Dict[str, List[Dict]]:
-    if not bars:
-        return {'new_bars': [], 'existing_bars': []}
-
-    place_ids = [bar['google_place_id'] for bar in bars if bar.get('google_place_id')]
-    if not place_ids:
-        return {'new_bars': [], 'existing_bars': []}
-
-    placeholders = ', '.join(['%s'] * len(place_ids))
-    cursor.execute(
-        f"SELECT bar_id, google_place_id FROM bar WHERE google_place_id IN ({placeholders})",
-        tuple(place_ids),
-    )
-    existing_rows = {row['google_place_id']: row for row in cursor.fetchall()}
-
-    new_bars = []
-    existing_bars = []
-    for bar in bars:
-        existing_row = existing_rows.get(bar['google_place_id'])
-        if existing_row:
-            existing_bars.append({**bar, 'bar_id': existing_row['bar_id']})
-        else:
-            new_bars.append(bar)
-
-    return {'new_bars': new_bars, 'existing_bars': existing_bars}
-
-
-def is_bar_operational(bar: Dict) -> bool:
-    return bar.get('business_status') == 'OPERATIONAL'
-
-
-def insert_new_bars(cursor, new_bars: List[Dict]) -> Dict[str, int]:
-    inserted_count = 0
-    for bar in new_bars:
-        cursor.execute(
-            """
-            INSERT INTO bar (name, google_place_id, address, neighborhood, latitude, longitude, website_url, image_file, is_active)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-            """,
-            (
-                bar['name'],
-                bar['google_place_id'],
-                bar['address'],
-                bar['neighborhood'],
-                bar.get('latitude'),
-                bar.get('longitude'),
-                bar.get('website_url'),
-                bar.get('image_file'),
-                'Y' if is_bar_operational(bar) else 'N',
-            ),
-        )
-        bar['bar_id'] = cursor.lastrowid
-        inserted_count += 1
-    return {'inserted_bars': inserted_count}
-
-
-def upsert_open_hours(cursor, bars: List[Dict]) -> int:
-    updated_rows = 0
-    for bar in bars:
-        bar_id = bar.get('bar_id')
-        if not bar_id:
-            raise ValueError(f"Missing bar_id for {bar.get('google_place_id')}")
-
-        cursor.execute(
-            """
-            UPDATE bar
-            SET is_active = %s,
-                latitude = %s,
-                longitude = %s,
-                update_date = NOW()
-            WHERE bar_id = %s
-            """,
-            (
-                'Y' if is_bar_operational(bar) else 'N',
-                bar.get('latitude'),
-                bar.get('longitude'),
-                bar_id,
-            ),
-        )
-
-        hours = bar.get('hours', {})
-        for day_of_week, value in hours.items():
-            if value == 'CLOSED':
-                open_time = None
-                close_time = None
-                is_closed = 'Y'
-            else:
-                open_time, close_time = value
-                is_closed = 'N'
-
-            cursor.execute(
-                """
-                INSERT INTO open_hours (bar_id, day_of_week, open_time, close_time, is_closed)
-                VALUES (%s, %s, %s, %s, %s)
-                ON DUPLICATE KEY UPDATE
-                    open_time = VALUES(open_time),
-                    close_time = VALUES(close_time),
-                    is_closed = VALUES(is_closed),
-                    update_date = NOW()
-                """,
-                (bar_id, day_of_week, open_time, close_time, is_closed),
-            )
-            updated_rows += 1
-    return updated_rows
-
-
-def apply_changes(cursor, new_bars: List[Dict], existing_bars: List[Dict]) -> Dict[str, int]:
-    result = insert_new_bars(cursor, new_bars)
-    all_bars = new_bars + existing_bars
-    result['updated_open_hours_rows'] = upsert_open_hours(cursor, all_bars)
-    result['processed_bar_count'] = len(all_bars)
-    return result
-
-
-def get_bars_by_neighborhood(cursor, neighborhood: str) -> Dict[str, List[Dict]]:
-    cursor.execute(
-        """
-        SELECT bar_id, name AS bar_name, neighborhood, website_url
-        FROM bar
-        WHERE neighborhood = %s
-        """,
-        (neighborhood,),
-    )
-    return {'bars': cursor.fetchall()}
 
 
 def _parse_confidence(value) -> float:
@@ -177,10 +51,8 @@ def _descriptions_match(candidate_description: str, special_description: str) ->
     special_normalized = _normalize_description(special_description)
     if not candidate_normalized or not special_normalized:
         return False
-
     if candidate_normalized == special_normalized:
         return True
-
     return SequenceMatcher(None, candidate_normalized, special_normalized).ratio() >= 0.78
 
 
@@ -190,10 +62,8 @@ def _parse_days_of_week(raw_days) -> List[str]:
             raw_days = json.loads(raw_days)
         except json.JSONDecodeError:
             raw_days = []
-
     if not isinstance(raw_days, list):
         return []
-
     return [day for day in raw_days if isinstance(day, str) and day.strip()]
 
 
@@ -206,7 +76,6 @@ def _normalize_day_of_week(value) -> str:
 def _normalize_yn_flag(value) -> str:
     if value in {'Y', 'N'}:
         return value
-
     normalized = str(value or '').strip().upper()
     if normalized in {'Y', 'YES', 'TRUE', 'T', '1'}:
         return 'Y'
@@ -218,23 +87,18 @@ def _normalize_yn_flag(value) -> str:
 def _normalize_time_value(value) -> str:
     if value is None:
         return ''
-
     if isinstance(value, timedelta):
         total_seconds = int(value.total_seconds()) % (24 * 60 * 60)
         hours, remainder = divmod(total_seconds, 3600)
         minutes, seconds = divmod(remainder, 60)
         return f'{hours:02d}:{minutes:02d}:{seconds:02d}'
-
     if isinstance(value, time):
         return value.strftime('%H:%M:%S')
-
     normalized = str(value).strip()
     if not normalized:
         return ''
-
     if len(normalized) == 5 and normalized.count(':') == 1:
         return f'{normalized}:00'
-
     return normalized
 
 
@@ -294,7 +158,7 @@ def insert_special_candidate_run(cursor, run: Dict) -> int:
     return cursor.lastrowid
 
 
-def insert_special_candidates(cursor, run: Dict, candidates: List[Dict]) -> Dict[str, int]:
+def insert_special_candidate(cursor, run: Dict, candidates: List[Dict]) -> Dict[str, int]:
     run_id = insert_special_candidate_run(cursor, run)
     inserted_count = 0
     auto_approved_count = 0
@@ -305,11 +169,7 @@ def insert_special_candidates(cursor, run: Dict, candidates: List[Dict]) -> Dict
         confidence = _parse_confidence(candidate.get('confidence'))
 
         fetch_method = (candidate.get('fetch_method') or '').strip()
-        if fetch_method == 'web_ai_search':
-            auto_approval_threshold = WEB_AI_SEARCH_AUTO_APPROVAL_THRESHOLD
-        else:
-            auto_approval_threshold = WEB_SCRAPE_AUTO_APPROVAL_THRESHOLD
-
+        auto_approval_threshold = WEB_AI_SEARCH_AUTO_APPROVAL_THRESHOLD if fetch_method == 'web_ai_search' else WEB_SCRAPE_AUTO_APPROVAL_THRESHOLD
         if confidence >= auto_approval_threshold:
             approval_status = 'AUTO_APPROVED'
             approval_date = datetime.utcnow()
@@ -365,7 +225,7 @@ def insert_special_candidates(cursor, run: Dict, candidates: List[Dict]) -> Dict
     }
 
 
-def publish_candidate_specials(cursor, bar_id: int, run_id: int, auto_publish: str = 'N') -> Dict[str, int]:
+def publish_special_candidate_run(cursor, bar_id: int, run_id: int, auto_publish: str = 'N') -> Dict[str, int]:
     cursor.execute(
         """
         SELECT special_candidate_id, description, type, days_of_week, start_time, end_time, all_day
@@ -406,11 +266,7 @@ def publish_candidate_specials(cursor, bar_id: int, run_id: int, auto_publish: s
     )
     existing_specials = cursor.fetchall()
 
-    approved_candidate_ids = [
-        candidate['special_candidate_id']
-        for candidate in approved_candidates
-        if candidate.get('special_candidate_id')
-    ]
+    approved_candidate_ids = [candidate['special_candidate_id'] for candidate in approved_candidates if candidate.get('special_candidate_id')]
     for candidate_id in approved_candidate_ids:
         cursor.execute(
             """
@@ -432,7 +288,6 @@ def publish_candidate_specials(cursor, bar_id: int, run_id: int, auto_publish: s
             if _is_candidate_same_as_special(candidate, special):
                 matched_id = special['special_id']
                 break
-
         if matched_id is not None:
             matched_special_ids.add(matched_id)
             candidate_to_special_ids.setdefault(candidate['candidate_id'], set()).add(matched_id)
@@ -508,40 +363,36 @@ def publish_candidate_specials(cursor, bar_id: int, run_id: int, auto_publish: s
 def lambda_handler(event, context):
     event = event or {}
     mode = event.get('mode')
-    if mode not in {'determine_if_bar_existing', 'apply_bar_upsert', 'get_bars_by_neighborhood'}:
+    if mode not in {'insert_special_candidate', 'publish_special_candidate_run'}:
         return {
             'statusCode': 400,
-            'body': json.dumps({
-                'error': 'mode must be one of determine_if_bar_existing, apply_bar_upsert, get_bars_by_neighborhood'
-            }),
+            'body': json.dumps({'error': 'mode must be one of insert_special_candidate, publish_special_candidate_run'}),
         }
 
     conn = get_connection()
     try:
         with conn.cursor() as cursor:
-            if mode == 'determine_if_bar_existing':
-                result = categorize_bars(cursor, event.get('bars', []))
-                conn.commit()
-            elif mode == 'apply_bar_upsert':
-                result = apply_changes(cursor, event.get('new_bars', []), event.get('existing_bars', []))
-                conn.commit()
-            elif mode == 'get_bars_by_neighborhood':
-                neighborhood = event.get('neighborhood')
-                if not neighborhood:
-                    raise ValueError('neighborhood is required for get_bars_by_neighborhood')
-                result = get_bars_by_neighborhood(cursor, neighborhood)
-                conn.commit()
-        LOGGER.info('dbBarSync %s result=%s', mode, result)
-        return {
-            'statusCode': 200,
-            'body': json.dumps(result),
-        }
+            if mode == 'insert_special_candidate':
+                run = event.get('run', {}) or {}
+                if not run.get('bar_id'):
+                    raise ValueError('run.bar_id is required for insert_special_candidate')
+                result = insert_special_candidate(cursor, run, event.get('candidates', []))
+            else:
+                bar_id = event.get('bar_id')
+                run_id = event.get('run_id')
+                auto_publish = event.get('auto_publish', 'N')
+                if not bar_id:
+                    raise ValueError('bar_id is required for publish_special_candidate_run')
+                if not run_id:
+                    raise ValueError('run_id is required for publish_special_candidate_run')
+                result = publish_special_candidate_run(cursor, bar_id, run_id, auto_publish)
+            conn.commit()
+
+        LOGGER.info('dbSpecialSync %s result=%s', mode, result)
+        return {'statusCode': 200, 'body': json.dumps(result)}
     except Exception as exc:
         conn.rollback()
-        LOGGER.exception('dbBarSync failed during %s', mode)
-        return {
-            'statusCode': 500,
-            'body': json.dumps({'error': str(exc), 'mode': mode}),
-        }
+        LOGGER.exception('dbSpecialSync failed during %s', mode)
+        return {'statusCode': 500, 'body': json.dumps({'error': str(exc), 'mode': mode})}
     finally:
         conn.close()

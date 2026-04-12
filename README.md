@@ -15,7 +15,7 @@ The folders inside `functions/` each correspond to an AWS Lambda function.
 
 
 - **`googleBarSync`**  
-  This is the only entry point for the new two-Lambda bar sync flow. It accepts only `{ "neighborhood": "downtown" }`, loads the built-in neighborhood config, calls Places API (New) Text Search (`textQuery: "bar"`) using one or more configured rectangle `locationRestriction` search windows per neighborhood, dedupes results across all rectangles/pages, filters candidates to the configured polygon, formats open hours using the same structure as `fetchGoogleAPIHours`, asks `dbBarSync` which bars are new vs existing, fetches Google photos only for new bars using Place Photos (New), uploads those images to S3, and then calls `dbBarSync` again to save the results. It no longer makes Place Details calls during the sync.
+  This is the only entry point for the new two-Lambda bar sync flow. It accepts only `{ "neighborhood": "downtown" }`, loads the built-in neighborhood config, calls Places API (New) Text Search (`textQuery: "bar"`) using one or more configured rectangle `locationRestriction` search windows per neighborhood, dedupes results across all rectangles/pages, filters candidates to the configured polygon, formats open hours using the same structure as `fetchGoogleAPIHours`, asks `dbBarSync` (`determine_if_bar_existing`) which bars are new vs existing, fetches Google photos only for new bars using Place Photos (New), uploads those images to S3, and then calls `dbBarSync` again (`apply_bar_upsert`) to save the results. It no longer makes Place Details calls during the sync.
 
   Required environment variables:
   - `GOOGLE_API_KEY`
@@ -24,7 +24,7 @@ The folders inside `functions/` each correspond to an AWS Lambda function.
   - `DB_BAR_SYNC_LAMBDA_NAME`
 
 - **`dbBarSync`**  
-  This Lambda is invoked only by `googleBarSync`. On the first invocation it categorizes bars into `new_bars` and `existing_bars` by `google_place_id`. On the second invocation it inserts new bar records into `bar`, upserts all open-hours rows into `open_hours`, and marks any bar whose Google `business_status` is not `OPERATIONAL` as inactive. It uses the same RDS connection variable pattern as the existing database Lambdas.
+  This Lambda is invoked only by `googleBarSync`. It handles bar-centric sync tasks. `determine_if_bar_existing` splits candidates into `new_bars` and `existing_bars` by `google_place_id`; `apply_bar_upsert` inserts new bars, upserts open-hours rows, and marks any bar whose Google `business_status` is not `OPERATIONAL` as inactive; `get_bars_by_neighborhood` returns bars for downstream jobs. It uses the same RDS connection variable pattern as the existing database Lambdas.
 
   Required environment variables:
   - `RDS_HOST`
@@ -33,6 +33,13 @@ The folders inside `functions/` each correspond to an AWS Lambda function.
   - `DB_NAME`
   - `WEB_SCRAPE_AUTO_APPROVAL_THRESHOLD` (optional; defaults to `1.0`)
   - `WEB_AI_SEARCH_AUTO_APPROVAL_THRESHOLD` (optional; defaults to `1.0`)
+
+
+- **`dbSpecialSync`**  
+  Handles special-candidate persistence and publish flows. `insert_special_candidate` creates a `special_candidate_run` and inserts candidate rows, and `publish_special_candidate_run` applies approved candidates to active `special` rows.
+
+- **`dbAdminSync`**  
+  Handles admin moderation workflows for specials. `get_unapproved_special_candidates` returns grouped run/special payloads for UI review, and `update_special_candidate_approval` updates one candidate to APPROVED/REJECTED and auto-publishes the run when no NOT_APPROVED non-recurring candidates remain.
 
 - **`insertUserReport`**  
   Used on the special details view. When a user marks a special for review, this function is called to insert a report record in the database.
@@ -87,7 +94,7 @@ The folders inside `functions/` each correspond to an AWS Lambda function.
   ```
 
 - **`generateCandidateSpecials`**  
-  Generates and stores candidate specials for all bars in a neighborhood. It accepts `neighborhood`, invokes `dbBarSync` to fetch bars (`bar_id`, `bar_name`, `neighborhood`, `website_url`), runs crawl-first + OpenAI fallback extraction per bar, and invokes `dbBarSync` again to insert results into `special_candidate`.
+  Generates and stores candidate specials for all bars in a neighborhood. It accepts `neighborhood`, invokes `dbBarSync` (`get_bars_by_neighborhood`) to fetch bars (`bar_id`, `bar_name`, `neighborhood`, `website_url`), runs crawl-first + OpenAI fallback extraction per bar, and invokes `dbSpecialSync` to insert/publish candidate results.
 
 ## Front-end integration
 
@@ -108,7 +115,7 @@ The folders inside `functions/` each correspond to an AWS Lambda function.
    ```
 
 2. `googleBarSync` loads the built-in neighborhood config (polygon + one or more search rectangles), runs Places Text Search for each rectangle with pagination, dedupes results, filters candidates to the polygon, and builds a bar list with formatted hours.
-3. `googleBarSync` invokes `dbBarSync` to split candidates into `new_bars` and `existing_bars` using `google_place_id`.
+3. `googleBarSync` invokes `dbBarSync` mode `determine_if_bar_existing` to split candidates into `new_bars` and `existing_bars` using `google_place_id`.
 4. `googleBarSync` leaves `existing_bars` alone, fetches and uploads images only for `new_bars`, and assigns each one an `image_file`.
-5. `googleBarSync` invokes `dbBarSync` a second time.
+5. `googleBarSync` invokes `dbBarSync` mode `apply_bar_upsert` a second time.
 6. `dbBarSync` inserts new bars and updates open hours for both new and existing bars.

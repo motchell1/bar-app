@@ -388,7 +388,7 @@ def lambda_handler(event, context):
 
         LOGGER.info('Built %s polygon-filtered candidate bars', len(candidate_bars))
 
-        categorized = invoke_db_lambda({'mode': 'categorize', 'bars': candidate_bars})
+        categorized = invoke_db_lambda({'mode': 'determine_if_bar_existing', 'bars': candidate_bars})
         new_bars = categorized.get('new_bars', [])
         existing_bars = categorized.get('existing_bars', [])
         LOGGER.info('Categorized bars: %s new, %s existing', len(new_bars), len(existing_bars))
@@ -397,7 +397,7 @@ def lambda_handler(event, context):
             bar['image_file'] = fetch_and_store_bar_image(bar)
 
         apply_result = invoke_db_lambda({
-            'mode': 'apply',
+            'mode': 'apply_bar_upsert',
             'new_bars': new_bars,
             'existing_bars': existing_bars,
         })
