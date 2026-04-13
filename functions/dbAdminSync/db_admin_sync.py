@@ -391,39 +391,67 @@ def get_all_specials(cursor):
             s.is_active,
             s.insert_method,
             s.insert_date,
-            s.update_date,
-            sc.special_candidate_id,
-            sc.confidence,
-            sc.fetch_method,
-            sc.notes,
-            sc.source,
-            sc.approval_date,
-            scr.run_id,
-            scr.published_at
+            s.update_date
         FROM special s
         JOIN bar b
             ON b.bar_id = s.bar_id
-        LEFT JOIN special_candidate sc
-            ON sc.special_candidate_id = (
-                SELECT sc_latest.special_candidate_id
-                FROM special_candidate sc_latest
-                WHERE sc_latest.approved_special_id = s.special_id
-                ORDER BY
-                    sc_latest.approval_date DESC,
-                    sc_latest.special_candidate_id DESC
-                LIMIT 1
-            )
-        LEFT JOIN special_candidate_run scr
-            ON scr.run_id = sc.run_id
         ORDER BY b.neighborhood ASC, b.name ASC, s.description ASC, s.insert_date ASC, s.special_id ASC
         """
     )
-    rows = cursor.fetchall()
+    special_rows = cursor.fetchall()
+    special_ids = [row.get('special_id') for row in special_rows if row.get('special_id')]
+
+    candidate_rows_by_special = {}
+    if special_ids:
+        placeholders = ','.join(['%s'] * len(special_ids))
+        cursor.execute(
+            f"""
+            SELECT
+                sc.approved_special_id,
+                sc.special_candidate_id,
+                sc.confidence,
+                sc.fetch_method,
+                sc.notes,
+                sc.source,
+                sc.approval_date,
+                scr.run_id,
+                scr.published_at
+            FROM special_candidate sc
+            LEFT JOIN special_candidate_run scr
+                ON scr.run_id = sc.run_id
+            WHERE sc.approved_special_id IN ({placeholders})
+            ORDER BY
+                sc.approved_special_id ASC,
+                sc.approval_date DESC,
+                sc.special_candidate_id DESC
+            """,
+            special_ids,
+        )
+        for row in cursor.fetchall():
+            special_id = row.get('approved_special_id')
+            if not special_id:
+                continue
+            candidate_rows_by_special.setdefault(special_id, []).append(
+                {
+                    'special_candidate_id': row.get('special_candidate_id'),
+                    'confidence': row.get('confidence'),
+                    'fetch_method': row.get('fetch_method'),
+                    'notes': row.get('notes'),
+                    'source': row.get('source'),
+                    'approval_date': row.get('approval_date').isoformat() if row.get('approval_date') else None,
+                    'run_id': row.get('run_id'),
+                    'published_at': row.get('published_at').isoformat() if row.get('published_at') else None,
+                }
+            )
+
     specials = []
-    for row in rows:
+    for row in special_rows:
+        special_id = row.get('special_id')
+        candidate_rows = candidate_rows_by_special.get(special_id, [])
+        primary_candidate = candidate_rows[0] if candidate_rows else {}
         specials.append(
             {
-                'special_id': row.get('special_id'),
+                'special_id': special_id,
                 'bar_name': row.get('bar_name'),
                 'neighborhood': row.get('neighborhood'),
                 'day_of_week': row.get('day_of_week'),
@@ -436,14 +464,15 @@ def get_all_specials(cursor):
                 'insert_method': row.get('insert_method'),
                 'insert_date': row.get('insert_date').isoformat() if row.get('insert_date') else None,
                 'update_date': row.get('update_date').isoformat() if row.get('update_date') else None,
-                'special_candidate_id': row.get('special_candidate_id'),
-                'confidence': row.get('confidence'),
-                'fetch_method': row.get('fetch_method'),
-                'notes': row.get('notes'),
-                'source': row.get('source'),
-                'approval_date': row.get('approval_date').isoformat() if row.get('approval_date') else None,
-                'run_id': row.get('run_id'),
-                'published_at': row.get('published_at').isoformat() if row.get('published_at') else None,
+                'special_candidate_id': primary_candidate.get('special_candidate_id'),
+                'confidence': primary_candidate.get('confidence'),
+                'fetch_method': primary_candidate.get('fetch_method'),
+                'notes': primary_candidate.get('notes'),
+                'source': primary_candidate.get('source'),
+                'approval_date': primary_candidate.get('approval_date'),
+                'run_id': primary_candidate.get('run_id'),
+                'published_at': primary_candidate.get('published_at'),
+                'candidate_rows': candidate_rows,
             }
         )
 
