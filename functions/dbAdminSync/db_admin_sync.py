@@ -375,6 +375,132 @@ def update_special_candidate_approval(cursor, special_candidate_id: int, approva
     }
 
 
+def get_all_specials(cursor):
+    cursor.execute(
+        """
+        SELECT
+            s.special_id,
+            b.name AS bar_name,
+            b.neighborhood,
+            s.day_of_week,
+            s.all_day,
+            s.start_time,
+            s.end_time,
+            s.description,
+            s.type,
+            s.is_active,
+            s.insert_method,
+            s.insert_date,
+            s.update_date,
+            sc.special_candidate_id,
+            sc.confidence,
+            sc.fetch_method,
+            sc.notes,
+            sc.source,
+            sc.approval_date,
+            scr.run_id,
+            scr.published_at
+        FROM special s
+        JOIN bar b
+            ON b.bar_id = s.bar_id
+        LEFT JOIN special_candidate sc
+            ON sc.approved_special_id = s.special_id
+        LEFT JOIN special_candidate_run scr
+            ON scr.run_id = sc.run_id
+        ORDER BY b.neighborhood ASC, b.name ASC, s.description ASC, s.insert_date ASC, s.special_id ASC
+        """
+    )
+    rows = cursor.fetchall()
+    specials = []
+    for row in rows:
+        specials.append(
+            {
+                'special_id': row.get('special_id'),
+                'bar_name': row.get('bar_name'),
+                'neighborhood': row.get('neighborhood'),
+                'day_of_week': row.get('day_of_week'),
+                'all_day': row.get('all_day'),
+                'start_time': _normalize_time_value(row.get('start_time')) or None,
+                'end_time': _normalize_time_value(row.get('end_time')) or None,
+                'description': row.get('description'),
+                'type': row.get('type'),
+                'is_active': row.get('is_active'),
+                'insert_method': row.get('insert_method'),
+                'insert_date': row.get('insert_date').isoformat() if row.get('insert_date') else None,
+                'update_date': row.get('update_date').isoformat() if row.get('update_date') else None,
+                'special_candidate_id': row.get('special_candidate_id'),
+                'confidence': row.get('confidence'),
+                'fetch_method': row.get('fetch_method'),
+                'notes': row.get('notes'),
+                'source': row.get('source'),
+                'approval_date': row.get('approval_date').isoformat() if row.get('approval_date') else None,
+                'run_id': row.get('run_id'),
+                'published_at': row.get('published_at').isoformat() if row.get('published_at') else None,
+            }
+        )
+
+    return {'specials': specials, 'special_count': len(specials)}
+
+
+def update_special(cursor, event):
+    special_id = event.get('special_id')
+    if not special_id:
+        raise ValueError('special_id is required for update_special')
+
+    editable_fields = {
+        'day_of_week',
+        'all_day',
+        'start_time',
+        'end_time',
+        'description',
+        'type',
+        'is_active',
+    }
+    updates = {}
+    for field in editable_fields:
+        if field in event:
+            updates[field] = event.get(field)
+
+    if not updates:
+        raise ValueError('At least one editable field must be provided for update_special')
+
+    if 'all_day' in updates:
+        updates['all_day'] = _normalize_yn_flag(updates['all_day'])
+    if 'is_active' in updates:
+        updates['is_active'] = _normalize_yn_flag(updates['is_active'])
+
+    set_clause = ', '.join([f"{key} = %s" for key in updates])
+    values = list(updates.values()) + [special_id]
+
+    cursor.execute(
+        f"""
+        UPDATE special
+        SET {set_clause},
+            update_date = NOW()
+        WHERE special_id = %s
+        """,
+        values,
+    )
+
+    if cursor.rowcount == 0:
+        raise ValueError('special_id was not found')
+
+    cursor.execute(
+        """
+        SELECT special_id, update_date, is_active
+        FROM special
+        WHERE special_id = %s
+        """,
+        (special_id,),
+    )
+    updated = cursor.fetchone() or {}
+    return {
+        'special_id': updated.get('special_id'),
+        'is_active': updated.get('is_active'),
+        'update_date': updated.get('update_date').isoformat() if updated.get('update_date') else None,
+    }
+
+
 
 
 def _parse_event_payload(event):
@@ -398,10 +524,10 @@ def _parse_event_payload(event):
 def lambda_handler(event, context):
     event = _parse_event_payload(event or {})
     mode = event.get('mode')
-    if mode not in {'get_unapproved_special_candidates', 'update_special_candidate_approval'}:
+    if mode not in {'get_unapproved_special_candidates', 'update_special_candidate_approval', 'get_all_specials', 'update_special'}:
         return {
             'statusCode': 400,
-            'body': json.dumps({'error': 'mode must be one of get_unapproved_special_candidates, update_special_candidate_approval'}),
+            'body': json.dumps({'error': 'mode must be one of get_unapproved_special_candidates, update_special_candidate_approval, get_all_specials, update_special'}),
         }
 
     conn = get_connection()
@@ -409,12 +535,16 @@ def lambda_handler(event, context):
         with conn.cursor() as cursor:
             if mode == 'get_unapproved_special_candidates':
                 result = get_unapproved_special_candidates(cursor)
-            else:
+            elif mode == 'update_special_candidate_approval':
                 special_candidate_id = event.get('special_candidate_id')
                 approval_status = event.get('approval_status')
                 if not special_candidate_id:
                     raise ValueError('special_candidate_id is required for update_special_candidate_approval')
                 result = update_special_candidate_approval(cursor, special_candidate_id, approval_status)
+            elif mode == 'get_all_specials':
+                result = get_all_specials(cursor)
+            else:
+                result = update_special(cursor, event)
             conn.commit()
 
         LOGGER.info('dbAdminSync %s result=%s', mode, result)
