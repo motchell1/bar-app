@@ -310,8 +310,9 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
       const isAuto = String(special.insert_method || '').toUpperCase() === 'AUTO';
       return `
         <section class="admin-special-detail-card">
-          <h4>${DAY_LABELS[normalizeDay(special.day_of_week)] || special.day_of_week || 'Unknown Day'}</h4>
+          <h4>${DAY_LABELS[normalizeDay(special.day_of_week)] || special.day_of_week || 'Unknown Day'} — Special ${special.special_id}</h4>
           <div class="admin-detail-grid">
+            <p><strong>Special ID:</strong> ${special.special_id ?? '—'}</p>
             <p><strong>Neighborhood:</strong> ${special.neighborhood || '—'}</p>
             <p><strong>Bar Name:</strong> ${special.bar_name || '—'}</p>
             <p><strong>Description:</strong> ${renderValue(special, 'description')}</p>
