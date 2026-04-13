@@ -447,7 +447,8 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
     });
 
     screenElement.querySelectorAll('[data-close-action-menu="true"]').forEach((element) => {
-      element.addEventListener('click', () => {
+      element.addEventListener('click', (event) => {
+        if (event.currentTarget !== event.target) return;
         state.actionSpecialId = null;
         render();
       });
@@ -477,7 +478,8 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
     });
 
     screenElement.querySelectorAll('[data-close-detail-modal="true"]').forEach((element) => {
-      element.addEventListener('click', () => {
+      element.addEventListener('click', (event) => {
+        if (event.currentTarget !== event.target) return;
         state.detailSpecial = null;
         state.detailEditing = false;
         render();
