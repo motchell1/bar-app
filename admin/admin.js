@@ -188,6 +188,27 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
       });
   }
 
+  function dedupeSpecialsById(specials) {
+    const byId = new Map();
+    specials.forEach((special) => {
+      const id = Number(special.special_id);
+      if (!id) return;
+
+      if (!byId.has(id)) {
+        byId.set(id, special);
+        return;
+      }
+
+      const current = byId.get(id);
+      const currentHasCandidate = current.special_candidate_id !== null && current.special_candidate_id !== undefined;
+      const nextHasCandidate = special.special_candidate_id !== null && special.special_candidate_id !== undefined;
+      if (!currentHasCandidate && nextHasCandidate) {
+        byId.set(id, special);
+      }
+    });
+    return [...byId.values()];
+  }
+
   async function loadUnapprovedSpecials() {
     state.loading = true;
     state.errorMessage = '';
@@ -212,7 +233,8 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
 
     try {
       const result = await callAdminSync({ mode: 'get_all_specials' });
-      state.allSpecials = Array.isArray(result?.specials) ? result.specials : [];
+      const rawSpecials = Array.isArray(result?.specials) ? result.specials : [];
+      state.allSpecials = dedupeSpecialsById(rawSpecials);
       state.groupedSpecials = groupSpecials(state.allSpecials);
     } catch (err) {
       console.error('Failed to load all specials:', err);

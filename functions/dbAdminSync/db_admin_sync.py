@@ -404,7 +404,15 @@ def get_all_specials(cursor):
         JOIN bar b
             ON b.bar_id = s.bar_id
         LEFT JOIN special_candidate sc
-            ON sc.approved_special_id = s.special_id
+            ON sc.special_candidate_id = (
+                SELECT sc_latest.special_candidate_id
+                FROM special_candidate sc_latest
+                WHERE sc_latest.approved_special_id = s.special_id
+                ORDER BY
+                    sc_latest.approval_date DESC,
+                    sc_latest.special_candidate_id DESC
+                LIMIT 1
+            )
         LEFT JOIN special_candidate_run scr
             ON scr.run_id = sc.run_id
         ORDER BY b.neighborhood ASC, b.name ASC, s.description ASC, s.insert_date ASC, s.special_id ASC
