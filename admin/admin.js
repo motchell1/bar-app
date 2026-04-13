@@ -1,10 +1,11 @@
 const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaws.com/default/dbAdminSync';
 
 (function initAdminPage() {
+  const backButton = document.getElementById('admin-back-button');
   const homeButton = document.getElementById('admin-home-button');
   const titleElement = document.getElementById('admin-title');
   const screenElement = document.getElementById('admin-screen');
-  if (!homeButton || !titleElement || !screenElement) return;
+  if (!backButton || !homeButton || !titleElement || !screenElement) return;
 
   const state = {
     currentView: 'home',
@@ -14,21 +15,26 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
     errorMessage: ''
   };
 
-  homeButton.addEventListener('click', () => {
-    if (state.currentView === 'home') {
-      window.location.assign('/');
-      return;
-    }
+  function goToHomeView() {
     state.currentView = 'home';
     state.errorMessage = '';
     render();
+  }
+
+  homeButton.addEventListener('click', () => {
+    window.location.assign('/');
+  });
+
+  backButton.addEventListener('click', () => {
+    if (state.currentView === 'home') return;
+    goToHomeView();
   });
 
   async function callAdminSync(payload) {
     const response = await fetch(DB_ADMIN_SYNC_API_URL, {
       method: 'POST',
       headers: {
-        'Content-Type': 'text/plain'
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify(payload)
     });
@@ -38,11 +44,9 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
     if (!response.ok) {
       throw new Error(parsed?.error || `Request failed with status ${response.status}`);
     }
-
     if (parsed?.error) {
       throw new Error(parsed.error);
     }
-
     return parsed;
   }
 
@@ -192,7 +196,13 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
     bindApprovalButtons();
   }
 
+  function renderToolbarButtons() {
+    const isHomeView = state.currentView === 'home';
+    backButton.classList.toggle('is-hidden', isHomeView);
+  }
+
   function render() {
+    renderToolbarButtons();
     if (state.currentView === 'specials') {
       renderSpecialsView();
       return;
