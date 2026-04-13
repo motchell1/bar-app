@@ -329,27 +329,6 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
     };
 
     const detailsMarkup = specials.map((special) => {
-      const isAuto = String(special.insert_method || '').toUpperCase() === 'AUTO';
-      const candidateRows = Array.isArray(special.candidate_rows) ? special.candidate_rows : [];
-      const candidateListMarkup = candidateRows.length
-        ? `
-          <div class="admin-candidate-history">
-            <p><strong>All Candidate Rows (${candidateRows.length}):</strong></p>
-            <ul>
-              ${candidateRows.map((candidate) => `
-                <li>
-                  ID ${candidate.special_candidate_id ?? '—'}
-                  | Run ${candidate.run_id ?? '—'}
-                  | Confidence ${candidate.confidence ?? '—'}
-                  | Method ${candidate.fetch_method || '—'}
-                  | Source ${candidate.source || '—'}
-                  | Approval ${formatDateTime(candidate.approval_date)}
-                </li>
-              `).join('')}
-            </ul>
-          </div>
-        `
-        : '<p><strong>All Candidate Rows:</strong> —</p>';
       return `
         <section class="admin-special-detail-card">
           <h4>${DAY_LABELS[normalizeDay(special.day_of_week)] || special.day_of_week || 'Unknown Day'} — Special ${special.special_id}</h4>
@@ -367,25 +346,53 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
             <p><strong>Insert Method:</strong> ${special.insert_method || '—'}</p>
             <p><strong>Insert Date:</strong> ${formatDateTime(special.insert_date)}</p>
             <p><strong>Update Date:</strong> ${formatDateTime(special.update_date)}</p>
-            ${isAuto ? `<p><strong>Special Candidate ID:</strong> ${special.special_candidate_id ?? '—'}</p>` : ''}
-            ${isAuto ? `<p><strong>Run ID:</strong> ${special.run_id ?? '—'}</p>` : ''}
-            ${isAuto ? `<p><strong>Confidence:</strong> ${special.confidence ?? '—'}</p>` : ''}
-            ${isAuto ? `<p><strong>Fetch Method:</strong> ${special.fetch_method || '—'}</p>` : ''}
-            ${isAuto ? `<p><strong>Notes:</strong> ${special.notes || '—'}</p>` : ''}
-            ${isAuto ? `<p><strong>Source:</strong> ${special.source || '—'}</p>` : ''}
-            ${isAuto ? `<p><strong>Approval Date:</strong> ${formatDateTime(special.approval_date)}</p>` : ''}
-            ${isAuto ? `<p><strong>Candidate IDs:</strong> ${special.special_candidate_ids_csv || '—'}</p>` : ''}
           </div>
-          ${isAuto ? candidateListMarkup : ''}
         </section>
       `;
     }).join('');
+
+    const allCandidateRows = [];
+    specials.forEach((special) => {
+      const candidateRows = Array.isArray(special.candidate_rows) ? special.candidate_rows : [];
+      candidateRows.forEach((candidate) => {
+        const candidateId = candidate.special_candidate_id;
+        const duplicate = allCandidateRows.some((existing) => existing.special_candidate_id === candidateId);
+        if (!duplicate) {
+          allCandidateRows.push(candidate);
+        }
+      });
+    });
+
+    const candidateSectionMarkup = allCandidateRows.length
+      ? `
+        <section class="admin-special-detail-card">
+          <h4>Special Candidate Data</h4>
+          <div class="admin-candidate-history">
+            <p><strong>All Candidate Rows (${allCandidateRows.length}):</strong></p>
+            <ul>
+              ${allCandidateRows.map((candidate) => `
+                <li>
+                  ID ${candidate.special_candidate_id ?? '—'}
+                  | Run ${candidate.run_id ?? '—'}
+                  | Confidence ${candidate.confidence ?? '—'}
+                  | Method ${candidate.fetch_method || '—'}
+                  | Notes ${candidate.notes || '—'}
+                  | Source ${candidate.source || '—'}
+                  | Approval ${formatDateTime(candidate.approval_date)}
+                </li>
+              `).join('')}
+            </ul>
+          </div>
+        </section>
+      `
+      : '';
 
     return `
       <div class="admin-modal-backdrop" data-close-detail-modal="true">
         <div class="admin-modal admin-modal-detail" role="dialog" aria-label="Special detail">
           <h3>Special Details</h3>
           ${detailsMarkup}
+          ${candidateSectionMarkup}
           <div class="admin-actions-row">
             ${state.detailEditing
               ? `<button type="button" class="admin-action-btn approve" data-detail-action="save" ${state.savingSpecial ? 'disabled' : ''}>Save</button>`
