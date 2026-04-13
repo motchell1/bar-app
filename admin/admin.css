@@ -139,6 +139,15 @@ body {
   font-size: 13px;
 }
 
+.admin-run-sublist {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+}
+
 .admin-candidate-list {
   display: flex;
   flex-direction: column;

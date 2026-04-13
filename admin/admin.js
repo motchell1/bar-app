@@ -1,10 +1,11 @@
 const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaws.com/default/dbAdminSync';
 
 (function initAdminPage() {
+  const backButton = document.getElementById('admin-back-button');
   const homeButton = document.getElementById('admin-home-button');
   const titleElement = document.getElementById('admin-title');
   const screenElement = document.getElementById('admin-screen');
-  if (!homeButton || !titleElement || !screenElement) return;
+  if (!backButton || !homeButton || !titleElement || !screenElement) return;
 
   const state = {
     currentView: 'home',
@@ -14,14 +15,20 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
     errorMessage: ''
   };
 
-  homeButton.addEventListener('click', () => {
-    if (state.currentView === 'home') {
-      window.location.assign('/');
-      return;
-    }
+  function updateToolbarButtons() {
+    const isHomeView = state.currentView === 'home';
+    backButton.classList.toggle('is-hidden', isHomeView);
+  }
+
+  backButton.addEventListener('click', () => {
+    if (state.currentView === 'home') return;
     state.currentView = 'home';
     state.errorMessage = '';
     render();
+  });
+
+  homeButton.addEventListener('click', () => {
+    window.location.assign('/');
   });
 
   async function callAdminSync(payload) {
@@ -130,6 +137,19 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
         <section class="admin-run-card">
           <h3>Run ${run.run_id} — ${run.bar_name || 'Unknown bar'}</h3>
           <p><strong>Total candidates:</strong> ${run.total_candidates ?? '—'}</p>
+          <p><strong>Auto Approved Candidates:</strong> ${run.auto_approved_candidates ?? '—'}</p>
+          <p><strong>Web Crawl:</strong></p>
+          <ul class="admin-run-sublist">
+            <li><strong>AI Parse Attempted:</strong> ${run.web_crawl_ai_parse_attempted ?? '—'}</li>
+            <li><strong>Candidates:</strong> ${run.web_crawl_candidates ?? '—'}</li>
+            <li><strong>Candidate Links:</strong> ${run.web_crawl_candidate_links ?? '—'}</li>
+            <li><strong>Keyword Matches:</strong> ${run.web_crawl_keyword_matches ?? '—'}</li>
+          </ul>
+          <p><strong>Web AI Search:</strong></p>
+          <ul class="admin-run-sublist">
+            <li><strong>Attempted:</strong> ${run.web_ai_search_attempted ?? '—'}</li>
+            <li><strong>Candidates:</strong> ${run.web_ai_search_candidates ?? '—'}</li>
+          </ul>
           <p><strong>Started:</strong> ${formatDateTime(run.started_at)}</p>
           <p><strong>Completed:</strong> ${formatDateTime(run.completed_at)}</p>
           <div class="admin-candidate-list">${specialsMarkup}</div>
@@ -193,6 +213,7 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
   }
 
   function render() {
+    updateToolbarButtons();
     if (state.currentView === 'specials') {
       renderSpecialsView();
       return;
