@@ -4,6 +4,7 @@ import json
 import os
 import time
 from datetime import datetime
+from pathlib import Path
 
 import boto3
 import requests
@@ -22,25 +23,13 @@ RESTAURANT_TYPES = {'restaurant', 'food'}
 
 s3_client = boto3.client('s3')
 
-NEIGHBORHOOD_CONFIGS = {
-    'downtown': {
-        'neighborhood_name': 'Downtown',
-        'search_label': 'Downtown Pittsburgh',
-        'search_bounds': {
-            'south': 40.4325,
-            'west': -80.0208,
-            'north': 40.4475,
-            'east': -79.9870
-        },
-        'polygon': [
-            {'lat': 40.442357, 'lng': -80.015060},
-            {'lat': 40.447582, 'lng': -79.994819},
-            {'lat': 40.443094, 'lng': -79.991779},
-            {'lat': 40.434590, 'lng': -79.996123},
-            {'lat': 40.442357, 'lng': -80.015060}
-        ]
-    }
-}
+def load_neighborhood_configs():
+    config_path = Path(__file__).resolve().parents[2] / 'neighborhoods.json'
+    with config_path.open('r', encoding='utf-8') as config_file:
+        return json.load(config_file)
+
+
+NEIGHBORHOOD_CONFIGS = load_neighborhood_configs()
 
 
 def get_neighborhood_config(neighborhood_input):
@@ -51,6 +40,13 @@ def get_neighborhood_config(neighborhood_input):
     config = NEIGHBORHOOD_CONFIGS.get(neighborhood_key)
     if not config:
         supported = sorted(NEIGHBORHOOD_CONFIGS.keys())
+        raise ValueError(f'Unsupported neighborhood "{neighborhood_input}". Supported: {supported}')
+    if not config.get('search_bounds') or not config.get('search_label'):
+        supported = sorted(
+            key
+            for key, neighborhood_config in NEIGHBORHOOD_CONFIGS.items()
+            if neighborhood_config.get('search_bounds') and neighborhood_config.get('search_label')
+        )
         raise ValueError(f'Unsupported neighborhood "{neighborhood_input}". Supported: {supported}')
 
     return config
