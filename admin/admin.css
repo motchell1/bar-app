@@ -3,7 +3,7 @@ body {
   margin: 0;
   padding: 0;
   font-family: Arial, sans-serif;
-  background: #fff;
+  background: #f5f7fb;
 }
 
 .admin-toolbar {
@@ -13,6 +13,7 @@ body {
   background-color: #007bff;
   color: #fff;
   box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+  z-index: 20;
 }
 
 .admin-toolbar-inner {
@@ -28,6 +29,7 @@ body {
 .admin-title {
   font-weight: bold;
   text-transform: uppercase;
+  letter-spacing: 0.4px;
 }
 
 .admin-home-button {
@@ -50,4 +52,104 @@ body {
   margin: 48px auto 0;
   min-height: calc(100vh - 48px);
   min-height: calc(100dvh - 48px);
+  padding: 12px;
+  box-sizing: border-box;
+}
+
+.admin-home-view,
+.admin-specials-view {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.admin-home-view h2,
+.admin-specials-view h2 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.admin-tool-button {
+  text-align: left;
+  padding: 14px;
+  border-radius: 10px;
+  border: 1px solid #c8d8ff;
+  background: #fff;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.admin-loading,
+.admin-empty,
+.admin-error {
+  margin: 0;
+  padding: 12px;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.admin-error {
+  color: #a60000;
+  border: 1px solid #ffb3b3;
+}
+
+.admin-run-card,
+.admin-candidate-card {
+  background: #fff;
+  border: 1px solid #e0e6ef;
+  border-radius: 10px;
+  padding: 12px;
+}
+
+.admin-run-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.admin-run-card h3,
+.admin-candidate-card h4 {
+  margin: 0;
+}
+
+.admin-run-card p,
+.admin-candidate-card p {
+  margin: 0;
+  font-size: 13px;
+}
+
+.admin-candidate-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.admin-actions-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.admin-action-btn {
+  flex: 1;
+  border: none;
+  border-radius: 8px;
+  padding: 10px;
+  color: #fff;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.admin-action-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.admin-action-btn.approve {
+  background: #1c8d3b;
+}
+
+.admin-action-btn.reject {
+  background: #bc2f2f;
 }
