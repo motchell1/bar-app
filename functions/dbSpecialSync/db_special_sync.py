@@ -315,6 +315,15 @@ def publish_special_candidate_run(cursor, bar_id: int, run_id: int, auto_publish
                 """,
                 (special['special_id'],),
             )
+        else:
+            cursor.execute(
+                """
+                UPDATE special
+                SET update_date = NOW()
+                WHERE special_id = %s
+                """,
+                (special['special_id'],),
+            )
 
     inserted_special_count = 0
     for candidate in unmatched_candidates:
