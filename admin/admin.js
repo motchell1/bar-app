@@ -379,6 +379,7 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
                     <th>Fetch Method</th>
                     <th>Notes</th>
                     <th>Source</th>
+                    <th>Approval Status</th>
                     <th>Insert Date</th>
                     <th>Approval Date</th>
                   </tr>
@@ -392,6 +393,7 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
                       <td>${candidate.fetch_method || '—'}</td>
                       <td>${candidate.notes || '—'}</td>
                       <td>${candidate.source || '—'}</td>
+                      <td>${candidate.approval_status || '—'}</td>
                       <td>${formatDateTime(candidate.insert_date)}</td>
                       <td>${formatDateTime(candidate.approval_date)}</td>
                     </tr>
