@@ -252,14 +252,21 @@ body {
 }
 
 .admin-detail-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 8px;
+  column-count: 2;
+  column-gap: 12px;
 }
 
 .admin-detail-grid p {
   margin: 0;
+  margin-bottom: 8px;
   font-size: 13px;
+  break-inside: avoid;
+}
+
+@media (max-width: 640px) {
+  .admin-detail-grid {
+    column-count: 1;
+  }
 }
 
 .admin-input {
