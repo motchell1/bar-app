@@ -330,6 +330,26 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
 
     const detailsMarkup = specials.map((special) => {
       const isAuto = String(special.insert_method || '').toUpperCase() === 'AUTO';
+      const candidateRows = Array.isArray(special.candidate_rows) ? special.candidate_rows : [];
+      const candidateListMarkup = candidateRows.length
+        ? `
+          <div class="admin-candidate-history">
+            <p><strong>All Candidate Rows (${candidateRows.length}):</strong></p>
+            <ul>
+              ${candidateRows.map((candidate) => `
+                <li>
+                  ID ${candidate.special_candidate_id ?? '—'}
+                  | Run ${candidate.run_id ?? '—'}
+                  | Confidence ${candidate.confidence ?? '—'}
+                  | Method ${candidate.fetch_method || '—'}
+                  | Source ${candidate.source || '—'}
+                  | Approval ${formatDateTime(candidate.approval_date)}
+                </li>
+              `).join('')}
+            </ul>
+          </div>
+        `
+        : '<p><strong>All Candidate Rows:</strong> —</p>';
       return `
         <section class="admin-special-detail-card">
           <h4>${DAY_LABELS[normalizeDay(special.day_of_week)] || special.day_of_week || 'Unknown Day'} — Special ${special.special_id}</h4>
@@ -354,7 +374,9 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
             ${isAuto ? `<p><strong>Notes:</strong> ${special.notes || '—'}</p>` : ''}
             ${isAuto ? `<p><strong>Source:</strong> ${special.source || '—'}</p>` : ''}
             ${isAuto ? `<p><strong>Approval Date:</strong> ${formatDateTime(special.approval_date)}</p>` : ''}
+            ${isAuto ? `<p><strong>Candidate IDs:</strong> ${special.special_candidate_ids_csv || '—'}</p>` : ''}
           </div>
+          ${isAuto ? candidateListMarkup : ''}
         </section>
       `;
     }).join('');

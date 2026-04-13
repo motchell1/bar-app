@@ -473,6 +473,11 @@ def get_all_specials(cursor):
                 'run_id': primary_candidate.get('run_id'),
                 'published_at': primary_candidate.get('published_at'),
                 'candidate_rows': candidate_rows,
+                'candidate_count': len(candidate_rows),
+                'special_candidate_ids': [candidate.get('special_candidate_id') for candidate in candidate_rows if candidate.get('special_candidate_id')],
+                'special_candidate_ids_csv': ','.join(
+                    [str(candidate.get('special_candidate_id')) for candidate in candidate_rows if candidate.get('special_candidate_id')]
+                ),
             }
         )
 

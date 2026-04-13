@@ -290,3 +290,17 @@ body {
   margin: 0;
   font-size: 14px;
 }
+
+.admin-candidate-history p {
+  margin: 0 0 6px;
+  font-size: 13px;
+}
+
+.admin-candidate-history ul {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+}
