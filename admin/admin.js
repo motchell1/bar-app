@@ -187,7 +187,7 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
     screenElement.innerHTML = `
       <section class="admin-home-view" aria-label="Admin tools">
         <h2>Admin tools</h2>
-        <button type="button" class="admin-tool-button" data-tool="specials-to-be-approved">Specials to be Approved</button>
+        <button type="button" class="admin-tool-button" data-tool="specials-to-be-approved">Specials Pending Approval</button>
       </section>
     `;
     bindToolButtons();
@@ -203,7 +203,7 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
 
     screenElement.innerHTML = `
       <section class="admin-specials-view" aria-label="Special approvals">
-        <h2>Specials to be Approved</h2>
+        <h2>Specials Pending Approval</h2>
         ${state.errorMessage ? `<p class="admin-error">${state.errorMessage}</p>` : ''}
         ${buildRunsMarkup()}
       </section>
