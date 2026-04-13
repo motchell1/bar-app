@@ -24,7 +24,7 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
     loadingSpecials: false,
     updatingCandidateId: null,
     actionSpecialId: null,
-    detailSpecial: null,
+    detailSpecials: [],
     detailEditing: false,
     savingSpecial: false,
     runs: [],
@@ -43,7 +43,7 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
     state.currentView = 'home';
     state.errorMessage = '';
     state.actionSpecialId = null;
-    state.detailSpecial = null;
+    state.detailSpecials = [];
     state.detailEditing = false;
     render();
   });
@@ -243,16 +243,20 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
     }
   }
 
-  async function saveSpecialUpdate(payload) {
+  async function saveSpecialUpdates(payloads) {
+    const updates = Array.isArray(payloads) ? payloads : [payloads];
     state.savingSpecial = true;
     state.errorMessage = '';
     render();
 
     try {
-      await callAdminSync({ mode: 'update_special', ...payload });
+      for (const payload of updates) {
+        await callAdminSync({ mode: 'update_special', ...payload });
+      }
       await loadAllSpecials();
-      if (state.detailSpecial) {
-        state.detailSpecial = state.allSpecials.find((row) => row.special_id === state.detailSpecial.special_id) || null;
+      if (state.detailSpecials.length) {
+        const detailIds = new Set(state.detailSpecials.map((row) => row.special_id));
+        state.detailSpecials = state.allSpecials.filter((row) => detailIds.has(row.special_id));
       }
       state.detailEditing = false;
     } catch (err) {
@@ -266,6 +270,10 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
 
   function getSpecialById(specialId) {
     return state.allSpecials.find((row) => row.special_id === specialId) || null;
+  }
+
+  function getGroupedRowByRepresentativeId(specialId) {
+    return state.groupedSpecials.find((row) => row.representative_special_id === specialId) || null;
   }
 
   function getSpecialActionMenuMarkup() {
@@ -284,31 +292,35 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
   }
 
   function getDetailModalMarkup() {
-    if (!state.detailSpecial) return '';
-    const special = state.detailSpecial;
-    const isAuto = String(special.insert_method || '').toUpperCase() === 'AUTO';
+    if (!state.detailSpecials.length) return '';
+    const specials = [...state.detailSpecials].sort((a, b) => {
+      const aIndex = DAY_ORDER.indexOf(normalizeDay(a.day_of_week));
+      const bIndex = DAY_ORDER.indexOf(normalizeDay(b.day_of_week));
+      return (aIndex === -1 ? 999 : aIndex) - (bIndex === -1 ? 999 : bIndex);
+    });
 
-    const renderValue = (key, fallback = '—') => {
+    const renderValue = (special, key, fallback = '—') => {
       if (state.detailEditing && ['day_of_week', 'all_day', 'start_time', 'end_time', 'description', 'type', 'is_active'].includes(key)) {
-        return `<input class="admin-input" data-special-field="${key}" value="${special[key] ?? ''}" />`;
+        return `<input class="admin-input" data-special-id="${special.special_id}" data-special-field="${key}" value="${special[key] ?? ''}" />`;
       }
       return special[key] === null || special[key] === undefined || special[key] === '' ? fallback : String(special[key]);
     };
 
-    return `
-      <div class="admin-modal-backdrop" data-close-detail-modal="true">
-        <div class="admin-modal admin-modal-detail" role="dialog" aria-label="Special detail">
-          <h3>Special ${special.special_id}</h3>
+    const detailsMarkup = specials.map((special) => {
+      const isAuto = String(special.insert_method || '').toUpperCase() === 'AUTO';
+      return `
+        <section class="admin-special-detail-card">
+          <h4>${DAY_LABELS[normalizeDay(special.day_of_week)] || special.day_of_week || 'Unknown Day'}</h4>
           <div class="admin-detail-grid">
             <p><strong>Neighborhood:</strong> ${special.neighborhood || '—'}</p>
             <p><strong>Bar Name:</strong> ${special.bar_name || '—'}</p>
-            <p><strong>Description:</strong> ${renderValue('description')}</p>
-            <p><strong>Day of Week:</strong> ${renderValue('day_of_week')}</p>
-            <p><strong>All Day:</strong> ${renderValue('all_day')}</p>
-            <p><strong>Start Time:</strong> ${renderValue('start_time')}</p>
-            <p><strong>End Time:</strong> ${renderValue('end_time')}</p>
-            <p><strong>Type:</strong> ${renderValue('type')}</p>
-            <p><strong>Is Active:</strong> ${renderValue('is_active')}</p>
+            <p><strong>Description:</strong> ${renderValue(special, 'description')}</p>
+            <p><strong>Day of Week:</strong> ${renderValue(special, 'day_of_week')}</p>
+            <p><strong>All Day:</strong> ${renderValue(special, 'all_day')}</p>
+            <p><strong>Start Time:</strong> ${renderValue(special, 'start_time')}</p>
+            <p><strong>End Time:</strong> ${renderValue(special, 'end_time')}</p>
+            <p><strong>Type:</strong> ${renderValue(special, 'type')}</p>
+            <p><strong>Is Active:</strong> ${renderValue(special, 'is_active')}</p>
             <p><strong>Insert Method:</strong> ${special.insert_method || '—'}</p>
             <p><strong>Insert Date:</strong> ${formatDateTime(special.insert_date)}</p>
             <p><strong>Update Date:</strong> ${formatDateTime(special.update_date)}</p>
@@ -320,6 +332,15 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
             ${isAuto ? `<p><strong>Source:</strong> ${special.source || '—'}</p>` : ''}
             ${isAuto ? `<p><strong>Approval Date:</strong> ${formatDateTime(special.approval_date)}</p>` : ''}
           </div>
+        </section>
+      `;
+    }).join('');
+
+    return `
+      <div class="admin-modal-backdrop" data-close-detail-modal="true">
+        <div class="admin-modal admin-modal-detail" role="dialog" aria-label="Special detail">
+          <h3>Special Details</h3>
+          ${detailsMarkup}
           <div class="admin-actions-row">
             ${state.detailEditing
               ? `<button type="button" class="admin-action-btn approve" data-detail-action="save" ${state.savingSpecial ? 'disabled' : ''}>Save</button>`
@@ -462,17 +483,20 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
 
         state.actionSpecialId = null;
         if (action === 'view-details') {
-          state.detailSpecial = getSpecialById(specialId);
+          const groupedRow = getGroupedRowByRepresentativeId(specialId);
+          state.detailSpecials = groupedRow?.specials || (getSpecialById(specialId) ? [getSpecialById(specialId)] : []);
           state.detailEditing = false;
           render();
           return;
         }
 
         if (action === 'activate' || action === 'deactivate') {
-          await saveSpecialUpdate({
-            special_id: specialId,
+          const groupedRow = getGroupedRowByRepresentativeId(specialId);
+          const updates = (groupedRow?.specials || []).map((special) => ({
+            special_id: special.special_id,
             is_active: action === 'activate' ? 'Y' : 'N'
-          });
+          }));
+          await saveSpecialUpdates(updates.length ? updates : [{ special_id: specialId, is_active: action === 'activate' ? 'Y' : 'N' }]);
         }
       });
     });
@@ -480,7 +504,7 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
     screenElement.querySelectorAll('[data-close-detail-modal="true"]').forEach((element) => {
       element.addEventListener('click', (event) => {
         if (event.currentTarget !== event.target) return;
-        state.detailSpecial = null;
+        state.detailSpecials = [];
         state.detailEditing = false;
         render();
       });
@@ -496,21 +520,26 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
         }
 
         if (action === 'cancel-edit') {
-          if (state.detailSpecial) {
-            state.detailSpecial = getSpecialById(state.detailSpecial.special_id);
+          if (state.detailSpecials.length) {
+            const detailIds = new Set(state.detailSpecials.map((row) => row.special_id));
+            state.detailSpecials = state.allSpecials.filter((row) => detailIds.has(row.special_id));
           }
           state.detailEditing = false;
           render();
           return;
         }
 
-        if (action === 'save' && state.detailSpecial) {
-          const payload = { special_id: state.detailSpecial.special_id };
+        if (action === 'save' && state.detailSpecials.length) {
+          const payloadBySpecialId = new Map();
           screenElement.querySelectorAll('[data-special-field]').forEach((input) => {
             const field = input.getAttribute('data-special-field');
-            payload[field] = input.value;
+            const specialId = Number(input.getAttribute('data-special-id'));
+            if (!payloadBySpecialId.has(specialId)) {
+              payloadBySpecialId.set(specialId, { special_id: specialId });
+            }
+            payloadBySpecialId.get(specialId)[field] = input.value;
           });
-          await saveSpecialUpdate(payload);
+          await saveSpecialUpdates([...payloadBySpecialId.values()]);
         }
       });
     });

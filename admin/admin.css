@@ -269,3 +269,17 @@ body {
   border-radius: 6px;
   border: 1px solid #c4d4ef;
 }
+
+.admin-special-detail-card {
+  border: 1px solid #dfe8f7;
+  border-radius: 8px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.admin-special-detail-card h4 {
+  margin: 0;
+  font-size: 14px;
+}
