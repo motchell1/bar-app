@@ -304,3 +304,22 @@ body {
   gap: 4px;
   font-size: 12px;
 }
+
+.admin-candidate-table-wrap {
+  overflow: auto;
+}
+
+.admin-candidate-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 640px;
+  font-size: 12px;
+}
+
+.admin-candidate-table th,
+.admin-candidate-table td {
+  border: 1px solid #e1e9f7;
+  padding: 6px;
+  text-align: left;
+  vertical-align: top;
+}

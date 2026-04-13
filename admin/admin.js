@@ -369,19 +369,34 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
           <h4>Special Candidate Data</h4>
           <div class="admin-candidate-history">
             <p><strong>All Candidate Rows (${allCandidateRows.length}):</strong></p>
-            <ul>
-              ${allCandidateRows.map((candidate) => `
-                <li>
-                  ID ${candidate.special_candidate_id ?? '—'}
-                  | Run ${candidate.run_id ?? '—'}
-                  | Confidence ${candidate.confidence ?? '—'}
-                  | Method ${candidate.fetch_method || '—'}
-                  | Notes ${candidate.notes || '—'}
-                  | Source ${candidate.source || '—'}
-                  | Approval ${formatDateTime(candidate.approval_date)}
-                </li>
-              `).join('')}
-            </ul>
+            <div class="admin-candidate-table-wrap">
+              <table class="admin-candidate-table">
+                <thead>
+                  <tr>
+                    <th>Candidate ID</th>
+                    <th>Run ID</th>
+                    <th>Confidence</th>
+                    <th>Fetch Method</th>
+                    <th>Notes</th>
+                    <th>Source</th>
+                    <th>Approval Date</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${allCandidateRows.map((candidate) => `
+                    <tr>
+                      <td>${candidate.special_candidate_id ?? '—'}</td>
+                      <td>${candidate.run_id ?? '—'}</td>
+                      <td>${candidate.confidence ?? '—'}</td>
+                      <td>${candidate.fetch_method || '—'}</td>
+                      <td>${candidate.notes || '—'}</td>
+                      <td>${candidate.source || '—'}</td>
+                      <td>${formatDateTime(candidate.approval_date)}</td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            </div>
           </div>
         </section>
       `
