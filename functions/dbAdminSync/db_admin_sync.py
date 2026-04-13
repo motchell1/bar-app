@@ -414,6 +414,7 @@ def get_all_specials(cursor):
                 sc.notes,
                 sc.source,
                 sc.approval_date,
+                sc.insert_date,
                 scr.run_id,
                 scr.published_at
             FROM special_candidate sc
@@ -439,6 +440,7 @@ def get_all_specials(cursor):
                     'notes': row.get('notes'),
                     'source': row.get('source'),
                     'approval_date': row.get('approval_date').isoformat() if row.get('approval_date') else None,
+                    'insert_date': row.get('insert_date').isoformat() if row.get('insert_date') else None,
                     'run_id': row.get('run_id'),
                     'published_at': row.get('published_at').isoformat() if row.get('published_at') else None,
                 }
