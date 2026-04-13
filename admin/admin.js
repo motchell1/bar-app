@@ -8,6 +8,17 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
   if (!backButton || !homeButton || !titleElement || !screenElement) return;
 
   const DAY_ORDER = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'];
+  const ADMIN_TIMEZONE = 'America/New_York';
+  const ADMIN_DATETIME_FORMATTER = new Intl.DateTimeFormat('en-US', {
+    timeZone: ADMIN_TIMEZONE,
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    second: '2-digit',
+    timeZoneName: 'short'
+  });
   const DAY_LABELS = {
     MONDAY: 'Mon',
     TUESDAY: 'Tue',
@@ -78,7 +89,7 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
     if (!value) return '—';
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return String(value);
-    return date.toLocaleString();
+    return ADMIN_DATETIME_FORMATTER.format(date);
   }
 
   function formatTime(value) {
