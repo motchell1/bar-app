@@ -375,8 +375,28 @@ def update_special_candidate_approval(cursor, special_candidate_id: int, approva
     }
 
 
+
+
+def _parse_event_payload(event):
+    if not isinstance(event, dict):
+        return {}
+
+    payload = dict(event)
+    raw_body = payload.get('body')
+    if isinstance(raw_body, str):
+        try:
+            parsed_body = json.loads(raw_body)
+            if isinstance(parsed_body, dict):
+                payload.update(parsed_body)
+        except json.JSONDecodeError:
+            LOGGER.warning('dbAdminSync received non-JSON body')
+    elif isinstance(raw_body, dict):
+        payload.update(raw_body)
+
+    return payload
+
 def lambda_handler(event, context):
-    event = event or {}
+    event = _parse_event_payload(event or {})
     mode = event.get('mode')
     if mode not in {'get_unapproved_special_candidates', 'update_special_candidate_approval'}:
         return {

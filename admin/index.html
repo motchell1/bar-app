@@ -9,13 +9,16 @@
 <body>
 <div class="admin-toolbar">
   <div class="admin-toolbar-inner">
-    <span class="admin-title">admin</span>
+    <button id="admin-back-button" class="admin-back-button" type="button" aria-label="Go back">
+      <span data-lucide="arrow-left"></span>
+    </button>
+    <span id="admin-title" class="admin-title">Admin</span>
     <button id="admin-home-button" class="admin-home-button" type="button" aria-label="Go home">
       <span data-lucide="house"></span>
     </button>
   </div>
 </div>
-<main class="admin-screen" aria-label="Admin screen"></main>
+<main id="admin-screen" class="admin-screen" aria-label="Admin screen"></main>
 
 <script src="https://cdn.jsdelivr.net/npm/lucide@0.575.0/dist/umd/lucide.js"></script>
 <script>lucide.createIcons();</script>
