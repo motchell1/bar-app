@@ -256,10 +256,9 @@ def publish_special_candidate_run(cursor, bar_id: int, run_id: int, auto_publish
     manual_filter_clause = "AND insert_method <> 'MANUAL'" if IGNORE_MANUAL_SPECIALS_ON_PUBLISH == 'Y' else ''
     cursor.execute(
         f"""
-        SELECT special_id, day_of_week, all_day, start_time, end_time, description
+        SELECT special_id, day_of_week, all_day, start_time, end_time, description, is_active
         FROM special
         WHERE bar_id = %s
-            AND is_active = 'Y'
             {manual_filter_clause}
         """,
         (bar_id,),
@@ -296,11 +295,31 @@ def publish_special_candidate_run(cursor, bar_id: int, run_id: int, auto_publish
 
     for special in existing_specials:
         if special['special_id'] not in matched_special_ids:
+            if special.get('is_active') == 'Y':
+                cursor.execute(
+                    """
+                    UPDATE special
+                    SET is_active = 'N',
+                        update_date = NOW()
+                    WHERE special_id = %s
+                    """,
+                    (special['special_id'],),
+                )
+        elif special.get('is_active') != 'Y':
             cursor.execute(
                 """
                 UPDATE special
-                SET is_active = 'N',
+                SET is_active = 'Y',
                     update_date = NOW()
+                WHERE special_id = %s
+                """,
+                (special['special_id'],),
+            )
+        else:
+            cursor.execute(
+                """
+                UPDATE special
+                SET update_date = NOW()
                 WHERE special_id = %s
                 """,
                 (special['special_id'],),
@@ -339,7 +358,11 @@ def publish_special_candidate_run(cursor, bar_id: int, run_id: int, auto_publish
             (approved_special_id, candidate_id),
         )
 
-    deactivated_special_count = len(existing_specials) - len(matched_special_ids)
+    deactivated_special_count = sum(
+        1
+        for special in existing_specials
+        if special.get('is_active') == 'Y' and special['special_id'] not in matched_special_ids
+    )
     cursor.execute(
         """
         UPDATE special_candidate_run
