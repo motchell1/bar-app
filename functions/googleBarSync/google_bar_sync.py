@@ -16,6 +16,8 @@ GOOGLE_API_KEY = os.environ['GOOGLE_API_KEY']
 S3_BUCKET_NAME = os.environ['S3_BUCKET_NAME']
 BAR_IMAGE_FOLDER = os.environ['BAR_IMAGE_FOLDER'].strip('/')
 DB_BAR_SYNC_LAMBDA_NAME = os.environ['DB_BAR_SYNC_LAMBDA_NAME']
+NEIGHBORHOODS_JSON_PATH = os.environ.get('NEIGHBORHOODS_JSON_PATH')
+NEIGHBORHOODS_JSON_S3_KEY = os.environ.get('NEIGHBORHOODS_JSON_S3_KEY')
 
 GOOGLE_TEXT_SEARCH_URL = 'https://places.googleapis.com/v1/places:searchText'
 GOOGLE_PLACE_PHOTO_URL_TEMPLATE = 'https://places.googleapis.com/v1/{photo_name}/media'
@@ -45,16 +47,41 @@ DAY_MAP = {
 ALL_DAYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']
 
 def load_neighborhood_configs() -> Dict:
-    config_path = Path(__file__).resolve().parents[2] / 'neighborhoods.json'
-    with config_path.open('r', encoding='utf-8') as config_file:
-        return json.load(config_file)
+    candidate_paths = []
+    if NEIGHBORHOODS_JSON_PATH:
+        candidate_paths.append(Path(NEIGHBORHOODS_JSON_PATH))
 
+    current_file = Path(__file__).resolve()
+    candidate_paths.extend([
+        current_file.with_name('neighborhoods.json'),
+        current_file.parent / 'neighborhoods.json',
+        current_file.parents[1] / 'neighborhoods.json',
+        current_file.parents[2] / 'neighborhoods.json',
+        Path.cwd() / 'neighborhoods.json',
+        Path('/var/task/neighborhoods.json'),
+    ])
 
-NEIGHBORHOOD_CONFIGS = load_neighborhood_configs()
+    for config_path in candidate_paths:
+        if config_path.exists():
+            with config_path.open('r', encoding='utf-8') as config_file:
+                return json.load(config_file)
+
+    if NEIGHBORHOODS_JSON_S3_KEY:
+        response = s3_client.get_object(Bucket=S3_BUCKET_NAME, Key=NEIGHBORHOODS_JSON_S3_KEY)
+        return json.loads(response['Body'].read().decode('utf-8'))
+
+    attempted_paths = ', '.join(str(path) for path in candidate_paths)
+    raise GoogleBarSyncError(
+        'Unable to load neighborhoods.json. '
+        f'Tried local paths: {attempted_paths}. '
+        'You can also set NEIGHBORHOODS_JSON_S3_KEY to load from S3.'
+    )
+
 
 lambda_client = boto3.client('lambda')
 s3_client = boto3.client('s3')
 http_session = requests.Session()
+NEIGHBORHOOD_CONFIGS = load_neighborhood_configs()
 
 
 class GoogleBarSyncError(Exception):
