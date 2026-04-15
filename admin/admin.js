@@ -33,6 +33,7 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
     currentView: 'home',
     loading: false,
     loadingSpecials: false,
+    loadingBars: false,
     specialSearchTerm: '',
     specialFilterActive: 'all',
     specialFilterNeighborhood: 'all',
@@ -45,6 +46,12 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
     detailSpecials: [],
     detailEditing: false,
     savingSpecial: false,
+    actionBarId: null,
+    allBars: [],
+    detailBar: null,
+    detailOpenHours: [],
+    detailBarEditing: false,
+    savingBar: false,
     runs: [],
     allSpecials: [],
     groupedSpecials: [],
@@ -63,6 +70,10 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
     state.actionSpecialId = null;
     state.detailSpecials = [];
     state.detailEditing = false;
+    state.actionBarId = null;
+    state.detailBar = null;
+    state.detailOpenHours = [];
+    state.detailBarEditing = false;
     render();
   });
 
@@ -280,6 +291,37 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
     }
   }
 
+  async function loadAllBars() {
+    state.loadingBars = true;
+    state.errorMessage = '';
+    render();
+
+    try {
+      const result = await callAdminSync({ mode: 'get_all_bars' });
+      state.allBars = Array.isArray(result?.bars) ? result.bars : [];
+    } catch (err) {
+      console.error('Failed to load all bars:', err);
+      state.errorMessage = err?.message || 'Failed to load bars.';
+    } finally {
+      state.loadingBars = false;
+      render();
+    }
+  }
+
+  async function loadBarDetails(barId) {
+    state.errorMessage = '';
+    try {
+      const result = await callAdminSync({ mode: 'get_bar_details', bar_id: barId });
+      state.detailBar = result?.bar || null;
+      state.detailOpenHours = Array.isArray(result?.open_hours) ? result.open_hours : [];
+    } catch (err) {
+      console.error('Failed to load bar details:', err);
+      state.errorMessage = err?.message || 'Failed to load bar details.';
+      state.detailBar = null;
+      state.detailOpenHours = [];
+    }
+  }
+
   async function updateCandidateApproval(specialCandidateId, approvalStatus) {
     state.updatingCandidateId = specialCandidateId;
     state.errorMessage = '';
@@ -344,6 +386,34 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
     }
   }
 
+  async function saveBarUpdates(barPayload, openHoursRows) {
+    state.savingBar = true;
+    state.errorMessage = '';
+    render();
+
+    try {
+      if (barPayload && Object.keys(barPayload).length > 1) {
+        await callAdminSync({ mode: 'update_bar', ...barPayload });
+      }
+      if (Array.isArray(openHoursRows) && openHoursRows.length) {
+        await callAdminSync({
+          mode: 'update_open_hours',
+          bar_id: barPayload.bar_id,
+          open_hours_rows: openHoursRows
+        });
+      }
+      await loadAllBars();
+      await loadBarDetails(barPayload.bar_id);
+      state.detailBarEditing = false;
+    } catch (err) {
+      console.error('Failed to update bar:', err);
+      state.errorMessage = err?.message || 'Failed to update bar.';
+    } finally {
+      state.savingBar = false;
+      render();
+    }
+  }
+
   function getSpecialById(specialId) {
     return state.allSpecials.find((row) => row.special_id === specialId) || null;
   }
@@ -362,6 +432,21 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
           <button type="button" class="admin-tool-button" data-special-action="activate" data-special-id="${state.actionSpecialId}">Activate Special</button>
           <button type="button" class="admin-tool-button" data-special-action="deactivate" data-special-id="${state.actionSpecialId}">Deactivate Special</button>
           <button type="button" class="admin-secondary-btn" data-close-action-menu="true">Close</button>
+        </div>
+      </div>
+    `;
+  }
+
+  function getBarActionMenuMarkup() {
+    if (!state.actionBarId) return '';
+    return `
+      <div class="admin-modal-backdrop" data-close-bar-action-menu="true">
+        <div class="admin-modal" role="dialog" aria-label="Bar actions">
+          <h3>Bar Actions</h3>
+          <button type="button" class="admin-tool-button" data-bar-action="view-details" data-bar-id="${state.actionBarId}">View Details</button>
+          <button type="button" class="admin-tool-button" data-bar-action="activate" data-bar-id="${state.actionBarId}">Activate Bar</button>
+          <button type="button" class="admin-tool-button" data-bar-action="deactivate" data-bar-id="${state.actionBarId}">Deactivate Bar</button>
+          <button type="button" class="admin-secondary-btn" data-close-bar-action-menu="true">Close</button>
         </div>
       </div>
     `;
@@ -486,6 +571,118 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
               ? '<button type="button" class="admin-secondary-btn" data-detail-action="cancel-edit">Cancel</button>'
               : ''}
             <button type="button" class="admin-secondary-btn" data-close-detail-modal="true">Close</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  function getBarDetailModalMarkup() {
+    if (!state.detailBar) return '';
+    const bar = state.detailBar;
+    const renderBarField = (key, label, fallback = '—') => {
+      const value = bar[key];
+      if (!state.detailBarEditing) {
+        const display = value === null || value === undefined || value === '' ? fallback : String(value);
+        return `<p><strong>${label}:</strong> ${display}</p>`;
+      }
+
+      if (key === 'is_active') {
+        const resolved = String(value || '').toUpperCase() === 'Y' ? 'Y' : 'N';
+        return `
+          <p><strong>${label}:</strong>
+            <select class="admin-input" data-bar-field="${key}">
+              <option value="Y" ${resolved === 'Y' ? 'selected' : ''}>Y</option>
+              <option value="N" ${resolved === 'N' ? 'selected' : ''}>N</option>
+            </select>
+          </p>
+        `;
+      }
+
+      return `<p><strong>${label}:</strong> <input class="admin-input" data-bar-field="${key}" value="${escapeAttribute(value ?? '')}" /></p>`;
+    };
+
+    const renderOpenHoursRow = (row) => {
+      const rowKey = normalizeDay(row.day_of_week);
+      if (!state.detailBarEditing) {
+        return `
+          <tr>
+            <td>${row.day_of_week || '—'}</td>
+            <td>${formatTime(row.open_time)}</td>
+            <td>${formatTime(row.close_time)}</td>
+            <td>${row.is_closed || '—'}</td>
+            <td>${formatDateTime(row.insert_date)}</td>
+            <td>${formatDateTime(row.update_date)}</td>
+          </tr>
+        `;
+      }
+
+      const resolvedClosed = String(row.is_closed || '').toUpperCase() === 'Y' ? 'Y' : 'N';
+      return `
+        <tr data-open-hours-row="${rowKey}">
+          <td>${row.day_of_week || '—'}</td>
+          <td><input class="admin-input" data-open-hours-field="open_time" data-open-hours-day="${rowKey}" value="${escapeAttribute(formatTime(row.open_time) === '—' ? '' : formatTime(row.open_time))}" /></td>
+          <td><input class="admin-input" data-open-hours-field="close_time" data-open-hours-day="${rowKey}" value="${escapeAttribute(formatTime(row.close_time) === '—' ? '' : formatTime(row.close_time))}" /></td>
+          <td>
+            <select class="admin-input" data-open-hours-field="is_closed" data-open-hours-day="${rowKey}">
+              <option value="N" ${resolvedClosed === 'N' ? 'selected' : ''}>N</option>
+              <option value="Y" ${resolvedClosed === 'Y' ? 'selected' : ''}>Y</option>
+            </select>
+          </td>
+          <td>${formatDateTime(row.insert_date)}</td>
+          <td>${formatDateTime(row.update_date)}</td>
+        </tr>
+      `;
+    };
+
+    return `
+      <div class="admin-modal-backdrop" data-close-bar-detail-modal="true">
+        <div class="admin-modal admin-modal-detail" role="dialog" aria-label="Bar detail">
+          <h3>Bar Details</h3>
+          <section class="admin-special-detail-card">
+            <h4>Bar Data</h4>
+            <div class="admin-detail-grid">
+              <p><strong>Bar ID:</strong> ${bar.bar_id ?? '—'}</p>
+              ${renderBarField('name', 'Name')}
+              ${renderBarField('neighborhood', 'Neighborhood')}
+              ${renderBarField('address', 'Address')}
+              ${renderBarField('website', 'Website')}
+              ${renderBarField('google_place_id', 'Google Place ID')}
+              ${renderBarField('latitude', 'Latitude')}
+              ${renderBarField('longitude', 'Longitude')}
+              ${renderBarField('is_active', 'Is Active')}
+              <p><strong>Insert Date:</strong> ${formatDateTime(bar.insert_date)}</p>
+              <p><strong>Update Date:</strong> ${formatDateTime(bar.update_date)}</p>
+            </div>
+          </section>
+          <section class="admin-special-detail-card">
+            <h4>Open Hours</h4>
+            <div class="admin-table-wrap">
+              <table class="admin-special-table">
+                <thead>
+                  <tr>
+                    <th>Day of Week</th>
+                    <th>Open Time</th>
+                    <th>Close Time</th>
+                    <th>Is Closed</th>
+                    <th>Insert Date</th>
+                    <th>Update Date</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${state.detailOpenHours.map((row) => renderOpenHoursRow(row)).join('')}
+                </tbody>
+              </table>
+            </div>
+          </section>
+          <div class="admin-actions-row">
+            ${state.detailBarEditing
+              ? `<button type="button" class="admin-action-btn approve" data-bar-detail-action="save" ${state.savingBar ? 'disabled' : ''}>Save</button>`
+              : `<button type="button" class="admin-action-btn approve" data-bar-detail-action="edit">Edit</button>`}
+            ${state.detailBarEditing
+              ? '<button type="button" class="admin-secondary-btn" data-bar-detail-action="cancel-edit">Cancel</button>'
+              : ''}
+            <button type="button" class="admin-secondary-btn" data-close-bar-detail-modal="true">Close</button>
           </div>
         </div>
       </div>
@@ -649,6 +846,41 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
     `;
   }
 
+  function buildBarManagementTable() {
+    if (!state.allBars.length) {
+      return '<p class="admin-empty">No bars found.</p>';
+    }
+
+    const rows = state.allBars.map((bar) => `
+      <tr class="admin-bar-row" data-bar-id="${bar.bar_id}">
+        <td>${bar.name || '—'}</td>
+        <td>${bar.neighborhood || '—'}</td>
+        <td>${bar.is_active || '—'}</td>
+        <td>${formatDateTime(bar.insert_date)}</td>
+        <td>${formatDateTime(bar.update_date)}</td>
+      </tr>
+    `).join('');
+
+    return `
+      <div class="admin-table-wrap">
+        <table class="admin-special-table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Neighborhood</th>
+              <th>Is Active</th>
+              <th>Insert Date</th>
+              <th>Update Date</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+      ${getBarActionMenuMarkup()}
+      ${getBarDetailModalMarkup()}
+    `;
+  }
+
   function bindApprovalButtons() {
     screenElement.querySelectorAll('[data-action][data-candidate-id]').forEach((button) => {
       button.addEventListener('click', () => {
@@ -794,6 +1026,107 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
     });
   }
 
+  function bindBarManagementEvents() {
+    screenElement.querySelectorAll('.admin-bar-row[data-bar-id]').forEach((row) => {
+      row.addEventListener('click', () => {
+        state.actionBarId = Number(row.getAttribute('data-bar-id'));
+        render();
+      });
+    });
+
+    screenElement.querySelectorAll('[data-close-bar-action-menu="true"]').forEach((element) => {
+      element.addEventListener('click', (event) => {
+        if (event.currentTarget !== event.target) return;
+        state.actionBarId = null;
+        render();
+      });
+    });
+
+    screenElement.querySelectorAll('[data-bar-action][data-bar-id]').forEach((button) => {
+      button.addEventListener('click', async () => {
+        const action = button.getAttribute('data-bar-action');
+        const barId = Number(button.getAttribute('data-bar-id'));
+        if (!barId || !action) return;
+
+        try {
+          state.errorMessage = '';
+          state.actionBarId = null;
+          if (action === 'view-details') {
+            await loadBarDetails(barId);
+            state.detailBarEditing = false;
+            render();
+            return;
+          }
+
+          if (action === 'activate' || action === 'deactivate') {
+            await callAdminSync({
+              mode: 'update_bar',
+              bar_id: barId,
+              is_active: action === 'activate' ? 'Y' : 'N'
+            });
+            await loadAllBars();
+            render();
+          }
+        } catch (err) {
+          console.error('Failed to update bar status:', err);
+          state.errorMessage = err?.message || 'Failed to update bar status.';
+          render();
+        }
+      });
+    });
+
+    screenElement.querySelectorAll('[data-close-bar-detail-modal="true"]').forEach((element) => {
+      element.addEventListener('click', (event) => {
+        if (event.currentTarget !== event.target) return;
+        state.detailBar = null;
+        state.detailOpenHours = [];
+        state.detailBarEditing = false;
+        render();
+      });
+    });
+
+    screenElement.querySelectorAll('[data-bar-detail-action]').forEach((button) => {
+      button.addEventListener('click', async () => {
+        const action = button.getAttribute('data-bar-detail-action');
+        if (!action || !state.detailBar?.bar_id) return;
+
+        if (action === 'edit') {
+          state.detailBarEditing = true;
+          render();
+          return;
+        }
+
+        if (action === 'cancel-edit') {
+          await loadBarDetails(state.detailBar.bar_id);
+          state.detailBarEditing = false;
+          render();
+          return;
+        }
+
+        if (action === 'save') {
+          const barPayload = { bar_id: state.detailBar.bar_id };
+          screenElement.querySelectorAll('[data-bar-field]').forEach((input) => {
+            const field = input.getAttribute('data-bar-field');
+            if (!field) return;
+            barPayload[field] = input.value;
+          });
+
+          const openHoursByDay = new Map();
+          screenElement.querySelectorAll('[data-open-hours-day][data-open-hours-field]').forEach((input) => {
+            const day = input.getAttribute('data-open-hours-day');
+            const field = input.getAttribute('data-open-hours-field');
+            if (!day || !field) return;
+            if (!openHoursByDay.has(day)) {
+              openHoursByDay.set(day, { day_of_week: day });
+            }
+            openHoursByDay.get(day)[field] = input.value;
+          });
+          await saveBarUpdates(barPayload, [...openHoursByDay.values()]);
+        }
+      });
+    });
+  }
+
   function bindToolButtons() {
     screenElement.querySelectorAll('[data-tool]').forEach((button) => {
       button.addEventListener('click', async () => {
@@ -809,6 +1142,12 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
           render();
           await loadAllSpecials();
         }
+
+        if (tool === 'bar-management') {
+          state.currentView = 'bar-management';
+          render();
+          await loadAllBars();
+        }
       });
     });
   }
@@ -819,6 +1158,7 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
       <section class="admin-home-view" aria-label="Admin tools">
         <h2>Admin tools</h2>
         <button type="button" class="admin-tool-button" data-tool="special-management">Special Management</button>
+        <button type="button" class="admin-tool-button" data-tool="bar-management">Bar Management</button>
         <button type="button" class="admin-tool-button" data-tool="specials-to-be-approved">Specials Pending Approval</button>
       </section>
     `;
@@ -900,6 +1240,25 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
     bindSpecialManagementEvents();
   }
 
+  function renderBarManagementView() {
+    titleElement.textContent = 'Bar Management';
+
+    if (state.loadingBars) {
+      screenElement.innerHTML = '<p class="admin-loading">Loading bars...</p>';
+      return;
+    }
+
+    screenElement.innerHTML = `
+      <section class="admin-specials-view" aria-label="Bar management">
+        <h2>Bar Management</h2>
+        ${state.errorMessage ? `<p class="admin-error">${state.errorMessage}</p>` : ''}
+        ${buildBarManagementTable()}
+      </section>
+    `;
+
+    bindBarManagementEvents();
+  }
+
   function render() {
     updateToolbarButtons();
     if (state.currentView === 'specials') {
@@ -909,6 +1268,11 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
 
     if (state.currentView === 'special-management') {
       renderSpecialManagementView();
+      return;
+    }
+
+    if (state.currentView === 'bar-management') {
+      renderBarManagementView();
       return;
     }
 
