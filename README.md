@@ -22,6 +22,10 @@ The folders inside `functions/` each correspond to an AWS Lambda function.
   - `S3_BUCKET_NAME`
   - `BAR_IMAGE_FOLDER`
   - `DB_BAR_SYNC_LAMBDA_NAME`
+  
+  Optional environment variables:
+  - `NEIGHBORHOODS_JSON_PATH` (absolute/relative local file path override for `neighborhoods.json`)
+  - `NEIGHBORHOODS_JSON_S3_KEY` (S3 object key in `S3_BUCKET_NAME`; used when no local file is found)
 
 - **`dbBarSync`**  
   This Lambda is invoked only by `googleBarSync`. It handles bar-centric sync tasks. `determine_if_bar_existing` splits candidates into `new_bars` and `existing_bars` by `google_place_id`; `apply_bar_upsert` inserts new bars, upserts open-hours rows, and marks any bar whose Google `business_status` is not `OPERATIONAL` as inactive; `get_bars_by_neighborhood` returns bars for downstream jobs. It uses the same RDS connection variable pattern as the existing database Lambdas.
