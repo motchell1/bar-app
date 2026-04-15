@@ -34,6 +34,10 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
     loading: false,
     loadingSpecials: false,
     specialSearchTerm: '',
+    specialFilterActive: 'all',
+    specialFilterNeighborhood: 'all',
+    specialFilterType: 'all',
+    specialFilterAllDay: 'all',
     updatingCandidateId: null,
     editingCandidateId: null,
     savingCandidate: false,
@@ -551,13 +555,36 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
 
   function buildSpecialManagementTable() {
     const searchTerm = String(state.specialSearchTerm || '').trim().toLowerCase();
-    const filteredSpecials = searchTerm
-      ? state.groupedSpecials.filter((row) => {
-        const neighborhood = String(row.neighborhood || '').toLowerCase();
-        const barName = String(row.bar_name || '').toLowerCase();
-        return neighborhood.includes(searchTerm) || barName.includes(searchTerm);
-      })
-      : state.groupedSpecials;
+    const filteredSpecials = state.groupedSpecials.filter((row) => {
+      const neighborhood = String(row.neighborhood || '').trim();
+      const barName = String(row.bar_name || '').trim();
+      const type = String(row.type || '').trim().toLowerCase();
+      const isActive = String(row.is_active || '').trim().toUpperCase();
+      const allDay = String(row.all_day || '').trim().toUpperCase();
+
+      const searchMatches = !searchTerm
+        || neighborhood.toLowerCase().includes(searchTerm)
+        || barName.toLowerCase().includes(searchTerm);
+      if (!searchMatches) return false;
+
+      const activeMatches = state.specialFilterActive === 'all'
+        || isActive === state.specialFilterActive;
+      if (!activeMatches) return false;
+
+      const neighborhoodMatches = state.specialFilterNeighborhood === 'all'
+        || neighborhood === state.specialFilterNeighborhood;
+      if (!neighborhoodMatches) return false;
+
+      const typeMatches = state.specialFilterType === 'all'
+        || type === state.specialFilterType;
+      if (!typeMatches) return false;
+
+      const allDayMatches = state.specialFilterAllDay === 'all'
+        || allDay === state.specialFilterAllDay;
+      if (!allDayMatches) return false;
+
+      return true;
+    });
 
     if (!filteredSpecials.length) {
       if (searchTerm) {
@@ -658,6 +685,17 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
         render();
       });
     }
+
+    screenElement.querySelectorAll('[data-special-filter]').forEach((select) => {
+      select.addEventListener('change', (event) => {
+        const filter = event.target.getAttribute('data-special-filter');
+        if (filter === 'active') state.specialFilterActive = event.target.value;
+        if (filter === 'neighborhood') state.specialFilterNeighborhood = event.target.value;
+        if (filter === 'type') state.specialFilterType = event.target.value;
+        if (filter === 'all-day') state.specialFilterAllDay = event.target.value;
+        render();
+      });
+    });
 
     screenElement.querySelectorAll('.admin-special-row[data-special-id]').forEach((row) => {
       row.addEventListener('click', () => {
@@ -802,6 +840,15 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
       return;
     }
 
+    const neighborhoodOptions = [...new Set(state.groupedSpecials
+      .map((row) => String(row.neighborhood || '').trim())
+      .filter(Boolean))]
+      .sort((a, b) => a.localeCompare(b));
+    const typeOptions = [...new Set(state.groupedSpecials
+      .map((row) => String(row.type || '').trim().toLowerCase())
+      .filter(Boolean))]
+      .sort((a, b) => a.localeCompare(b));
+
     screenElement.innerHTML = `
       <section class="admin-specials-view" aria-label="Special management">
         <h2>Special Management</h2>
@@ -813,6 +860,26 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
           value="${escapeAttribute(state.specialSearchTerm)}"
           aria-label="Search specials by bar or neighborhood"
         />
+        <div class="admin-special-filters" aria-label="Special filters">
+          <select class="admin-input admin-special-filter-select" data-special-filter="active" aria-label="Filter by active">
+            <option value="all" ${state.specialFilterActive === 'all' ? 'selected' : ''}>Active: All</option>
+            <option value="Y" ${state.specialFilterActive === 'Y' ? 'selected' : ''}>Active: Yes</option>
+            <option value="N" ${state.specialFilterActive === 'N' ? 'selected' : ''}>Active: No</option>
+          </select>
+          <select class="admin-input admin-special-filter-select" data-special-filter="neighborhood" aria-label="Filter by neighborhood">
+            <option value="all" ${state.specialFilterNeighborhood === 'all' ? 'selected' : ''}>Neighborhood: All</option>
+            ${neighborhoodOptions.map((name) => `<option value="${escapeAttribute(name)}" ${state.specialFilterNeighborhood === name ? 'selected' : ''}>${name}</option>`).join('')}
+          </select>
+          <select class="admin-input admin-special-filter-select" data-special-filter="type" aria-label="Filter by type">
+            <option value="all" ${state.specialFilterType === 'all' ? 'selected' : ''}>Type: All</option>
+            ${typeOptions.map((type) => `<option value="${escapeAttribute(type)}" ${state.specialFilterType === type ? 'selected' : ''}>Type: ${type}</option>`).join('')}
+          </select>
+          <select class="admin-input admin-special-filter-select" data-special-filter="all-day" aria-label="Filter by all day">
+            <option value="all" ${state.specialFilterAllDay === 'all' ? 'selected' : ''}>All Day: All</option>
+            <option value="Y" ${state.specialFilterAllDay === 'Y' ? 'selected' : ''}>All Day: Yes</option>
+            <option value="N" ${state.specialFilterAllDay === 'N' ? 'selected' : ''}>All Day: No</option>
+          </select>
+        </div>
         ${state.errorMessage ? `<p class="admin-error">${state.errorMessage}</p>` : ''}
         ${buildSpecialManagementTable()}
       </section>
