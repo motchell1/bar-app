@@ -89,6 +89,16 @@ body {
   font-size: 20px;
 }
 
+.admin-special-search-input {
+  background: #fff;
+}
+
+.admin-special-filters {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
 .admin-tool-button {
   text-align: left;
   padding: 14px;
