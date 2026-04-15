@@ -33,6 +33,7 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
     currentView: 'home',
     loading: false,
     loadingSpecials: false,
+    specialSearchTerm: '',
     updatingCandidateId: null,
     editingCandidateId: null,
     savingCandidate: false,
@@ -97,6 +98,14 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
   function formatTime(value) {
     if (!value) return '—';
     return String(value).slice(0, 5);
+  }
+
+  function escapeAttribute(value) {
+    return String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/"/g, '&quot;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
   }
 
   function getSourceMarkup(source) {
@@ -541,11 +550,23 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
   }
 
   function buildSpecialManagementTable() {
-    if (!state.groupedSpecials.length) {
+    const searchTerm = String(state.specialSearchTerm || '').trim().toLowerCase();
+    const filteredSpecials = searchTerm
+      ? state.groupedSpecials.filter((row) => {
+        const neighborhood = String(row.neighborhood || '').toLowerCase();
+        const barName = String(row.bar_name || '').toLowerCase();
+        return neighborhood.includes(searchTerm) || barName.includes(searchTerm);
+      })
+      : state.groupedSpecials;
+
+    if (!filteredSpecials.length) {
+      if (searchTerm) {
+        return '<p class="admin-empty">No specials match that bar or neighborhood.</p>';
+      }
       return '<p class="admin-empty">No specials found.</p>';
     }
 
-    const rows = state.groupedSpecials.map((row) => `
+    const rows = filteredSpecials.map((row) => `
       <tr class="admin-special-row" data-special-id="${row.representative_special_id}">
         <td>${row.neighborhood || '—'}</td>
         <td>${row.bar_name || '—'}</td>
@@ -630,6 +651,14 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
   }
 
   function bindSpecialManagementEvents() {
+    const searchInput = screenElement.querySelector('[data-special-search-input]');
+    if (searchInput) {
+      searchInput.addEventListener('input', (event) => {
+        state.specialSearchTerm = event.target.value;
+        render();
+      });
+    }
+
     screenElement.querySelectorAll('.admin-special-row[data-special-id]').forEach((row) => {
       row.addEventListener('click', () => {
         state.actionSpecialId = Number(row.getAttribute('data-special-id'));
@@ -776,6 +805,14 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
     screenElement.innerHTML = `
       <section class="admin-specials-view" aria-label="Special management">
         <h2>Special Management</h2>
+        <input
+          type="search"
+          class="admin-input admin-special-search-input"
+          data-special-search-input
+          placeholder="Search by bar or neighborhood"
+          value="${escapeAttribute(state.specialSearchTerm)}"
+          aria-label="Search specials by bar or neighborhood"
+        />
         ${state.errorMessage ? `<p class="admin-error">${state.errorMessage}</p>` : ''}
         ${buildSpecialManagementTable()}
       </section>
