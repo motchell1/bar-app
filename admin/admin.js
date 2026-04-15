@@ -377,6 +377,18 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
 
     const renderValue = (special, key, fallback = '—') => {
       if (state.detailEditing && ['day_of_week', 'all_day', 'start_time', 'end_time', 'description', 'type', 'is_active'].includes(key)) {
+        if (key === 'type') {
+          const normalizedType = String(special[key] || '').trim().toLowerCase();
+          const resolvedType = ['drink', 'food', 'combo'].includes(normalizedType) ? normalizedType : 'unknown';
+          return `
+            <select class="admin-input" data-special-id="${special.special_id}" data-special-field="type">
+              <option value="drink" ${resolvedType === 'drink' ? 'selected' : ''}>drink</option>
+              <option value="food" ${resolvedType === 'food' ? 'selected' : ''}>food</option>
+              <option value="combo" ${resolvedType === 'combo' ? 'selected' : ''}>combo</option>
+              <option value="unknown" ${resolvedType === 'unknown' ? 'selected' : ''}>unknown</option>
+            </select>
+          `;
+        }
         return `<input class="admin-input" data-special-id="${special.special_id}" data-special-field="${key}" value="${special[key] ?? ''}" />`;
       }
       return special[key] === null || special[key] === undefined || special[key] === '' ? fallback : String(special[key]);
