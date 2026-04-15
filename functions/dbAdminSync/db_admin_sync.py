@@ -514,6 +514,192 @@ def get_all_specials(cursor):
     return {'specials': specials, 'special_count': len(specials)}
 
 
+def get_all_bars(cursor):
+    cursor.execute(
+        """
+        SELECT
+            bar_id,
+            name,
+            neighborhood,
+            is_active,
+            insert_date,
+            update_date
+        FROM bar
+        ORDER BY neighborhood ASC, name ASC, bar_id ASC
+        """
+    )
+    rows = cursor.fetchall()
+    bars = []
+    for row in rows:
+        bars.append(
+            {
+                'bar_id': row.get('bar_id'),
+                'name': row.get('name'),
+                'neighborhood': row.get('neighborhood'),
+                'is_active': row.get('is_active'),
+                'insert_date': row.get('insert_date').isoformat() if row.get('insert_date') else None,
+                'update_date': row.get('update_date').isoformat() if row.get('update_date') else None,
+            }
+        )
+    return {'bars': bars, 'bar_count': len(bars)}
+
+
+def get_bar_details(cursor, bar_id: int):
+    cursor.execute(
+        """
+        SELECT
+            bar_id,
+            name,
+            neighborhood,
+            address,
+            website,
+            google_place_id,
+            latitude,
+            longitude,
+            is_active,
+            insert_date,
+            update_date
+        FROM bar
+        WHERE bar_id = %s
+        """,
+        (bar_id,),
+    )
+    bar_row = cursor.fetchone()
+    if not bar_row:
+        raise ValueError('bar_id was not found')
+
+    cursor.execute(
+        """
+        SELECT
+            day_of_week,
+            open_time,
+            close_time,
+            is_closed,
+            insert_date,
+            update_date
+        FROM open_hours
+        WHERE bar_id = %s
+        ORDER BY FIELD(day_of_week, 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY')
+        """,
+        (bar_id,),
+    )
+    open_hours_rows = cursor.fetchall()
+
+    return {
+        'bar': {
+            'bar_id': bar_row.get('bar_id'),
+            'name': bar_row.get('name'),
+            'neighborhood': bar_row.get('neighborhood'),
+            'address': bar_row.get('address'),
+            'website': bar_row.get('website'),
+            'google_place_id': bar_row.get('google_place_id'),
+            'latitude': bar_row.get('latitude'),
+            'longitude': bar_row.get('longitude'),
+            'is_active': bar_row.get('is_active'),
+            'insert_date': bar_row.get('insert_date').isoformat() if bar_row.get('insert_date') else None,
+            'update_date': bar_row.get('update_date').isoformat() if bar_row.get('update_date') else None,
+        },
+        'open_hours': [
+            {
+                'day_of_week': row.get('day_of_week'),
+                'open_time': _normalize_time_value(row.get('open_time')) or None,
+                'close_time': _normalize_time_value(row.get('close_time')) or None,
+                'is_closed': row.get('is_closed'),
+                'insert_date': row.get('insert_date').isoformat() if row.get('insert_date') else None,
+                'update_date': row.get('update_date').isoformat() if row.get('update_date') else None,
+            }
+            for row in open_hours_rows
+        ],
+    }
+
+
+def update_bar(cursor, event):
+    bar_id = event.get('bar_id')
+    if not bar_id:
+        raise ValueError('bar_id is required for update_bar')
+
+    editable_fields = {
+        'name',
+        'neighborhood',
+        'address',
+        'website',
+        'google_place_id',
+        'latitude',
+        'longitude',
+        'is_active',
+    }
+    updates = {}
+    for field in editable_fields:
+        if field in event:
+            updates[field] = event.get(field)
+
+    if not updates:
+        raise ValueError('At least one editable field must be provided for update_bar')
+
+    if 'is_active' in updates:
+        updates['is_active'] = _normalize_yn_flag(updates['is_active'])
+
+    set_clause = ', '.join([f"{key} = %s" for key in updates])
+    values = list(updates.values()) + [bar_id]
+    cursor.execute(
+        f"""
+        UPDATE bar
+        SET {set_clause},
+            update_date = NOW()
+        WHERE bar_id = %s
+        """,
+        values,
+    )
+    if cursor.rowcount == 0:
+        raise ValueError('bar_id was not found')
+
+    return get_bar_details(cursor, bar_id)
+
+
+def update_open_hours(cursor, event):
+    bar_id = event.get('bar_id')
+    rows = event.get('open_hours_rows')
+    if not bar_id:
+        raise ValueError('bar_id is required for update_open_hours')
+    if not isinstance(rows, list) or not rows:
+        raise ValueError('open_hours_rows must be a non-empty list for update_open_hours')
+
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        day_of_week = _normalize_day_of_week(row.get('day_of_week'))
+        if not day_of_week:
+            continue
+
+        open_time = _normalize_time_value(row.get('open_time')) or None
+        close_time = _normalize_time_value(row.get('close_time')) or None
+        is_closed = _normalize_yn_flag(row.get('is_closed'))
+
+        cursor.execute(
+            """
+            UPDATE open_hours
+            SET open_time = %s,
+                close_time = %s,
+                is_closed = %s,
+                update_date = NOW()
+            WHERE bar_id = %s
+                AND day_of_week = %s
+            """,
+            (open_time, close_time, is_closed, bar_id, day_of_week),
+        )
+
+        if cursor.rowcount == 0:
+            cursor.execute(
+                """
+                INSERT INTO open_hours (bar_id, day_of_week, open_time, close_time, is_closed)
+                VALUES (%s, %s, %s, %s, %s)
+                """,
+                (bar_id, day_of_week, open_time, close_time, is_closed),
+            )
+
+    return get_bar_details(cursor, bar_id)
+
+
 def update_special(cursor, event):
     special_id = event.get('special_id')
     if not special_id:
@@ -661,14 +847,25 @@ def _parse_event_payload(event):
 def lambda_handler(event, context):
     event = _parse_event_payload(event or {})
     mode = event.get('mode')
-    if mode not in {'get_unapproved_special_candidates', 'update_special_candidate_approval', 'get_all_specials', 'update_special', 'update_special_candidate'}:
+    if mode not in {
+        'get_unapproved_special_candidates',
+        'update_special_candidate_approval',
+        'get_all_specials',
+        'update_special',
+        'update_special_candidate',
+        'get_all_bars',
+        'get_bar_details',
+        'update_bar',
+        'update_open_hours',
+    }:
         return {
             'statusCode': 400,
             'body': json.dumps(
                 {
                     'error': (
                         'mode must be one of get_unapproved_special_candidates, '
-                        'update_special_candidate_approval, get_all_specials, update_special, update_special_candidate'
+                        'update_special_candidate_approval, get_all_specials, update_special, '
+                        'update_special_candidate, get_all_bars, get_bar_details, update_bar, update_open_hours'
                     )
                 }
             ),
@@ -687,6 +884,17 @@ def lambda_handler(event, context):
                 result = update_special_candidate_approval(cursor, special_candidate_id, approval_status)
             elif mode == 'get_all_specials':
                 result = get_all_specials(cursor)
+            elif mode == 'get_all_bars':
+                result = get_all_bars(cursor)
+            elif mode == 'get_bar_details':
+                bar_id = event.get('bar_id')
+                if not bar_id:
+                    raise ValueError('bar_id is required for get_bar_details')
+                result = get_bar_details(cursor, bar_id)
+            elif mode == 'update_bar':
+                result = update_bar(cursor, event)
+            elif mode == 'update_open_hours':
+                result = update_open_hours(cursor, event)
             elif mode == 'update_special_candidate':
                 result = update_special_candidate(cursor, event)
             else:
