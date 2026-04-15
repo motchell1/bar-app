@@ -477,11 +477,20 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
         const candidateId = Number(special.special_candidate_id);
         const isUpdating = state.updatingCandidateId === candidateId;
         const isEditing = state.editingCandidateId === candidateId;
-        const days = Array.isArray(special.days_of_week) ? special.days_of_week.join(', ') : '';
         const confidence = special.confidence === null || special.confidence === undefined ? '—' : String(special.confidence);
         const editableValue = (field, fallback = '—') => {
           const value = special[field] ?? '';
           if (isEditing) {
+            if (field === 'type') {
+              const normalizedType = String(value || '').trim().toLowerCase();
+              return `
+                <select class="admin-input" data-candidate-id="${candidateId}" data-candidate-field="type">
+                  <option value="food" ${normalizedType === 'food' ? 'selected' : ''}>food</option>
+                  <option value="drink" ${normalizedType === 'drink' ? 'selected' : ''}>drink</option>
+                  <option value="combo" ${normalizedType === 'combo' ? 'selected' : ''}>combo</option>
+                </select>
+              `;
+            }
             return `<input class="admin-input" data-candidate-id="${candidateId}" data-candidate-field="${field}" value="${value}" />`;
           }
           return value === '' ? fallback : String(value);
