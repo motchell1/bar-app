@@ -122,6 +122,10 @@ body {
   padding: 12px;
 }
 
+.admin-candidate-card {
+  position: relative;
+}
+
 .admin-run-card {
   display: flex;
   flex-direction: column;
@@ -158,6 +162,35 @@ body {
   display: flex;
   gap: 8px;
   margin-top: 8px;
+}
+
+.admin-icon-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 28px;
+  height: 28px;
+  border: 1px solid #c8d8ff;
+  border-radius: 999px;
+  background: #fff;
+  color: #2f6fd1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.admin-icon-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.admin-source-link {
+  color: #2458b8;
+  text-decoration: underline;
+  word-break: break-word;
 }
 
 .admin-action-btn {

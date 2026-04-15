@@ -99,6 +99,15 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
     return String(value).slice(0, 5);
   }
 
+  function getSourceMarkup(source) {
+    if (!source) return '—';
+    const sourceValue = String(source);
+    if (/^https?:\/\//i.test(sourceValue)) {
+      return `<a class="admin-source-link" href="${sourceValue}" target="_blank" rel="noopener noreferrer">${sourceValue}</a>`;
+    }
+    return sourceValue;
+  }
+
   function normalizeDay(day) {
     return String(day || '').trim().toUpperCase();
   }
@@ -424,7 +433,7 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
                       <td>${candidate.confidence ?? '—'}</td>
                       <td>${candidate.fetch_method || '—'}</td>
                       <td>${candidate.notes || '—'}</td>
-                      <td>${candidate.source || '—'}</td>
+                      <td>${getSourceMarkup(candidate.source)}</td>
                       <td>${candidate.approval_status || '—'}</td>
                       <td>${formatDateTime(candidate.insert_date)}</td>
                       <td>${formatDateTime(candidate.approval_date)}</td>
@@ -480,6 +489,11 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
 
         return `
           <article class="admin-candidate-card" data-candidate-id="${candidateId}">
+            ${isEditing ? '' : `
+              <button class="admin-icon-btn" type="button" aria-label="Edit special candidate" title="Edit" data-candidate-action="edit" data-candidate-id="${candidateId}" ${isUpdating ? 'disabled' : ''}>
+                &#9998;
+              </button>
+            `}
             <h4>${isEditing ? 'Editing Special Candidate' : (special.description || 'No description')}</h4>
             <p><strong>Description:</strong> ${editableValue('description')}</p>
             <p><strong>Type:</strong> ${editableValue('type')}</p>
@@ -489,14 +503,13 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
             <p><strong>End Time:</strong> ${editableValue('end_time')}</p>
             <p><strong>Confidence:</strong> ${confidence}</p>
             <p><strong>Method:</strong> ${special.fetch_method || '—'}</p>
-            <p><strong>Source:</strong> ${special.source || '—'}</p>
+            <p><strong>Source:</strong> ${getSourceMarkup(special.source)}</p>
             <p><strong>Notes:</strong> ${special.notes || '—'}</p>
             <div class="admin-actions-row">
               ${isEditing
                 ? `<button class="admin-action-btn approve" type="button" data-candidate-action="save-edit" data-candidate-id="${candidateId}" ${state.savingCandidate ? 'disabled' : ''}>Save</button>
                    <button class="admin-secondary-btn" type="button" data-candidate-action="cancel-edit" data-candidate-id="${candidateId}" ${state.savingCandidate ? 'disabled' : ''}>Cancel</button>`
-                : `<button class="admin-action-btn edit" type="button" data-candidate-action="edit" data-candidate-id="${candidateId}" ${isUpdating ? 'disabled' : ''}>Edit</button>
-                   <button class="admin-action-btn approve" type="button" data-action="APPROVED" data-candidate-id="${candidateId}" ${isUpdating ? 'disabled' : ''}>Approve</button>
+                : `<button class="admin-action-btn approve" type="button" data-action="APPROVED" data-candidate-id="${candidateId}" ${isUpdating ? 'disabled' : ''}>Approve</button>
                    <button class="admin-action-btn reject" type="button" data-action="REJECTED" data-candidate-id="${candidateId}" ${isUpdating ? 'disabled' : ''}>Reject</button>`}
             </div>
           </article>
@@ -507,6 +520,7 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
         <section class="admin-run-card">
           <h3>Run ${run.run_id} — ${run.bar_name || 'Unknown bar'}</h3>
           <p><strong>Neighborhood:</strong> ${run.neighborhood || '—'}</p>
+          <p><strong>Bar ID:</strong> ${run.bar_id ?? '—'}</p>
           <p><strong>Total candidates:</strong> ${run.total_candidates ?? '—'}</p>
           <p><strong>Auto Approved Candidates:</strong> ${run.auto_approved_candidates ?? '—'}</p>
           <p><strong>Started:</strong> ${formatDateTime(run.started_at)}</p>
