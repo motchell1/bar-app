@@ -552,7 +552,7 @@ def get_bar_details(cursor, bar_id: int):
             name,
             neighborhood,
             address,
-            website,
+            website_url AS website,
             google_place_id,
             latitude,
             longitude,
@@ -619,19 +619,20 @@ def update_bar(cursor, event):
         raise ValueError('bar_id is required for update_bar')
 
     editable_fields = {
-        'name',
-        'neighborhood',
-        'address',
-        'website',
-        'google_place_id',
-        'latitude',
-        'longitude',
-        'is_active',
+        'name': 'name',
+        'neighborhood': 'neighborhood',
+        'address': 'address',
+        'website': 'website_url',
+        'website_url': 'website_url',
+        'google_place_id': 'google_place_id',
+        'latitude': 'latitude',
+        'longitude': 'longitude',
+        'is_active': 'is_active',
     }
     updates = {}
-    for field in editable_fields:
-        if field in event:
-            updates[field] = event.get(field)
+    for event_field, column_name in editable_fields.items():
+        if event_field in event:
+            updates[column_name] = event.get(event_field)
 
     if not updates:
         raise ValueError('At least one editable field must be provided for update_bar')
