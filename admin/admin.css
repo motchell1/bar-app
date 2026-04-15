@@ -179,6 +179,10 @@ body {
   background: #1c8d3b;
 }
 
+.admin-action-btn.edit {
+  background: #2f6fd1;
+}
+
 .admin-action-btn.reject {
   background: #bc2f2f;
 }

@@ -34,6 +34,8 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
     loading: false,
     loadingSpecials: false,
     updatingCandidateId: null,
+    editingCandidateId: null,
+    savingCandidate: false,
     actionSpecialId: null,
     detailSpecials: [],
     detailEditing: false,
@@ -276,6 +278,25 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
     }
   }
 
+  async function saveCandidateUpdates(payload) {
+    state.savingCandidate = true;
+    state.errorMessage = '';
+    render();
+
+    try {
+      await callAdminSync({ mode: 'update_special_candidate', ...payload });
+      await loadUnapprovedSpecials();
+      state.editingCandidateId = null;
+    } catch (err) {
+      console.error('Failed to update candidate:', err);
+      state.errorMessage = err?.message || 'Failed to update candidate.';
+      render();
+    } finally {
+      state.savingCandidate = false;
+      render();
+    }
+  }
+
   async function saveSpecialUpdates(payloads) {
     const updates = Array.isArray(payloads) ? payloads : [payloads];
     state.savingSpecial = true;
@@ -446,23 +467,37 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
       const specialsMarkup = (run.specials || []).map((special) => {
         const candidateId = Number(special.special_candidate_id);
         const isUpdating = state.updatingCandidateId === candidateId;
-        const days = Array.isArray(special.days_of_week) ? special.days_of_week.join(', ') : '—';
+        const isEditing = state.editingCandidateId === candidateId;
+        const days = Array.isArray(special.days_of_week) ? special.days_of_week.join(', ') : '';
         const confidence = special.confidence === null || special.confidence === undefined ? '—' : String(special.confidence);
+        const editableValue = (field, fallback = '—') => {
+          const value = special[field] ?? '';
+          if (isEditing) {
+            return `<input class="admin-input" data-candidate-id="${candidateId}" data-candidate-field="${field}" value="${value}" />`;
+          }
+          return value === '' ? fallback : String(value);
+        };
 
         return `
           <article class="admin-candidate-card" data-candidate-id="${candidateId}">
-            <h4>${special.description || 'No description'}</h4>
-            <p><strong>Type:</strong> ${special.type || '—'}</p>
-            <p><strong>Neighborhood:</strong> ${special.neighborhood || '—'}</p>
-            <p><strong>Days:</strong> ${days}</p>
-            <p><strong>Time:</strong> ${formatTime(special.start_time)} - ${formatTime(special.end_time)} (All day: ${special.all_day || 'N'})</p>
+            <h4>${isEditing ? 'Editing Special Candidate' : (special.description || 'No description')}</h4>
+            <p><strong>Description:</strong> ${editableValue('description')}</p>
+            <p><strong>Type:</strong> ${editableValue('type')}</p>
+            <p><strong>Days:</strong> ${editableValue('days_of_week', '—')}</p>
+            <p><strong>All Day:</strong> ${editableValue('all_day', 'N')}</p>
+            <p><strong>Start Time:</strong> ${editableValue('start_time')}</p>
+            <p><strong>End Time:</strong> ${editableValue('end_time')}</p>
             <p><strong>Confidence:</strong> ${confidence}</p>
             <p><strong>Method:</strong> ${special.fetch_method || '—'}</p>
             <p><strong>Source:</strong> ${special.source || '—'}</p>
             <p><strong>Notes:</strong> ${special.notes || '—'}</p>
             <div class="admin-actions-row">
-              <button class="admin-action-btn approve" type="button" data-action="APPROVED" data-candidate-id="${candidateId}" ${isUpdating ? 'disabled' : ''}>Approve</button>
-              <button class="admin-action-btn reject" type="button" data-action="REJECTED" data-candidate-id="${candidateId}" ${isUpdating ? 'disabled' : ''}>Reject</button>
+              ${isEditing
+                ? `<button class="admin-action-btn approve" type="button" data-candidate-action="save-edit" data-candidate-id="${candidateId}" ${state.savingCandidate ? 'disabled' : ''}>Save</button>
+                   <button class="admin-secondary-btn" type="button" data-candidate-action="cancel-edit" data-candidate-id="${candidateId}" ${state.savingCandidate ? 'disabled' : ''}>Cancel</button>`
+                : `<button class="admin-action-btn edit" type="button" data-candidate-action="edit" data-candidate-id="${candidateId}" ${isUpdating ? 'disabled' : ''}>Edit</button>
+                   <button class="admin-action-btn approve" type="button" data-action="APPROVED" data-candidate-id="${candidateId}" ${isUpdating ? 'disabled' : ''}>Approve</button>
+                   <button class="admin-action-btn reject" type="button" data-action="REJECTED" data-candidate-id="${candidateId}" ${isUpdating ? 'disabled' : ''}>Reject</button>`}
             </div>
           </article>
         `;
@@ -471,6 +506,7 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
       return `
         <section class="admin-run-card">
           <h3>Run ${run.run_id} — ${run.bar_name || 'Unknown bar'}</h3>
+          <p><strong>Neighborhood:</strong> ${run.neighborhood || '—'}</p>
           <p><strong>Total candidates:</strong> ${run.total_candidates ?? '—'}</p>
           <p><strong>Auto Approved Candidates:</strong> ${run.auto_approved_candidates ?? '—'}</p>
           <p><strong>Started:</strong> ${formatDateTime(run.started_at)}</p>
@@ -537,6 +573,35 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
         const action = button.getAttribute('data-action');
         if (!candidateId || !action) return;
         updateCandidateApproval(candidateId, action);
+      });
+    });
+
+    screenElement.querySelectorAll('[data-candidate-action][data-candidate-id]').forEach((button) => {
+      button.addEventListener('click', async () => {
+        const candidateId = Number(button.getAttribute('data-candidate-id'));
+        const action = button.getAttribute('data-candidate-action');
+        if (!candidateId || !action) return;
+
+        if (action === 'edit') {
+          state.editingCandidateId = candidateId;
+          render();
+          return;
+        }
+
+        if (action === 'cancel-edit') {
+          state.editingCandidateId = null;
+          render();
+          return;
+        }
+
+        if (action === 'save-edit') {
+          const payload = { special_candidate_id: candidateId };
+          screenElement.querySelectorAll(`[data-candidate-id="${candidateId}"][data-candidate-field]`).forEach((input) => {
+            const field = input.getAttribute('data-candidate-field');
+            payload[field] = input.value;
+          });
+          await saveCandidateUpdates(payload);
+        }
       });
     });
   }
