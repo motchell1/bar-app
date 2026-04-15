@@ -54,6 +54,31 @@ def _parse_days_of_week(raw_days) -> List[str]:
     return [day for day in raw_days if isinstance(day, str) and day.strip()]
 
 
+def _normalize_days_input(raw_days) -> List[str]:
+    if isinstance(raw_days, list):
+        candidates = raw_days
+    else:
+        value = str(raw_days or '').strip()
+        if not value:
+            return []
+        if value.startswith('['):
+            try:
+                parsed = json.loads(value)
+                candidates = parsed if isinstance(parsed, list) else []
+            except json.JSONDecodeError:
+                candidates = []
+        else:
+            candidates = [segment.strip() for segment in value.split(',')]
+
+    normalized = []
+    for day in candidates:
+        parsed_day = _normalize_day_of_week(day)
+        if parsed_day:
+            normalized.append(parsed_day)
+
+    return list(dict.fromkeys(normalized))
+
+
 def _normalize_day_of_week(value) -> str:
     if value is None:
         return ''
@@ -240,6 +265,7 @@ def get_unapproved_special_candidates(cursor):
         SELECT
             scr.run_id,
             b.name AS bar_name,
+            b.neighborhood AS run_neighborhood,
             scr.total_candidates,
             scr.auto_approved_candidates,
             scr.web_crawl_candidates,
@@ -252,7 +278,6 @@ def get_unapproved_special_candidates(cursor):
             scr.started_at,
             scr.completed_at,
             sc.special_candidate_id,
-            sc.neighborhood,
             sc.description,
             sc.days_of_week,
             sc.type,
@@ -281,6 +306,7 @@ def get_unapproved_special_candidates(cursor):
             {
                 'run_id': run_id,
                 'bar_name': row.get('bar_name'),
+                'neighborhood': row.get('run_neighborhood'),
                 'total_candidates': row.get('total_candidates'),
                 'auto_approved_candidates': row.get('auto_approved_candidates'),
                 'web_crawl_candidates': row.get('web_crawl_candidates'),
@@ -298,7 +324,6 @@ def get_unapproved_special_candidates(cursor):
         run['specials'].append(
             {
                 'special_candidate_id': row.get('special_candidate_id'),
-                'neighborhood': row.get('neighborhood'),
                 'description': row.get('description'),
                 'days_of_week': _parse_days_of_week(row.get('days_of_week')),
                 'type': row.get('type'),
@@ -547,6 +572,71 @@ def update_special(cursor, event):
     }
 
 
+def update_special_candidate(cursor, event):
+    special_candidate_id = event.get('special_candidate_id')
+    if not special_candidate_id:
+        raise ValueError('special_candidate_id is required for update_special_candidate')
+
+    editable_fields = {
+        'description',
+        'all_day',
+        'days_of_week',
+        'start_time',
+        'end_time',
+        'type',
+    }
+    updates = {}
+    for field in editable_fields:
+        if field in event:
+            updates[field] = event.get(field)
+
+    if not updates:
+        raise ValueError('At least one editable field must be provided for update_special_candidate')
+
+    if 'all_day' in updates:
+        updates['all_day'] = _normalize_yn_flag(updates.get('all_day'))
+    if 'days_of_week' in updates:
+        updates['days_of_week'] = json.dumps(_normalize_days_input(updates.get('days_of_week')))
+    if 'start_time' in updates:
+        updates['start_time'] = _normalize_time_value(updates.get('start_time')) or None
+    if 'end_time' in updates:
+        updates['end_time'] = _normalize_time_value(updates.get('end_time')) or None
+
+    set_clause = ', '.join([f"{key} = %s" for key in updates])
+    values = list(updates.values()) + [special_candidate_id]
+
+    cursor.execute(
+        f"""
+        UPDATE special_candidate
+        SET {set_clause}
+        WHERE special_candidate_id = %s
+        """,
+        values,
+    )
+
+    if cursor.rowcount == 0:
+        raise ValueError('special_candidate_id was not found')
+
+    cursor.execute(
+        """
+        SELECT special_candidate_id, description, all_day, days_of_week, start_time, end_time, type
+        FROM special_candidate
+        WHERE special_candidate_id = %s
+        """,
+        (special_candidate_id,),
+    )
+    updated = cursor.fetchone() or {}
+    return {
+        'special_candidate_id': updated.get('special_candidate_id'),
+        'description': updated.get('description'),
+        'all_day': updated.get('all_day'),
+        'days_of_week': _parse_days_of_week(updated.get('days_of_week')),
+        'start_time': _normalize_time_value(updated.get('start_time')) or None,
+        'end_time': _normalize_time_value(updated.get('end_time')) or None,
+        'type': updated.get('type'),
+    }
+
+
 
 
 def _parse_event_payload(event):
@@ -570,10 +660,17 @@ def _parse_event_payload(event):
 def lambda_handler(event, context):
     event = _parse_event_payload(event or {})
     mode = event.get('mode')
-    if mode not in {'get_unapproved_special_candidates', 'update_special_candidate_approval', 'get_all_specials', 'update_special'}:
+    if mode not in {'get_unapproved_special_candidates', 'update_special_candidate_approval', 'get_all_specials', 'update_special', 'update_special_candidate'}:
         return {
             'statusCode': 400,
-            'body': json.dumps({'error': 'mode must be one of get_unapproved_special_candidates, update_special_candidate_approval, get_all_specials, update_special'}),
+            'body': json.dumps(
+                {
+                    'error': (
+                        'mode must be one of get_unapproved_special_candidates, '
+                        'update_special_candidate_approval, get_all_specials, update_special, update_special_candidate'
+                    )
+                }
+            ),
         }
 
     conn = get_connection()
@@ -589,6 +686,8 @@ def lambda_handler(event, context):
                 result = update_special_candidate_approval(cursor, special_candidate_id, approval_status)
             elif mode == 'get_all_specials':
                 result = get_all_specials(cursor)
+            elif mode == 'update_special_candidate':
+                result = update_special_candidate(cursor, event)
             else:
                 result = update_special(cursor, event)
             conn.commit()
