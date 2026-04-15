@@ -265,7 +265,6 @@ def get_unapproved_special_candidates(cursor):
         SELECT
             scr.run_id,
             b.name AS bar_name,
-            b.neighborhood AS run_neighborhood,
             scr.total_candidates,
             scr.auto_approved_candidates,
             scr.web_crawl_candidates,
@@ -278,6 +277,7 @@ def get_unapproved_special_candidates(cursor):
             scr.started_at,
             scr.completed_at,
             sc.special_candidate_id,
+            sc.neighborhood,
             sc.description,
             sc.days_of_week,
             sc.type,
@@ -306,7 +306,7 @@ def get_unapproved_special_candidates(cursor):
             {
                 'run_id': run_id,
                 'bar_name': row.get('bar_name'),
-                'neighborhood': row.get('run_neighborhood'),
+                'neighborhood': row.get('neighborhood'),
                 'total_candidates': row.get('total_candidates'),
                 'auto_approved_candidates': row.get('auto_approved_candidates'),
                 'web_crawl_candidates': row.get('web_crawl_candidates'),
@@ -324,6 +324,7 @@ def get_unapproved_special_candidates(cursor):
         run['specials'].append(
             {
                 'special_candidate_id': row.get('special_candidate_id'),
+                'neighborhood': row.get('neighborhood'),
                 'description': row.get('description'),
                 'days_of_week': _parse_days_of_week(row.get('days_of_week')),
                 'type': row.get('type'),

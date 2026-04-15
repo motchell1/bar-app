@@ -483,7 +483,6 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
             <h4>${isEditing ? 'Editing Special Candidate' : (special.description || 'No description')}</h4>
             <p><strong>Description:</strong> ${editableValue('description')}</p>
             <p><strong>Type:</strong> ${editableValue('type')}</p>
-            <p><strong>Neighborhood:</strong> ${run.neighborhood || '—'}</p>
             <p><strong>Days:</strong> ${editableValue('days_of_week', '—')}</p>
             <p><strong>All Day:</strong> ${editableValue('all_day', 'N')}</p>
             <p><strong>Start Time:</strong> ${editableValue('start_time')}</p>
@@ -496,7 +495,7 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
               ${isEditing
                 ? `<button class="admin-action-btn approve" type="button" data-candidate-action="save-edit" data-candidate-id="${candidateId}" ${state.savingCandidate ? 'disabled' : ''}>Save</button>
                    <button class="admin-secondary-btn" type="button" data-candidate-action="cancel-edit" data-candidate-id="${candidateId}" ${state.savingCandidate ? 'disabled' : ''}>Cancel</button>`
-                : `<button class="admin-secondary-btn" type="button" data-candidate-action="edit" data-candidate-id="${candidateId}" ${isUpdating ? 'disabled' : ''}>Edit</button>
+                : `<button class="admin-action-btn edit" type="button" data-candidate-action="edit" data-candidate-id="${candidateId}" ${isUpdating ? 'disabled' : ''}>Edit</button>
                    <button class="admin-action-btn approve" type="button" data-action="APPROVED" data-candidate-id="${candidateId}" ${isUpdating ? 'disabled' : ''}>Approve</button>
                    <button class="admin-action-btn reject" type="button" data-action="REJECTED" data-candidate-id="${candidateId}" ${isUpdating ? 'disabled' : ''}>Reject</button>`}
             </div>
@@ -507,6 +506,7 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
       return `
         <section class="admin-run-card">
           <h3>Run ${run.run_id} — ${run.bar_name || 'Unknown bar'}</h3>
+          <p><strong>Neighborhood:</strong> ${run.neighborhood || '—'}</p>
           <p><strong>Total candidates:</strong> ${run.total_candidates ?? '—'}</p>
           <p><strong>Auto Approved Candidates:</strong> ${run.auto_approved_candidates ?? '—'}</p>
           <p><strong>Started:</strong> ${formatDateTime(run.started_at)}</p>
