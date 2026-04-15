@@ -500,7 +500,7 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
           <article class="admin-candidate-card" data-candidate-id="${candidateId}">
             ${isEditing ? '' : `
               <button class="admin-icon-btn" type="button" aria-label="Edit special candidate" title="Edit" data-candidate-action="edit" data-candidate-id="${candidateId}" ${isUpdating ? 'disabled' : ''}>
-                &#9998;
+                &#8943;
               </button>
             `}
             <h4>${isEditing ? 'Editing Special Candidate' : (special.description || 'No description')}</h4>
