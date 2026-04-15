@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+from decimal import Decimal
 from datetime import time, timedelta
 from difflib import SequenceMatcher
 from typing import Dict, List
@@ -112,6 +113,12 @@ def _normalize_time_value(value) -> str:
     if len(normalized) == 5 and normalized.count(':') == 1:
         return f'{normalized}:00'
     return normalized
+
+
+def _to_json_safe_number(value):
+    if isinstance(value, Decimal):
+        return float(value)
+    return value
 
 
 def _is_candidate_same_as_special(candidate_row: Dict, special_row: Dict) -> bool:
@@ -593,8 +600,8 @@ def get_bar_details(cursor, bar_id: int):
             'address': bar_row.get('address'),
             'website': bar_row.get('website'),
             'google_place_id': bar_row.get('google_place_id'),
-            'latitude': bar_row.get('latitude'),
-            'longitude': bar_row.get('longitude'),
+            'latitude': _to_json_safe_number(bar_row.get('latitude')),
+            'longitude': _to_json_safe_number(bar_row.get('longitude')),
             'is_active': bar_row.get('is_active'),
             'insert_date': bar_row.get('insert_date').isoformat() if bar_row.get('insert_date') else None,
             'update_date': bar_row.get('update_date').isoformat() if bar_row.get('update_date') else None,
