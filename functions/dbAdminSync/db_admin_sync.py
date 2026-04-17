@@ -357,7 +357,19 @@ def update_special_candidate_approval(cursor, special_candidate_id: int, approva
 
     cursor.execute(
         """
-        SELECT special_candidate_id, run_id, bar_id
+        SELECT
+            special_candidate_id,
+            run_id,
+            bar_id,
+            description,
+            days_of_week,
+            start_time,
+            end_time,
+            all_day,
+            is_recurring,
+            date,
+            fetch_method,
+            source
         FROM special_candidate
         WHERE special_candidate_id = %s
         """,
@@ -369,6 +381,46 @@ def update_special_candidate_approval(cursor, special_candidate_id: int, approva
 
     run_id = target['run_id']
     bar_id = target['bar_id']
+
+    if normalized_status == 'REJECTED':
+        cursor.execute(
+            """
+            INSERT INTO special_candidate_reject
+            (
+                bar_id,
+                description,
+                days_of_week,
+                start_time,
+                end_time,
+                all_day,
+                is_recurring,
+                date,
+                fetch_method,
+                source
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """,
+            (
+                bar_id,
+                target.get('description'),
+                target.get('days_of_week'),
+                target.get('start_time'),
+                target.get('end_time'),
+                target.get('all_day'),
+                target.get('is_recurring'),
+                target.get('date'),
+                target.get('fetch_method'),
+                target.get('source'),
+            ),
+        )
+        reject_id = cursor.lastrowid
+        cursor.execute(
+            """
+            INSERT INTO special_candidate_reject_join (reject_id, special_candidate_id)
+            VALUES (%s, %s)
+            """,
+            (reject_id, special_candidate_id),
+        )
 
     cursor.execute(
         """
