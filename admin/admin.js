@@ -714,7 +714,40 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
                 </select>
               `;
             }
+            if (field === 'days_of_week') {
+              const selectedDays = Array.isArray(value)
+                ? value.map((day) => normalizeDay(day))
+                : String(value || '')
+                  .split(',')
+                  .map((day) => normalizeDay(day))
+                  .filter(Boolean);
+              return `
+                <span>
+                  ${DAY_ORDER.map((day) => `
+                    <label>
+                      <input
+                        type="checkbox"
+                        data-candidate-id="${candidateId}"
+                        data-candidate-day="${day}"
+                        ${selectedDays.includes(day) ? 'checked' : ''}
+                      />
+                      ${day.charAt(0) + day.slice(1).toLowerCase()}
+                    </label>
+                  `).join(' ')}
+                </span>
+              `;
+            }
             return `<input class="admin-input" data-candidate-id="${candidateId}" data-candidate-field="${field}" value="${value}" />`;
+          }
+          if (field === 'days_of_week') {
+            const resolvedDays = Array.isArray(value)
+              ? value
+              : String(value || '')
+                .split(',')
+                .map((day) => normalizeDay(day))
+                .filter(Boolean);
+            const displayDays = resolvedDays.map((day) => day.charAt(0) + day.slice(1).toLowerCase()).join(', ');
+            return displayDays || fallback;
           }
           return value === '' ? fallback : String(value);
         };
@@ -727,6 +760,7 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
               </button>
             `}
             <h4>${isEditing ? 'Editing Special Candidate' : (special.description || 'No description')}</h4>
+            <p><strong>Special Candidate ID:</strong> ${special.special_candidate_id ?? '—'}</p>
             <p><strong>Description:</strong> ${editableValue('description')}</p>
             <p><strong>Type:</strong> ${editableValue('type')}</p>
             <p><strong>Days:</strong> ${editableValue('days_of_week', '—')}</p>
@@ -918,6 +952,9 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
             const field = input.getAttribute('data-candidate-field');
             payload[field] = input.value;
           });
+          payload.days_of_week = Array.from(
+            screenElement.querySelectorAll(`[data-candidate-id="${candidateId}"][data-candidate-day]:checked`)
+          ).map((checkbox) => checkbox.getAttribute('data-candidate-day'));
           await saveCandidateUpdates(payload);
         }
       });
