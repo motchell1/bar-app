@@ -529,6 +529,7 @@ def get_all_bars(cursor):
             name,
             neighborhood,
             is_active,
+            last_special_candidate_run,
             insert_date,
             update_date
         FROM bar
@@ -544,6 +545,7 @@ def get_all_bars(cursor):
                 'name': row.get('name'),
                 'neighborhood': row.get('neighborhood'),
                 'is_active': row.get('is_active'),
+                'last_special_candidate_run': row.get('last_special_candidate_run').isoformat() if row.get('last_special_candidate_run') else None,
                 'insert_date': row.get('insert_date').isoformat() if row.get('insert_date') else None,
                 'update_date': row.get('update_date').isoformat() if row.get('update_date') else None,
             }
@@ -564,6 +566,7 @@ def get_bar_details(cursor, bar_id: int):
             latitude,
             longitude,
             is_active,
+            last_special_candidate_run,
             insert_date,
             update_date
         FROM bar
@@ -603,6 +606,7 @@ def get_bar_details(cursor, bar_id: int):
             'latitude': _to_json_safe_number(bar_row.get('latitude')),
             'longitude': _to_json_safe_number(bar_row.get('longitude')),
             'is_active': bar_row.get('is_active'),
+            'last_special_candidate_run': bar_row.get('last_special_candidate_run').isoformat() if bar_row.get('last_special_candidate_run') else None,
             'insert_date': bar_row.get('insert_date').isoformat() if bar_row.get('insert_date') else None,
             'update_date': bar_row.get('update_date').isoformat() if bar_row.get('update_date') else None,
         },

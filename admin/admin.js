@@ -651,6 +651,7 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
               ${renderBarField('latitude', 'Latitude')}
               ${renderBarField('longitude', 'Longitude')}
               ${renderBarField('is_active', 'Is Active')}
+              <p><strong>Last Candidate Run:</strong> ${formatDateTime(bar.last_special_candidate_run)}</p>
               <p><strong>Insert Date:</strong> ${formatDateTime(bar.insert_date)}</p>
               <p><strong>Update Date:</strong> ${formatDateTime(bar.update_date)}</p>
             </div>
@@ -856,6 +857,7 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
         <td>${bar.name || '—'}</td>
         <td>${bar.neighborhood || '—'}</td>
         <td>${bar.is_active || '—'}</td>
+        <td>${formatDateTime(bar.last_special_candidate_run)}</td>
         <td>${formatDateTime(bar.insert_date)}</td>
         <td>${formatDateTime(bar.update_date)}</td>
       </tr>
@@ -869,6 +871,7 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
               <th>Name</th>
               <th>Neighborhood</th>
               <th>Is Active</th>
+              <th>Last Candidate Run</th>
               <th>Insert Date</th>
               <th>Update Date</th>
             </tr>
