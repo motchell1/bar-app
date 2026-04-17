@@ -151,6 +151,7 @@ def get_bars_by_neighborhood(cursor, neighborhood: str) -> Dict[str, List[Dict]]
         SELECT bar_id, name AS bar_name, neighborhood, website_url
         FROM bar
         WHERE neighborhood = %s
+        ORDER BY last_special_candidate_run ASC, bar_id ASC
         """,
         (neighborhood,),
     )
