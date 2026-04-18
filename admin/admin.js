@@ -60,6 +60,7 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
     updatingCandidateId: null,
     editingCandidateId: null,
     savingCandidate: false,
+    actionRejectedCandidateId: null,
     actionSpecialId: null,
     detailSpecials: [],
     detailEditing: false,
@@ -87,6 +88,7 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
     state.currentView = 'home';
     state.errorMessage = '';
     state.actionSpecialId = null;
+    state.actionRejectedCandidateId = null;
     state.detailSpecials = [];
     state.detailEditing = false;
     state.actionBarId = null;
@@ -340,6 +342,7 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
         mode: 'remove_rejected_special_candidate',
         special_candidate_id: specialCandidateId
       });
+      state.actionRejectedCandidateId = null;
       await loadRejectedSpecials();
     } catch (err) {
       console.error('Failed to remove rejected special candidate:', err);
@@ -1417,16 +1420,14 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
               <th>Type</th>
               <th>Method</th>
               <th>Source</th>
-              <th>Status</th>
               <th>Web AI Search Matches</th>
               <th>Web Crawl Matches</th>
               <th>Insert Date</th>
-              <th>Actions</th>
             </tr>
           </thead>
           <tbody>
             ${rows.map((row) => `
-              <tr>
+              <tr data-rejected-special-candidate-row="${row.special_candidate_id}">
                 <td>${row.neighborhood || '—'}</td>
                 <td>${row.bar_name || '—'}</td>
                 <td>${row.description || '—'}</td>
@@ -1437,23 +1438,43 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
                 <td>${row.type || '—'}</td>
                 <td>${row.fetch_method || '—'}</td>
                 <td>${getSourceMarkup(row.source)}</td>
-                <td>${row.approval_status || '—'}</td>
                 <td>${row.web_ai_search_matches ?? 0}</td>
                 <td>${row.web_crawl_matches ?? 0}</td>
                 <td>${formatDateTime(row.insert_date)}</td>
-                <td>
-                  <button
-                    type="button"
-                    class="admin-action-btn reject"
-                    data-remove-rejected-candidate-id="${row.special_candidate_id}"
-                  >
-                    Remove Rejected Special Candidate
-                  </button>
-                </td>
               </tr>
             `).join('')}
           </tbody>
         </table>
+      </div>
+      ${getRejectedSpecialActionMenuMarkup()}
+    `;
+  }
+
+  function getRejectedSpecialActionMenuMarkup() {
+    const candidateId = Number(state.actionRejectedCandidateId);
+    if (!candidateId) return '';
+    return `
+      <div class="admin-action-menu-backdrop" data-close-rejected-action-menu="true">
+        <div class="admin-action-menu" role="dialog" aria-modal="true" aria-label="Rejected special actions">
+          <h4>Rejected Special Candidate ${candidateId}</h4>
+          <div class="admin-actions-row">
+            <button
+              type="button"
+              class="admin-action-btn reject"
+              data-rejected-special-action="remove-rejected-candidate"
+              data-special-candidate-id="${candidateId}"
+            >
+              Remove Rejected Special Candidate
+            </button>
+            <button
+              type="button"
+              class="admin-secondary-btn"
+              data-close-rejected-action-menu="true"
+            >
+              Close
+            </button>
+          </div>
+        </div>
       </div>
     `;
   }
@@ -1484,9 +1505,27 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
           render();
         });
       }
-      screenElement.querySelectorAll('[data-remove-rejected-candidate-id]').forEach((button) => {
+
+      screenElement.querySelectorAll('[data-rejected-special-candidate-row]').forEach((row) => {
+        row.addEventListener('click', () => {
+          const specialCandidateId = Number(row.getAttribute('data-rejected-special-candidate-row'));
+          if (!specialCandidateId) return;
+          state.actionRejectedCandidateId = specialCandidateId;
+          render();
+        });
+      });
+
+      screenElement.querySelectorAll('[data-close-rejected-action-menu="true"]').forEach((element) => {
+        element.addEventListener('click', (event) => {
+          if (event.currentTarget !== event.target && !event.target.hasAttribute('data-close-rejected-action-menu')) return;
+          state.actionRejectedCandidateId = null;
+          render();
+        });
+      });
+
+      screenElement.querySelectorAll('[data-rejected-special-action="remove-rejected-candidate"]').forEach((button) => {
         button.addEventListener('click', async () => {
-          const specialCandidateId = Number(button.getAttribute('data-remove-rejected-candidate-id'));
+          const specialCandidateId = Number(button.getAttribute('data-special-candidate-id'));
           if (!specialCandidateId) return;
           const shouldContinue = window.confirm('Remove rejected special candidate and matching reject records?');
           if (!shouldContinue) return;
