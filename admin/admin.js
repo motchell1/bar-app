@@ -60,6 +60,7 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
     updatingCandidateId: null,
     editingCandidateId: null,
     savingCandidate: false,
+    actionRejectedCandidateId: null,
     actionSpecialId: null,
     detailSpecials: [],
     detailEditing: false,
@@ -86,6 +87,7 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
     if (state.currentView === 'home') return;
     state.currentView = 'home';
     state.errorMessage = '';
+    state.actionRejectedCandidateId = null;
     state.actionSpecialId = null;
     state.detailSpecials = [];
     state.detailEditing = false;
@@ -1378,6 +1380,8 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
         ${buildRejectedSpecialManagementTable()}
       </section>
     `;
+
+    bindRejectedSpecialManagementEvents();
   }
 
   function buildRejectedSpecialManagementTable() {
@@ -1424,7 +1428,7 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
           </thead>
           <tbody>
             ${rows.map((row) => `
-              <tr data-rejected-special-candidate-row="${row.special_candidate_id}">
+              <tr class="admin-special-row" data-rejected-special-candidate-row="${row.special_candidate_id}">
                 <td>${row.neighborhood || '—'}</td>
                 <td>${row.bar_name || '—'}</td>
                 <td>${row.description || '—'}</td>
@@ -1443,7 +1447,64 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
           </tbody>
         </table>
       </div>
+      ${getRejectedSpecialActionMenuMarkup()}
     `;
+  }
+
+  function getRejectedSpecialActionMenuMarkup() {
+    if (!state.actionRejectedCandidateId) return '';
+    return `
+      <div class="admin-modal-backdrop" data-close-rejected-action-menu="true">
+        <div class="admin-modal" role="dialog" aria-label="Rejected special actions">
+          <h3>Rejected Special Actions</h3>
+          <button
+            type="button"
+            class="admin-tool-button"
+            data-rejected-special-action="remove-rejected-candidate"
+            data-special-candidate-id="${state.actionRejectedCandidateId}"
+          >
+            Remove Rejected Special Candidate
+          </button>
+          <button type="button" class="admin-secondary-btn" data-close-rejected-action-menu="true">Close</button>
+        </div>
+      </div>
+    `;
+  }
+
+  function bindRejectedSpecialManagementEvents() {
+    const searchInput = screenElement.querySelector('[data-rejected-special-search-input]');
+    if (searchInput) {
+      searchInput.addEventListener('input', (event) => {
+        state.specialSearchTerm = event.target.value;
+        render();
+      });
+    }
+
+    screenElement.querySelectorAll('[data-rejected-special-candidate-row]').forEach((row) => {
+      row.addEventListener('click', () => {
+        const specialCandidateId = Number(row.getAttribute('data-rejected-special-candidate-row'));
+        if (!specialCandidateId) return;
+        state.actionRejectedCandidateId = specialCandidateId;
+        render();
+      });
+    });
+
+    screenElement.querySelectorAll('[data-close-rejected-action-menu="true"]').forEach((element) => {
+      element.addEventListener('click', (event) => {
+        if (event.currentTarget !== event.target) return;
+        state.actionRejectedCandidateId = null;
+        render();
+      });
+    });
+
+    screenElement.querySelectorAll('[data-rejected-special-action="remove-rejected-candidate"]').forEach((button) => {
+      button.addEventListener('click', async () => {
+        const specialCandidateId = Number(button.getAttribute('data-special-candidate-id'));
+        if (!specialCandidateId) return;
+        state.actionRejectedCandidateId = null;
+        await removeRejectedSpecialCandidate(specialCandidateId);
+      });
+    });
   }
 
   function render() {
@@ -1465,23 +1526,6 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
 
     if (state.currentView === 'rejected-special-management') {
       renderRejectedSpecialManagementView();
-      const rejectedSearch = screenElement.querySelector('[data-rejected-special-search-input]');
-      if (rejectedSearch) {
-        rejectedSearch.addEventListener('input', (event) => {
-          state.specialSearchTerm = event.target.value;
-          render();
-        });
-      }
-
-      screenElement.querySelectorAll('[data-rejected-special-candidate-row]').forEach((row) => {
-        row.addEventListener('click', async () => {
-          const specialCandidateId = Number(row.getAttribute('data-rejected-special-candidate-row'));
-          if (!specialCandidateId) return;
-          const shouldContinue = window.confirm('Remove rejected special candidate and matching reject records?');
-          if (!shouldContinue) return;
-          await removeRejectedSpecialCandidate(specialCandidateId);
-        });
-      });
       return;
     }
 
