@@ -209,6 +209,7 @@ def insert_special_candidate(cursor, run: Dict, candidates: List[Dict]) -> Dict[
     cursor.execute(
         """
         SELECT
+            reject_id,
             bar_id,
             description,
             days_of_week,
@@ -232,7 +233,13 @@ def insert_special_candidate(cursor, run: Dict, candidates: List[Dict]) -> Dict[
         approved_special_id = None
         confidence = _parse_confidence(candidate.get('confidence'))
 
-        is_rejected_candidate = any(_is_candidate_same_as_reject(candidate, rejected_candidate) for rejected_candidate in rejected_candidates)
+        matched_reject_ids = [
+            rejected_candidate.get('reject_id')
+            for rejected_candidate in rejected_candidates
+            if _is_candidate_same_as_reject(candidate, rejected_candidate)
+            and rejected_candidate.get('reject_id')
+        ]
+        is_rejected_candidate = bool(matched_reject_ids)
 
         if is_rejected_candidate:
             approval_status = 'AUTO_REJECTED'
@@ -273,6 +280,16 @@ def insert_special_candidate(cursor, run: Dict, candidates: List[Dict]) -> Dict[
                 approved_special_id,
             ),
         )
+        candidate_id = cursor.lastrowid
+        if is_rejected_candidate:
+            for reject_id in matched_reject_ids:
+                cursor.execute(
+                    """
+                    INSERT INTO special_candidate_reject_join (reject_id, special_candidate_id)
+                    VALUES (%s, %s)
+                    """,
+                    (reject_id, candidate_id),
+                )
         inserted_count += 1
 
     cursor.execute(

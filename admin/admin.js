@@ -50,6 +50,7 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
     currentView: 'home',
     loading: false,
     loadingSpecials: false,
+    loadingRejectedSpecials: false,
     loadingBars: false,
     specialSearchTerm: '',
     specialFilterActive: 'all',
@@ -70,6 +71,7 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
     detailBarEditing: false,
     savingBar: false,
     runs: [],
+    rejectedSpecials: [],
     allSpecials: [],
     groupedSpecials: [],
     errorMessage: ''
@@ -309,6 +311,23 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
       state.errorMessage = err?.message || 'Failed to load specials.';
     } finally {
       state.loadingSpecials = false;
+      render();
+    }
+  }
+
+  async function loadRejectedSpecials() {
+    state.loadingRejectedSpecials = true;
+    state.errorMessage = '';
+    render();
+
+    try {
+      const result = await callAdminSync({ mode: 'get_rejected_special_candidates' });
+      state.rejectedSpecials = Array.isArray(result?.specials) ? result.specials : [];
+    } catch (err) {
+      console.error('Failed to load rejected specials:', err);
+      state.errorMessage = err?.message || 'Failed to load rejected specials.';
+    } finally {
+      state.loadingRejectedSpecials = false;
       render();
     }
   }
@@ -1210,6 +1229,12 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
           render();
           await loadAllBars();
         }
+
+        if (tool === 'rejected-special-management') {
+          state.currentView = 'rejected-special-management';
+          render();
+          await loadRejectedSpecials();
+        }
       });
     });
   }
@@ -1220,6 +1245,7 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
       <section class="admin-home-view" aria-label="Admin tools">
         <h2>Admin tools</h2>
         <button type="button" class="admin-tool-button" data-tool="special-management">Special Management</button>
+        <button type="button" class="admin-tool-button" data-tool="rejected-special-management">Rejected Special Management</button>
         <button type="button" class="admin-tool-button" data-tool="bar-management">Bar Management</button>
         <button type="button" class="admin-tool-button" data-tool="specials-to-be-approved">Specials Pending Approval</button>
       </section>
@@ -1321,6 +1347,91 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
     bindBarManagementEvents();
   }
 
+  function renderRejectedSpecialManagementView() {
+    titleElement.textContent = 'Rejected Special Management';
+
+    if (state.loadingRejectedSpecials) {
+      screenElement.innerHTML = '<p class="admin-loading">Loading rejected specials...</p>';
+      return;
+    }
+
+    screenElement.innerHTML = `
+      <section class="admin-specials-view" aria-label="Rejected special management">
+        <h2>Rejected Special Management</h2>
+        ${state.errorMessage ? `<p class="admin-error">${state.errorMessage}</p>` : ''}
+        ${buildRejectedSpecialManagementTable()}
+      </section>
+    `;
+  }
+
+  function buildRejectedSpecialManagementTable() {
+    const searchTerm = String(state.specialSearchTerm || '').trim().toLowerCase();
+    const rows = state.rejectedSpecials.filter((row) => {
+      const neighborhood = String(row.neighborhood || '').trim().toLowerCase();
+      const barName = String(row.bar_name || '').trim().toLowerCase();
+      if (!searchTerm) return true;
+      return neighborhood.includes(searchTerm) || barName.includes(searchTerm);
+    });
+
+    if (!rows.length) {
+      if (searchTerm) return '<p class="admin-empty">No rejected specials match that bar or neighborhood.</p>';
+      return '<p class="admin-empty">No rejected specials found.</p>';
+    }
+
+    return `
+      <input
+        type="search"
+        class="admin-input admin-special-search-input"
+        data-rejected-special-search-input
+        placeholder="Search by bar or neighborhood"
+        value="${escapeAttribute(state.specialSearchTerm)}"
+        aria-label="Search rejected specials by bar or neighborhood"
+      />
+      <div class="admin-table-wrap">
+        <table class="admin-special-table">
+          <thead>
+            <tr>
+              <th>Neighborhood</th>
+              <th>Bar Name</th>
+              <th>Description</th>
+              <th>Days of Week</th>
+              <th>All Day</th>
+              <th>Start Time</th>
+              <th>End Time</th>
+              <th>Type</th>
+              <th>Method</th>
+              <th>Source</th>
+              <th>Status</th>
+              <th>Web AI Search Matches</th>
+              <th>Web Crawl Matches</th>
+              <th>Insert Date</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows.map((row) => `
+              <tr>
+                <td>${row.neighborhood || '—'}</td>
+                <td>${row.bar_name || '—'}</td>
+                <td>${row.description || '—'}</td>
+                <td>${formatDayGroup(row.days_of_week || [])}</td>
+                <td>${row.all_day || '—'}</td>
+                <td>${formatTime(row.start_time)}</td>
+                <td>${formatTime(row.end_time)}</td>
+                <td>${row.type || '—'}</td>
+                <td>${row.fetch_method || '—'}</td>
+                <td>${getSourceMarkup(row.source)}</td>
+                <td>${row.approval_status || '—'}</td>
+                <td>${row.web_ai_search_matches ?? 0}</td>
+                <td>${row.web_crawl_matches ?? 0}</td>
+                <td>${formatDateTime(row.insert_date)}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+  }
+
   function render() {
     updateToolbarButtons();
     if (state.currentView === 'specials') {
@@ -1335,6 +1446,18 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
 
     if (state.currentView === 'bar-management') {
       renderBarManagementView();
+      return;
+    }
+
+    if (state.currentView === 'rejected-special-management') {
+      renderRejectedSpecialManagementView();
+      const rejectedSearch = screenElement.querySelector('[data-rejected-special-search-input]');
+      if (rejectedSearch) {
+        rejectedSearch.addEventListener('input', (event) => {
+          state.specialSearchTerm = event.target.value;
+          render();
+        });
+      }
       return;
     }
 

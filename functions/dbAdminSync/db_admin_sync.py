@@ -350,6 +350,81 @@ def get_unapproved_special_candidates(cursor):
     return {'runs': runs, 'run_count': len(runs), 'special_count': len(rows)}
 
 
+def get_rejected_special_candidates(cursor):
+    cursor.execute(
+        """
+        SELECT
+            sc.special_candidate_id,
+            sc.bar_id,
+            b.name AS bar_name,
+            sc.neighborhood,
+            sc.description,
+            sc.days_of_week,
+            sc.type,
+            sc.start_time,
+            sc.end_time,
+            sc.all_day,
+            sc.is_recurring,
+            sc.date,
+            sc.fetch_method,
+            sc.source,
+            sc.approval_status,
+            sc.insert_date,
+            COALESCE(SUM(CASE WHEN scr.fetch_method = 'web_ai_search' THEN 1 ELSE 0 END), 0) AS web_ai_search_matches,
+            COALESCE(SUM(CASE WHEN scr.fetch_method = 'web_crawl' THEN 1 ELSE 0 END), 0) AS web_crawl_matches
+        FROM special_candidate sc
+        JOIN bar b ON b.bar_id = sc.bar_id
+        LEFT JOIN special_candidate_reject_join scrj ON scrj.special_candidate_id = sc.special_candidate_id
+        LEFT JOIN special_candidate_reject scr ON scr.reject_id = scrj.reject_id
+        WHERE sc.approval_status IN ('REJECTED', 'AUTO_REJECTED')
+        GROUP BY
+            sc.special_candidate_id,
+            sc.bar_id,
+            b.name,
+            sc.neighborhood,
+            sc.description,
+            sc.days_of_week,
+            sc.type,
+            sc.start_time,
+            sc.end_time,
+            sc.all_day,
+            sc.is_recurring,
+            sc.date,
+            sc.fetch_method,
+            sc.source,
+            sc.approval_status,
+            sc.insert_date
+        ORDER BY sc.insert_date DESC, sc.special_candidate_id DESC
+        """
+    )
+    rows = cursor.fetchall()
+    specials = []
+    for row in rows:
+        specials.append(
+            {
+                'special_candidate_id': row.get('special_candidate_id'),
+                'bar_id': row.get('bar_id'),
+                'bar_name': row.get('bar_name'),
+                'neighborhood': row.get('neighborhood'),
+                'description': row.get('description'),
+                'days_of_week': _parse_days_of_week(row.get('days_of_week')),
+                'type': row.get('type'),
+                'start_time': _normalize_time_value(row.get('start_time')) or None,
+                'end_time': _normalize_time_value(row.get('end_time')) or None,
+                'all_day': row.get('all_day'),
+                'is_recurring': row.get('is_recurring'),
+                'date': row.get('date').isoformat() if hasattr(row.get('date'), 'isoformat') and row.get('date') else row.get('date'),
+                'fetch_method': row.get('fetch_method'),
+                'source': row.get('source'),
+                'approval_status': row.get('approval_status'),
+                'insert_date': row.get('insert_date').isoformat() if row.get('insert_date') else None,
+                'web_ai_search_matches': int(row.get('web_ai_search_matches') or 0),
+                'web_crawl_matches': int(row.get('web_crawl_matches') or 0),
+            }
+        )
+    return {'specials': specials, 'special_count': len(specials)}
+
+
 def update_special_candidate_approval(cursor, special_candidate_id: int, approval_status: str):
     normalized_status = str(approval_status or '').strip().upper()
     if normalized_status not in {'APPROVED', 'REJECTED'}:
@@ -913,6 +988,7 @@ def lambda_handler(event, context):
     mode = event.get('mode')
     if mode not in {
         'get_unapproved_special_candidates',
+        'get_rejected_special_candidates',
         'update_special_candidate_approval',
         'get_all_specials',
         'update_special',
@@ -928,6 +1004,7 @@ def lambda_handler(event, context):
                 {
                     'error': (
                         'mode must be one of get_unapproved_special_candidates, '
+                        'get_rejected_special_candidates, '
                         'update_special_candidate_approval, get_all_specials, update_special, '
                         'update_special_candidate, get_all_bars, get_bar_details, update_bar, update_open_hours'
                     )
@@ -940,6 +1017,8 @@ def lambda_handler(event, context):
         with conn.cursor() as cursor:
             if mode == 'get_unapproved_special_candidates':
                 result = get_unapproved_special_candidates(cursor)
+            elif mode == 'get_rejected_special_candidates':
+                result = get_rejected_special_candidates(cursor)
             elif mode == 'update_special_candidate_approval':
                 special_candidate_id = event.get('special_candidate_id')
                 approval_status = event.get('approval_status')
