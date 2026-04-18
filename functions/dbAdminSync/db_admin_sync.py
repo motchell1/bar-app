@@ -357,7 +357,19 @@ def update_special_candidate_approval(cursor, special_candidate_id: int, approva
 
     cursor.execute(
         """
-        SELECT special_candidate_id, run_id, bar_id
+        SELECT
+            special_candidate_id,
+            run_id,
+            bar_id,
+            description,
+            days_of_week,
+            start_time,
+            end_time,
+            all_day,
+            is_recurring,
+            date,
+            fetch_method,
+            source
         FROM special_candidate
         WHERE special_candidate_id = %s
         """,
@@ -369,6 +381,46 @@ def update_special_candidate_approval(cursor, special_candidate_id: int, approva
 
     run_id = target['run_id']
     bar_id = target['bar_id']
+
+    if normalized_status == 'REJECTED':
+        cursor.execute(
+            """
+            INSERT INTO special_candidate_reject
+            (
+                bar_id,
+                description,
+                days_of_week,
+                start_time,
+                end_time,
+                all_day,
+                is_recurring,
+                date,
+                fetch_method,
+                source
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """,
+            (
+                bar_id,
+                target.get('description'),
+                target.get('days_of_week'),
+                target.get('start_time'),
+                target.get('end_time'),
+                target.get('all_day'),
+                target.get('is_recurring'),
+                target.get('date'),
+                target.get('fetch_method'),
+                target.get('source'),
+            ),
+        )
+        reject_id = cursor.lastrowid
+        cursor.execute(
+            """
+            INSERT INTO special_candidate_reject_join (reject_id, special_candidate_id)
+            VALUES (%s, %s)
+            """,
+            (reject_id, special_candidate_id),
+        )
 
     cursor.execute(
         """
@@ -529,6 +581,7 @@ def get_all_bars(cursor):
             name,
             neighborhood,
             is_active,
+            last_special_candidate_run,
             insert_date,
             update_date
         FROM bar
@@ -544,6 +597,7 @@ def get_all_bars(cursor):
                 'name': row.get('name'),
                 'neighborhood': row.get('neighborhood'),
                 'is_active': row.get('is_active'),
+                'last_special_candidate_run': row.get('last_special_candidate_run').isoformat() if row.get('last_special_candidate_run') else None,
                 'insert_date': row.get('insert_date').isoformat() if row.get('insert_date') else None,
                 'update_date': row.get('update_date').isoformat() if row.get('update_date') else None,
             }
@@ -564,6 +618,7 @@ def get_bar_details(cursor, bar_id: int):
             latitude,
             longitude,
             is_active,
+            last_special_candidate_run,
             insert_date,
             update_date
         FROM bar
@@ -603,6 +658,7 @@ def get_bar_details(cursor, bar_id: int):
             'latitude': _to_json_safe_number(bar_row.get('latitude')),
             'longitude': _to_json_safe_number(bar_row.get('longitude')),
             'is_active': bar_row.get('is_active'),
+            'last_special_candidate_run': bar_row.get('last_special_candidate_run').isoformat() if bar_row.get('last_special_candidate_run') else None,
             'insert_date': bar_row.get('insert_date').isoformat() if bar_row.get('insert_date') else None,
             'update_date': bar_row.get('update_date').isoformat() if bar_row.get('update_date') else None,
         },

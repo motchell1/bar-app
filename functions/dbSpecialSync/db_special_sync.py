@@ -113,6 +113,7 @@ def _is_candidate_same_as_special(candidate_row: Dict, special_row: Dict) -> boo
 
 
 def insert_special_candidate_run(cursor, run: Dict) -> int:
+    completed_at = run.get('completed_at') or datetime.utcnow()
     cursor.execute(
         """
         INSERT INTO special_candidate_run
@@ -151,11 +152,22 @@ def insert_special_candidate_run(cursor, run: Dict) -> int:
             'N',
             'N',
             run.get('started_at') or datetime.utcnow(),
-            run.get('completed_at') or datetime.utcnow(),
+            completed_at,
             None,
         ),
     )
-    return cursor.lastrowid
+    run_id = cursor.lastrowid
+    cursor.execute(
+        """
+        UPDATE bar
+        SET last_special_candidate_run = %s
+        WHERE bar_id = %s
+        """,
+        (completed_at, run['bar_id']),
+    )
+    if cursor.rowcount == 0:
+        raise ValueError('run.bar_id was not found while updating bar.last_special_candidate_run')
+    return run_id
 
 
 def insert_special_candidate(cursor, run: Dict, candidates: List[Dict]) -> Dict[str, int]:
