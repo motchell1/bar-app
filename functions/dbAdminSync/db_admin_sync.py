@@ -394,7 +394,10 @@ def get_rejected_special_candidates(cursor):
             sc.source,
             sc.approval_status,
             sc.insert_date
-        ORDER BY sc.insert_date DESC, sc.special_candidate_id DESC
+        ORDER BY
+            sc.neighborhood ASC,
+            b.name ASC,
+            sc.special_candidate_id DESC
         """
     )
     rows = cursor.fetchall()
