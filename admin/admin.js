@@ -8,6 +8,23 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
   if (!backButton || !homeButton || !titleElement || !screenElement) return;
 
   const DAY_ORDER = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'];
+  const CANDIDATE_DAY_KEYS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
+  const CANDIDATE_DAY_ALIASES = {
+    MONDAY: 'MON',
+    TUESDAY: 'TUE',
+    WEDNESDAY: 'WED',
+    THURSDAY: 'THU',
+    FRIDAY: 'FRI',
+    SATURDAY: 'SAT',
+    SUNDAY: 'SUN',
+    MON: 'MON',
+    TUE: 'TUE',
+    WED: 'WED',
+    THU: 'THU',
+    FRI: 'FRI',
+    SAT: 'SAT',
+    SUN: 'SUN'
+  };
   const ADMIN_TIMEZONE = 'America/New_York';
   const ADMIN_DATETIME_FORMATTER = new Intl.DateTimeFormat('en-US', {
     timeZone: ADMIN_TIMEZONE,
@@ -134,6 +151,11 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
 
   function normalizeDay(day) {
     return String(day || '').trim().toUpperCase();
+  }
+
+  function normalizeCandidateDay(day) {
+    const normalized = normalizeDay(day);
+    return CANDIDATE_DAY_ALIASES[normalized] || '';
   }
 
   function sortDays(days) {
@@ -716,14 +738,14 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
             }
             if (field === 'days_of_week') {
               const selectedDays = Array.isArray(value)
-                ? value.map((day) => normalizeDay(day))
+                ? value.map((day) => normalizeCandidateDay(day)).filter(Boolean)
                 : String(value || '')
                   .split(',')
-                  .map((day) => normalizeDay(day))
+                  .map((day) => normalizeCandidateDay(day))
                   .filter(Boolean);
               return `
                 <span>
-                  ${DAY_ORDER.map((day) => `
+                  ${CANDIDATE_DAY_KEYS.map((day) => `
                     <label>
                       <input
                         type="checkbox"
@@ -731,7 +753,7 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
                         data-candidate-day="${day}"
                         ${selectedDays.includes(day) ? 'checked' : ''}
                       />
-                      ${day.charAt(0) + day.slice(1).toLowerCase()}
+                      ${day}
                     </label>
                   `).join(' ')}
                 </span>
@@ -741,12 +763,12 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
           }
           if (field === 'days_of_week') {
             const resolvedDays = Array.isArray(value)
-              ? value
+              ? value.map((day) => normalizeCandidateDay(day)).filter(Boolean)
               : String(value || '')
                 .split(',')
-                .map((day) => normalizeDay(day))
+                .map((day) => normalizeCandidateDay(day))
                 .filter(Boolean);
-            const displayDays = resolvedDays.map((day) => day.charAt(0) + day.slice(1).toLowerCase()).join(', ');
+            const displayDays = resolvedDays.join(', ');
             return displayDays || fallback;
           }
           return value === '' ? fallback : String(value);
