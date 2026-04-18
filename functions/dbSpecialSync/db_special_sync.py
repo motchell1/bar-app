@@ -73,6 +73,10 @@ def _normalize_day_of_week(value) -> str:
     return str(value).strip().upper()
 
 
+def _normalize_days_of_week_value(value) -> tuple:
+    return tuple(sorted(_normalize_day_of_week(day) for day in _parse_days_of_week(value)))
+
+
 def _normalize_yn_flag(value) -> str:
     if value in {'Y', 'N'}:
         return value
@@ -102,6 +106,18 @@ def _normalize_time_value(value) -> str:
     return normalized
 
 
+def _normalize_date_value(value) -> str:
+    if value is None:
+        return ''
+    if isinstance(value, datetime):
+        return value.date().isoformat()
+    return str(value).strip()
+
+
+def _normalize_text_value(value) -> str:
+    return str(value or '').strip()
+
+
 def _is_candidate_same_as_special(candidate_row: Dict, special_row: Dict) -> bool:
     return (
         _normalize_day_of_week(candidate_row.get('day_of_week')) == _normalize_day_of_week(special_row.get('day_of_week'))
@@ -109,6 +125,21 @@ def _is_candidate_same_as_special(candidate_row: Dict, special_row: Dict) -> boo
         and _normalize_time_value(candidate_row.get('start_time')) == _normalize_time_value(special_row.get('start_time'))
         and _normalize_time_value(candidate_row.get('end_time')) == _normalize_time_value(special_row.get('end_time'))
         and _descriptions_match(candidate_row.get('description'), special_row.get('description'))
+    )
+
+
+def _is_candidate_same_as_reject(candidate_row: Dict, reject_row: Dict) -> bool:
+    return (
+        str(candidate_row.get('bar_id')) == str(reject_row.get('bar_id'))
+        and _normalize_days_of_week_value(candidate_row.get('days_of_week')) == _normalize_days_of_week_value(reject_row.get('days_of_week'))
+        and _normalize_time_value(candidate_row.get('start_time')) == _normalize_time_value(reject_row.get('start_time'))
+        and _normalize_time_value(candidate_row.get('end_time')) == _normalize_time_value(reject_row.get('end_time'))
+        and _normalize_yn_flag(candidate_row.get('all_day')) == _normalize_yn_flag(reject_row.get('all_day'))
+        and _normalize_yn_flag(candidate_row.get('is_recurring')) == _normalize_yn_flag(reject_row.get('is_recurring'))
+        and _normalize_date_value(candidate_row.get('date')) == _normalize_date_value(reject_row.get('date'))
+        and _normalize_text_value(candidate_row.get('fetch_method')) == _normalize_text_value(reject_row.get('fetch_method'))
+        and _normalize_text_value(candidate_row.get('source') or candidate_row.get('source_url')) == _normalize_text_value(reject_row.get('source'))
+        and _descriptions_match(candidate_row.get('description'), reject_row.get('description'))
     )
 
 
@@ -174,18 +205,45 @@ def insert_special_candidate(cursor, run: Dict, candidates: List[Dict]) -> Dict[
     run_id = insert_special_candidate_run(cursor, run)
     inserted_count = 0
     auto_approved_count = 0
+
+    cursor.execute(
+        """
+        SELECT
+            bar_id,
+            description,
+            days_of_week,
+            start_time,
+            end_time,
+            all_day,
+            is_recurring,
+            date,
+            fetch_method,
+            source
+        FROM special_candidate_reject
+        WHERE bar_id = %s
+        """,
+        (run['bar_id'],),
+    )
+    rejected_candidates = cursor.fetchall()
+
     for candidate in candidates:
         approval_status = 'NOT_APPROVED'
         approval_date = None
         approved_special_id = None
         confidence = _parse_confidence(candidate.get('confidence'))
 
-        fetch_method = (candidate.get('fetch_method') or '').strip()
-        auto_approval_threshold = WEB_AI_SEARCH_AUTO_APPROVAL_THRESHOLD if fetch_method == 'web_ai_search' else WEB_SCRAPE_AUTO_APPROVAL_THRESHOLD
-        if confidence >= auto_approval_threshold:
-            approval_status = 'AUTO_APPROVED'
+        is_rejected_candidate = any(_is_candidate_same_as_reject(candidate, rejected_candidate) for rejected_candidate in rejected_candidates)
+
+        if is_rejected_candidate:
+            approval_status = 'AUTO_REJECTED'
             approval_date = datetime.utcnow()
-            auto_approved_count += 1
+        else:
+            fetch_method = (candidate.get('fetch_method') or '').strip()
+            auto_approval_threshold = WEB_AI_SEARCH_AUTO_APPROVAL_THRESHOLD if fetch_method == 'web_ai_search' else WEB_SCRAPE_AUTO_APPROVAL_THRESHOLD
+            if confidence >= auto_approval_threshold:
+                approval_status = 'AUTO_APPROVED'
+                approval_date = datetime.utcnow()
+                auto_approved_count += 1
 
         cursor.execute(
             """
