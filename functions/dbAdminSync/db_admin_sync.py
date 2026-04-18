@@ -376,7 +376,7 @@ def get_rejected_special_candidates(cursor):
         JOIN bar b ON b.bar_id = sc.bar_id
         LEFT JOIN special_candidate_reject_join scrj ON scrj.special_candidate_id = sc.special_candidate_id
         LEFT JOIN special_candidate_reject scr ON scr.reject_id = scrj.reject_id
-        WHERE sc.approval_status IN ('REJECTED', 'AUTO_REJECTED')
+        WHERE sc.approval_status = 'AUTO_REJECTED'
         GROUP BY
             sc.special_candidate_id,
             sc.bar_id,

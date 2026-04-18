@@ -1245,7 +1245,7 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
       <section class="admin-home-view" aria-label="Admin tools">
         <h2>Admin tools</h2>
         <button type="button" class="admin-tool-button" data-tool="special-management">Special Management</button>
-        <button type="button" class="admin-tool-button" data-tool="rejected-special-management">Rejected Special Management</button>
+        <button type="button" class="admin-tool-button" data-tool="rejected-special-management">Auto-Rejected Special Management</button>
         <button type="button" class="admin-tool-button" data-tool="bar-management">Bar Management</button>
         <button type="button" class="admin-tool-button" data-tool="specials-to-be-approved">Specials Pending Approval</button>
       </section>
@@ -1348,16 +1348,16 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
   }
 
   function renderRejectedSpecialManagementView() {
-    titleElement.textContent = 'Rejected Special Management';
+    titleElement.textContent = 'Auto-Rejected Special Management';
 
     if (state.loadingRejectedSpecials) {
-      screenElement.innerHTML = '<p class="admin-loading">Loading rejected specials...</p>';
+      screenElement.innerHTML = '<p class="admin-loading">Loading auto-rejected specials...</p>';
       return;
     }
 
     screenElement.innerHTML = `
-      <section class="admin-specials-view" aria-label="Rejected special management">
-        <h2>Rejected Special Management</h2>
+      <section class="admin-specials-view" aria-label="Auto-rejected special management">
+        <h2>Auto-Rejected Special Management</h2>
         ${state.errorMessage ? `<p class="admin-error">${state.errorMessage}</p>` : ''}
         ${buildRejectedSpecialManagementTable()}
       </section>
@@ -1374,8 +1374,8 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
     });
 
     if (!rows.length) {
-      if (searchTerm) return '<p class="admin-empty">No rejected specials match that bar or neighborhood.</p>';
-      return '<p class="admin-empty">No rejected specials found.</p>';
+      if (searchTerm) return '<p class="admin-empty">No auto-rejected specials match that bar or neighborhood.</p>';
+      return '<p class="admin-empty">No auto-rejected specials found.</p>';
     }
 
     return `
