@@ -332,6 +332,22 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
     }
   }
 
+  async function removeRejectedSpecialCandidate(specialCandidateId) {
+    state.errorMessage = '';
+    render();
+    try {
+      await callAdminSync({
+        mode: 'remove_rejected_special_candidate',
+        special_candidate_id: specialCandidateId
+      });
+      await loadRejectedSpecials();
+    } catch (err) {
+      console.error('Failed to remove rejected special candidate:', err);
+      state.errorMessage = err?.message || 'Failed to remove rejected special candidate.';
+      render();
+    }
+  }
+
   async function loadAllBars() {
     state.loadingBars = true;
     state.errorMessage = '';
@@ -1245,7 +1261,7 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
       <section class="admin-home-view" aria-label="Admin tools">
         <h2>Admin tools</h2>
         <button type="button" class="admin-tool-button" data-tool="special-management">Special Management</button>
-        <button type="button" class="admin-tool-button" data-tool="rejected-special-management">Auto-Rejected Special Management</button>
+        <button type="button" class="admin-tool-button" data-tool="rejected-special-management">Rejected Specials</button>
         <button type="button" class="admin-tool-button" data-tool="bar-management">Bar Management</button>
         <button type="button" class="admin-tool-button" data-tool="specials-to-be-approved">Specials Pending Approval</button>
       </section>
@@ -1348,16 +1364,16 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
   }
 
   function renderRejectedSpecialManagementView() {
-    titleElement.textContent = 'Auto-Rejected Special Management';
+    titleElement.textContent = 'Rejected Specials';
 
     if (state.loadingRejectedSpecials) {
-      screenElement.innerHTML = '<p class="admin-loading">Loading auto-rejected specials...</p>';
+      screenElement.innerHTML = '<p class="admin-loading">Loading rejected specials...</p>';
       return;
     }
 
     screenElement.innerHTML = `
-      <section class="admin-specials-view" aria-label="Auto-rejected special management">
-        <h2>Auto-Rejected Special Management</h2>
+      <section class="admin-specials-view" aria-label="Rejected specials">
+        <h2>Rejected Specials</h2>
         ${state.errorMessage ? `<p class="admin-error">${state.errorMessage}</p>` : ''}
         ${buildRejectedSpecialManagementTable()}
       </section>
@@ -1374,8 +1390,8 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
     });
 
     if (!rows.length) {
-      if (searchTerm) return '<p class="admin-empty">No auto-rejected specials match that bar or neighborhood.</p>';
-      return '<p class="admin-empty">No auto-rejected specials found.</p>';
+      if (searchTerm) return '<p class="admin-empty">No rejected specials match that bar or neighborhood.</p>';
+      return '<p class="admin-empty">No rejected specials found.</p>';
     }
 
     return `
@@ -1405,6 +1421,7 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
               <th>Web AI Search Matches</th>
               <th>Web Crawl Matches</th>
               <th>Insert Date</th>
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -1424,6 +1441,15 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
                 <td>${row.web_ai_search_matches ?? 0}</td>
                 <td>${row.web_crawl_matches ?? 0}</td>
                 <td>${formatDateTime(row.insert_date)}</td>
+                <td>
+                  <button
+                    type="button"
+                    class="admin-action-btn reject"
+                    data-remove-rejected-candidate-id="${row.special_candidate_id}"
+                  >
+                    Remove Rejected Special Candidate
+                  </button>
+                </td>
               </tr>
             `).join('')}
           </tbody>
@@ -1458,6 +1484,15 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
           render();
         });
       }
+      screenElement.querySelectorAll('[data-remove-rejected-candidate-id]').forEach((button) => {
+        button.addEventListener('click', async () => {
+          const specialCandidateId = Number(button.getAttribute('data-remove-rejected-candidate-id'));
+          if (!specialCandidateId) return;
+          const shouldContinue = window.confirm('Remove rejected special candidate and matching reject records?');
+          if (!shouldContinue) return;
+          await removeRejectedSpecialCandidate(specialCandidateId);
+        });
+      });
       return;
     }
 

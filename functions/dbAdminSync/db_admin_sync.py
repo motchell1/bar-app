@@ -376,7 +376,7 @@ def get_rejected_special_candidates(cursor):
         JOIN bar b ON b.bar_id = sc.bar_id
         LEFT JOIN special_candidate_reject_join scrj ON scrj.special_candidate_id = sc.special_candidate_id
         LEFT JOIN special_candidate_reject scr ON scr.reject_id = scrj.reject_id
-        WHERE sc.approval_status = 'AUTO_REJECTED'
+        WHERE sc.approval_status = 'REJECTED'
         GROUP BY
             sc.special_candidate_id,
             sc.bar_id,
@@ -423,6 +423,49 @@ def get_rejected_special_candidates(cursor):
             }
         )
     return {'specials': specials, 'special_count': len(specials)}
+
+
+def remove_rejected_special_candidate(cursor, special_candidate_id: int):
+    cursor.execute(
+        """
+        SELECT reject_id
+        FROM special_candidate_reject_join
+        WHERE special_candidate_id = %s
+        """,
+        (special_candidate_id,),
+    )
+    reject_ids = [row.get('reject_id') for row in cursor.fetchall() if row.get('reject_id')]
+
+    cursor.execute(
+        """
+        DELETE FROM special_candidate_reject_join
+        WHERE special_candidate_id = %s
+        """,
+        (special_candidate_id,),
+    )
+    deleted_join_rows = cursor.rowcount
+
+    deleted_reject_rows = 0
+    if reject_ids:
+        placeholders = ', '.join(['%s'] * len(reject_ids))
+        cursor.execute(
+            f"""
+            DELETE FROM special_candidate_reject
+            WHERE reject_id IN ({placeholders})
+              AND reject_id NOT IN (
+                    SELECT reject_id
+                    FROM special_candidate_reject_join
+                )
+            """,
+            tuple(reject_ids),
+        )
+        deleted_reject_rows = cursor.rowcount
+
+    return {
+        'special_candidate_id': special_candidate_id,
+        'deleted_join_rows': deleted_join_rows,
+        'deleted_reject_rows': deleted_reject_rows,
+    }
 
 
 def update_special_candidate_approval(cursor, special_candidate_id: int, approval_status: str):
@@ -989,6 +1032,7 @@ def lambda_handler(event, context):
     if mode not in {
         'get_unapproved_special_candidates',
         'get_rejected_special_candidates',
+        'remove_rejected_special_candidate',
         'update_special_candidate_approval',
         'get_all_specials',
         'update_special',
@@ -1005,6 +1049,7 @@ def lambda_handler(event, context):
                     'error': (
                         'mode must be one of get_unapproved_special_candidates, '
                         'get_rejected_special_candidates, '
+                        'remove_rejected_special_candidate, '
                         'update_special_candidate_approval, get_all_specials, update_special, '
                         'update_special_candidate, get_all_bars, get_bar_details, update_bar, update_open_hours'
                     )
@@ -1025,6 +1070,11 @@ def lambda_handler(event, context):
                 if not special_candidate_id:
                     raise ValueError('special_candidate_id is required for update_special_candidate_approval')
                 result = update_special_candidate_approval(cursor, special_candidate_id, approval_status)
+            elif mode == 'remove_rejected_special_candidate':
+                special_candidate_id = event.get('special_candidate_id')
+                if not special_candidate_id:
+                    raise ValueError('special_candidate_id is required for remove_rejected_special_candidate')
+                result = remove_rejected_special_candidate(cursor, special_candidate_id)
             elif mode == 'get_all_specials':
                 result = get_all_specials(cursor)
             elif mode == 'get_all_bars':
