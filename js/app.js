@@ -21,13 +21,8 @@ function showTab(tabName) {
   const barsScreen = document.getElementById('bars-screen');
   const favoritesScreen = document.getElementById('favorites-screen');
   const mapScreen = document.getElementById('map-screen');
-  const previousTab = currentTab;
-
   currentTab = tabName;
-
-  if (previousTab !== tabName) {
-    resetFilters();
-  }
+  loadStoredFiltersForTab(tabName);
 
   updateFilterSectionVisibility();
 
@@ -80,6 +75,86 @@ function resetFilters() {
   activeFilters.neighborhoods = [];
   activeFilters.favoritesOnly = false;
   resetFilterInputs();
+}
+
+function getFiltersStorageKey() {
+  const normalizedDeviceId = String(deviceId || '').trim();
+  if (!normalizedDeviceId) return null;
+  return `filters:${normalizedDeviceId}`;
+}
+
+function readStoredFiltersByTab() {
+  const storageKey = getFiltersStorageKey();
+  if (!storageKey) return {};
+
+  try {
+    const raw = localStorage.getItem(storageKey);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+    return parsed;
+  } catch (err) {
+    console.error('Failed to parse stored filters:', err);
+    return {};
+  }
+}
+
+function sanitizeFiltersForTab(filters, tabName) {
+  const rawTypes = Array.isArray(filters?.types) ? filters.types : [];
+  const rawNeighborhoods = Array.isArray(filters?.neighborhoods) ? filters.neighborhoods : [];
+  const isBarsTab = tabName === 'bars';
+
+  return {
+    types: isBarsTab ? [] : rawTypes.map((type) => String(type)).filter(Boolean),
+    neighborhoods: rawNeighborhoods.map((name) => String(name)).filter(Boolean),
+    favoritesOnly: Boolean(filters?.favoritesOnly) && isBarsTab
+  };
+}
+
+function syncFilterInputsFromActiveFilters() {
+  const typeRows = document.querySelectorAll('#special-type-filters .filter-row');
+  typeRows.forEach((row) => {
+    const checkbox = row.querySelector('input[type="checkbox"]');
+    if (!checkbox) return;
+    const typeName = checkbox.id.replace('Filter', '').toLowerCase();
+    checkbox.checked = activeFilters.types.includes(typeName);
+    row.classList.toggle('selected', checkbox.checked);
+  });
+
+  const favoritesCheckbox = document.getElementById('favoritesFilter');
+  if (favoritesCheckbox) {
+    favoritesCheckbox.checked = Boolean(activeFilters.favoritesOnly);
+    const favoritesRow = favoritesCheckbox.closest('.filter-row');
+    if (favoritesRow) {
+      favoritesRow.classList.toggle('selected', favoritesCheckbox.checked);
+    }
+  }
+
+  const neighborhoodSelect = document.getElementById('neighborhoodFilterSelect');
+  if (neighborhoodSelect) {
+    const [selectedNeighborhood] = activeFilters.neighborhoods;
+    neighborhoodSelect.value = selectedNeighborhood || '';
+  }
+}
+
+function loadStoredFiltersForTab(tabName = currentTab) {
+  const storedByTab = readStoredFiltersByTab();
+  const fallbackFilters = { types: [], neighborhoods: [], favoritesOnly: false };
+  const nextFilters = sanitizeFiltersForTab(storedByTab[tabName] || fallbackFilters, tabName);
+
+  activeFilters.types = nextFilters.types;
+  activeFilters.neighborhoods = nextFilters.neighborhoods;
+  activeFilters.favoritesOnly = nextFilters.favoritesOnly;
+  syncFilterInputsFromActiveFilters();
+}
+
+function persistFiltersForCurrentTab() {
+  const storageKey = getFiltersStorageKey();
+  if (!storageKey) return;
+
+  const storedByTab = readStoredFiltersByTab();
+  storedByTab[currentTab] = sanitizeFiltersForTab(activeFilters, currentTab);
+  localStorage.setItem(storageKey, JSON.stringify(storedByTab));
 }
 
 function updateFilterSectionVisibility() {
@@ -212,7 +287,6 @@ function initSidebarFilters() {
     if (!row || row.dataset.bound === 'true') return;
     const checkbox = row.querySelector('input[type="checkbox"]');
     if (!checkbox) return;
-    checkbox.checked = false;
     row.classList.toggle('selected', checkbox.checked);
     row.addEventListener('click', () => {
       checkbox.checked = !checkbox.checked;
@@ -240,6 +314,7 @@ function initSidebarFilters() {
     activeFilters.neighborhoods = getSelectedNeighborhoodsFromFilters();
     const favoritesCheckbox = document.getElementById('favoritesFilter');
     activeFilters.favoritesOnly = currentTab === 'bars' && Boolean(favoritesCheckbox?.checked);
+    persistFiltersForCurrentTab();
     renderCurrentTabData();
     sideMenu.classList.remove('open');
     menuOverlay.classList.remove('active');
