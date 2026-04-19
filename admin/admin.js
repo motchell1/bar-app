@@ -50,6 +50,7 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
     currentView: 'home',
     loading: false,
     loadingSpecials: false,
+    loadingRejectedSpecials: false,
     loadingBars: false,
     specialSearchTerm: '',
     specialFilterActive: 'all',
@@ -59,6 +60,7 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
     updatingCandidateId: null,
     editingCandidateId: null,
     savingCandidate: false,
+    actionRejectedCandidateId: null,
     actionSpecialId: null,
     detailSpecials: [],
     detailEditing: false,
@@ -70,6 +72,7 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
     detailBarEditing: false,
     savingBar: false,
     runs: [],
+    rejectedSpecials: [],
     allSpecials: [],
     groupedSpecials: [],
     errorMessage: ''
@@ -84,6 +87,7 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
     if (state.currentView === 'home') return;
     state.currentView = 'home';
     state.errorMessage = '';
+    state.actionRejectedCandidateId = null;
     state.actionSpecialId = null;
     state.detailSpecials = [];
     state.detailEditing = false;
@@ -309,6 +313,39 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
       state.errorMessage = err?.message || 'Failed to load specials.';
     } finally {
       state.loadingSpecials = false;
+      render();
+    }
+  }
+
+  async function loadRejectedSpecials() {
+    state.loadingRejectedSpecials = true;
+    state.errorMessage = '';
+    render();
+
+    try {
+      const result = await callAdminSync({ mode: 'get_rejected_special_candidates' });
+      state.rejectedSpecials = Array.isArray(result?.specials) ? result.specials : [];
+    } catch (err) {
+      console.error('Failed to load rejected specials:', err);
+      state.errorMessage = err?.message || 'Failed to load rejected specials.';
+    } finally {
+      state.loadingRejectedSpecials = false;
+      render();
+    }
+  }
+
+  async function removeRejectedSpecialCandidate(specialCandidateId) {
+    state.errorMessage = '';
+    render();
+    try {
+      await callAdminSync({
+        mode: 'remove_rejected_special_candidate',
+        special_candidate_id: specialCandidateId
+      });
+      await loadRejectedSpecials();
+    } catch (err) {
+      console.error('Failed to remove rejected special candidate:', err);
+      state.errorMessage = err?.message || 'Failed to remove rejected special candidate.';
       render();
     }
   }
@@ -1210,6 +1247,12 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
           render();
           await loadAllBars();
         }
+
+        if (tool === 'rejected-special-management') {
+          state.currentView = 'rejected-special-management';
+          render();
+          await loadRejectedSpecials();
+        }
       });
     });
   }
@@ -1220,6 +1263,7 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
       <section class="admin-home-view" aria-label="Admin tools">
         <h2>Admin tools</h2>
         <button type="button" class="admin-tool-button" data-tool="special-management">Special Management</button>
+        <button type="button" class="admin-tool-button" data-tool="rejected-special-management">Rejected Specials</button>
         <button type="button" class="admin-tool-button" data-tool="bar-management">Bar Management</button>
         <button type="button" class="admin-tool-button" data-tool="specials-to-be-approved">Specials Pending Approval</button>
       </section>
@@ -1321,6 +1365,148 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
     bindBarManagementEvents();
   }
 
+  function renderRejectedSpecialManagementView() {
+    titleElement.textContent = 'Rejected Specials';
+
+    if (state.loadingRejectedSpecials) {
+      screenElement.innerHTML = '<p class="admin-loading">Loading rejected specials...</p>';
+      return;
+    }
+
+    screenElement.innerHTML = `
+      <section class="admin-specials-view" aria-label="Rejected specials">
+        <h2>Rejected Specials</h2>
+        ${state.errorMessage ? `<p class="admin-error">${state.errorMessage}</p>` : ''}
+        ${buildRejectedSpecialManagementTable()}
+      </section>
+    `;
+
+    bindRejectedSpecialManagementEvents();
+  }
+
+  function buildRejectedSpecialManagementTable() {
+    const searchTerm = String(state.specialSearchTerm || '').trim().toLowerCase();
+    const rows = state.rejectedSpecials.filter((row) => {
+      const neighborhood = String(row.neighborhood || '').trim().toLowerCase();
+      const barName = String(row.bar_name || '').trim().toLowerCase();
+      if (!searchTerm) return true;
+      return neighborhood.includes(searchTerm) || barName.includes(searchTerm);
+    });
+
+    if (!rows.length) {
+      if (searchTerm) return '<p class="admin-empty">No rejected specials match that bar or neighborhood.</p>';
+      return '<p class="admin-empty">No rejected specials found.</p>';
+    }
+
+    return `
+      <input
+        type="search"
+        class="admin-input admin-special-search-input"
+        data-rejected-special-search-input
+        placeholder="Search by bar or neighborhood"
+        value="${escapeAttribute(state.specialSearchTerm)}"
+        aria-label="Search rejected specials by bar or neighborhood"
+      />
+      <div class="admin-table-wrap">
+        <table class="admin-special-table">
+          <thead>
+            <tr>
+              <th>Neighborhood</th>
+              <th>Bar Name</th>
+              <th>Description</th>
+              <th>Days of Week</th>
+              <th>All Day</th>
+              <th>Start Time</th>
+              <th>End Time</th>
+              <th>Type</th>
+              <th>Method</th>
+              <th>Source</th>
+              <th>Web AI Search Matches</th>
+              <th>Web Crawl Matches</th>
+              <th>Insert Date</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows.map((row) => `
+              <tr class="admin-special-row" data-rejected-special-candidate-row="${row.special_candidate_id}">
+                <td>${row.neighborhood || '—'}</td>
+                <td>${row.bar_name || '—'}</td>
+                <td>${row.description || '—'}</td>
+                <td>${formatDayGroup(row.days_of_week || [])}</td>
+                <td>${row.all_day || '—'}</td>
+                <td>${formatTime(row.start_time)}</td>
+                <td>${formatTime(row.end_time)}</td>
+                <td>${row.type || '—'}</td>
+                <td>${row.fetch_method || '—'}</td>
+                <td>${getSourceMarkup(row.source)}</td>
+                <td>${row.web_ai_search_matches ?? 0}</td>
+                <td>${row.web_crawl_matches ?? 0}</td>
+                <td>${formatDateTime(row.insert_date)}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+      ${getRejectedSpecialActionMenuMarkup()}
+    `;
+  }
+
+  function getRejectedSpecialActionMenuMarkup() {
+    if (!state.actionRejectedCandidateId) return '';
+    return `
+      <div class="admin-modal-backdrop" data-close-rejected-action-menu="true">
+        <div class="admin-modal" role="dialog" aria-label="Rejected special actions">
+          <h3>Rejected Special Actions</h3>
+          <button
+            type="button"
+            class="admin-tool-button"
+            data-rejected-special-action="remove-rejected-candidate"
+            data-special-candidate-id="${state.actionRejectedCandidateId}"
+          >
+            Remove Rejected Special Candidate
+          </button>
+          <button type="button" class="admin-secondary-btn" data-close-rejected-action-menu="true">Close</button>
+        </div>
+      </div>
+    `;
+  }
+
+  function bindRejectedSpecialManagementEvents() {
+    const searchInput = screenElement.querySelector('[data-rejected-special-search-input]');
+    if (searchInput) {
+      searchInput.addEventListener('input', (event) => {
+        state.specialSearchTerm = event.target.value;
+        render();
+      });
+    }
+
+    screenElement.querySelectorAll('[data-rejected-special-candidate-row]').forEach((row) => {
+      row.addEventListener('click', () => {
+        const specialCandidateId = Number(row.getAttribute('data-rejected-special-candidate-row'));
+        if (!specialCandidateId) return;
+        state.actionRejectedCandidateId = specialCandidateId;
+        render();
+      });
+    });
+
+    screenElement.querySelectorAll('[data-close-rejected-action-menu="true"]').forEach((element) => {
+      element.addEventListener('click', (event) => {
+        if (event.currentTarget !== event.target) return;
+        state.actionRejectedCandidateId = null;
+        render();
+      });
+    });
+
+    screenElement.querySelectorAll('[data-rejected-special-action="remove-rejected-candidate"]').forEach((button) => {
+      button.addEventListener('click', async () => {
+        const specialCandidateId = Number(button.getAttribute('data-special-candidate-id'));
+        if (!specialCandidateId) return;
+        state.actionRejectedCandidateId = null;
+        await removeRejectedSpecialCandidate(specialCandidateId);
+      });
+    });
+  }
+
   function render() {
     updateToolbarButtons();
     if (state.currentView === 'specials') {
@@ -1335,6 +1521,11 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
 
     if (state.currentView === 'bar-management') {
       renderBarManagementView();
+      return;
+    }
+
+    if (state.currentView === 'rejected-special-management') {
+      renderRejectedSpecialManagementView();
       return;
     }
 

@@ -350,6 +350,127 @@ def get_unapproved_special_candidates(cursor):
     return {'runs': runs, 'run_count': len(runs), 'special_count': len(rows)}
 
 
+def get_rejected_special_candidates(cursor):
+    cursor.execute(
+        """
+        SELECT
+            sc.special_candidate_id,
+            sc.bar_id,
+            b.name AS bar_name,
+            sc.neighborhood,
+            sc.description,
+            sc.days_of_week,
+            sc.type,
+            sc.start_time,
+            sc.end_time,
+            sc.all_day,
+            sc.is_recurring,
+            sc.date,
+            sc.fetch_method,
+            sc.source,
+            sc.approval_status,
+            sc.insert_date,
+            COALESCE(SUM(CASE WHEN scr.fetch_method = 'web_ai_search' THEN 1 ELSE 0 END), 0) AS web_ai_search_matches,
+            COALESCE(SUM(CASE WHEN scr.fetch_method = 'web_crawl' THEN 1 ELSE 0 END), 0) AS web_crawl_matches
+        FROM special_candidate sc
+        JOIN bar b ON b.bar_id = sc.bar_id
+        LEFT JOIN special_candidate_reject_join scrj ON scrj.special_candidate_id = sc.special_candidate_id
+        LEFT JOIN special_candidate_reject scr ON scr.reject_id = scrj.reject_id
+        WHERE sc.approval_status = 'REJECTED'
+        GROUP BY
+            sc.special_candidate_id,
+            sc.bar_id,
+            b.name,
+            sc.neighborhood,
+            sc.description,
+            sc.days_of_week,
+            sc.type,
+            sc.start_time,
+            sc.end_time,
+            sc.all_day,
+            sc.is_recurring,
+            sc.date,
+            sc.fetch_method,
+            sc.source,
+            sc.approval_status,
+            sc.insert_date
+        ORDER BY
+            sc.neighborhood ASC,
+            b.name ASC,
+            sc.special_candidate_id DESC
+        """
+    )
+    rows = cursor.fetchall()
+    specials = []
+    for row in rows:
+        specials.append(
+            {
+                'special_candidate_id': row.get('special_candidate_id'),
+                'bar_id': row.get('bar_id'),
+                'bar_name': row.get('bar_name'),
+                'neighborhood': row.get('neighborhood'),
+                'description': row.get('description'),
+                'days_of_week': _parse_days_of_week(row.get('days_of_week')),
+                'type': row.get('type'),
+                'start_time': _normalize_time_value(row.get('start_time')) or None,
+                'end_time': _normalize_time_value(row.get('end_time')) or None,
+                'all_day': row.get('all_day'),
+                'is_recurring': row.get('is_recurring'),
+                'date': row.get('date').isoformat() if hasattr(row.get('date'), 'isoformat') and row.get('date') else row.get('date'),
+                'fetch_method': row.get('fetch_method'),
+                'source': row.get('source'),
+                'approval_status': row.get('approval_status'),
+                'insert_date': row.get('insert_date').isoformat() if row.get('insert_date') else None,
+                'web_ai_search_matches': int(row.get('web_ai_search_matches') or 0),
+                'web_crawl_matches': int(row.get('web_crawl_matches') or 0),
+            }
+        )
+    return {'specials': specials, 'special_count': len(specials)}
+
+
+def remove_rejected_special_candidate(cursor, special_candidate_id: int):
+    cursor.execute(
+        """
+        SELECT reject_id
+        FROM special_candidate_reject_join
+        WHERE special_candidate_id = %s
+        """,
+        (special_candidate_id,),
+    )
+    reject_ids = [row.get('reject_id') for row in cursor.fetchall() if row.get('reject_id')]
+
+    cursor.execute(
+        """
+        DELETE FROM special_candidate_reject_join
+        WHERE special_candidate_id = %s
+        """,
+        (special_candidate_id,),
+    )
+    deleted_join_rows = cursor.rowcount
+
+    deleted_reject_rows = 0
+    if reject_ids:
+        placeholders = ', '.join(['%s'] * len(reject_ids))
+        cursor.execute(
+            f"""
+            DELETE FROM special_candidate_reject
+            WHERE reject_id IN ({placeholders})
+              AND reject_id NOT IN (
+                    SELECT reject_id
+                    FROM special_candidate_reject_join
+                )
+            """,
+            tuple(reject_ids),
+        )
+        deleted_reject_rows = cursor.rowcount
+
+    return {
+        'special_candidate_id': special_candidate_id,
+        'deleted_join_rows': deleted_join_rows,
+        'deleted_reject_rows': deleted_reject_rows,
+    }
+
+
 def update_special_candidate_approval(cursor, special_candidate_id: int, approval_status: str):
     normalized_status = str(approval_status or '').strip().upper()
     if normalized_status not in {'APPROVED', 'REJECTED'}:
@@ -913,6 +1034,8 @@ def lambda_handler(event, context):
     mode = event.get('mode')
     if mode not in {
         'get_unapproved_special_candidates',
+        'get_rejected_special_candidates',
+        'remove_rejected_special_candidate',
         'update_special_candidate_approval',
         'get_all_specials',
         'update_special',
@@ -928,6 +1051,8 @@ def lambda_handler(event, context):
                 {
                     'error': (
                         'mode must be one of get_unapproved_special_candidates, '
+                        'get_rejected_special_candidates, '
+                        'remove_rejected_special_candidate, '
                         'update_special_candidate_approval, get_all_specials, update_special, '
                         'update_special_candidate, get_all_bars, get_bar_details, update_bar, update_open_hours'
                     )
@@ -940,12 +1065,19 @@ def lambda_handler(event, context):
         with conn.cursor() as cursor:
             if mode == 'get_unapproved_special_candidates':
                 result = get_unapproved_special_candidates(cursor)
+            elif mode == 'get_rejected_special_candidates':
+                result = get_rejected_special_candidates(cursor)
             elif mode == 'update_special_candidate_approval':
                 special_candidate_id = event.get('special_candidate_id')
                 approval_status = event.get('approval_status')
                 if not special_candidate_id:
                     raise ValueError('special_candidate_id is required for update_special_candidate_approval')
                 result = update_special_candidate_approval(cursor, special_candidate_id, approval_status)
+            elif mode == 'remove_rejected_special_candidate':
+                special_candidate_id = event.get('special_candidate_id')
+                if not special_candidate_id:
+                    raise ValueError('special_candidate_id is required for remove_rejected_special_candidate')
+                result = remove_rejected_special_candidate(cursor, special_candidate_id)
             elif mode == 'get_all_specials':
                 result = get_all_specials(cursor)
             elif mode == 'get_all_bars':
