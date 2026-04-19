@@ -10,6 +10,12 @@ function getOrderedDaysForDetail(todayKey) {
   return DAYS_FULL.slice(todayIndex).concat(DAYS_FULL.slice(0, todayIndex));
 }
 
+const detailLocationMapState = {
+  map: null,
+  marker: null,
+  mapContainer: null
+};
+
 function getBarFromPayload(barOrId) {
   const barId = String(typeof barOrId === 'object' ? barOrId?.bar_id : barOrId);
   const barData = startupPayload?.bars?.[barId];
@@ -151,13 +157,94 @@ function updateBarLocationSection(selectedBar) {
   if (!placeId || !googleApiKey) {
     section.style.display = 'none';
     mapFrame.removeAttribute('src');
+    if (detailLocationMapState.mapContainer) {
+      detailLocationMapState.mapContainer.style.display = 'none';
+    }
     return;
   }
 
   const encodedPlaceQuery = encodeURIComponent(`place_id:${placeId}`);
   const encodedApiKey = encodeURIComponent(googleApiKey);
   mapFrame.setAttribute('src', `https://www.google.com/maps/embed/v1/place?key=${encodedApiKey}&q=${encodedPlaceQuery}`);
+  mapFrame.style.display = '';
   section.style.display = '';
+
+  if (typeof loadGoogleMapsApi !== 'function') return;
+
+  loadGoogleMapsApi()
+    .then(() => {
+      if (!window.google?.maps?.Map || !window.google.maps.Geocoder) return;
+      const mapWrap = mapFrame.parentElement;
+      if (!mapWrap) return;
+
+      if (!detailLocationMapState.mapContainer) {
+        const mapContainer = document.createElement('div');
+        mapContainer.className = mapFrame.className;
+        mapContainer.id = 'detail-location-map-canvas';
+        mapWrap.appendChild(mapContainer);
+        detailLocationMapState.mapContainer = mapContainer;
+      }
+
+      detailLocationMapState.mapContainer.style.display = '';
+      mapFrame.style.display = 'none';
+
+      if (!detailLocationMapState.map) {
+        const mapId = startupPayload?.general_data?.google_map_id || 'DEMO_MAP_ID';
+        detailLocationMapState.map = new google.maps.Map(detailLocationMapState.mapContainer, {
+          center: { lat: 0, lng: 0 },
+          zoom: 15,
+          mapId,
+          clickableIcons: false,
+          mapTypeControl: false,
+          streetViewControl: false,
+          fullscreenControl: false
+        });
+      }
+
+      const hasCoordinates = Number.isFinite(Number(selectedBar?.latitude)) && Number.isFinite(Number(selectedBar?.longitude));
+      const setMarkerLocation = (location) => {
+        detailLocationMapState.map.setCenter(location);
+        detailLocationMapState.map.setZoom(15);
+
+        if (google.maps.marker?.AdvancedMarkerElement) {
+          if (detailLocationMapState.marker) detailLocationMapState.marker.map = null;
+          detailLocationMapState.marker = new google.maps.marker.AdvancedMarkerElement({
+            map: detailLocationMapState.map,
+            position: location
+          });
+          return;
+        }
+
+        if (!detailLocationMapState.marker) {
+          detailLocationMapState.marker = new google.maps.Marker({
+            map: detailLocationMapState.map,
+            position: location
+          });
+        } else {
+          detailLocationMapState.marker.setPosition(location);
+          detailLocationMapState.marker.setMap(detailLocationMapState.map);
+        }
+      };
+
+      if (hasCoordinates) {
+        setMarkerLocation({ lat: Number(selectedBar.latitude), lng: Number(selectedBar.longitude) });
+        return;
+      }
+
+      const geocoder = new google.maps.Geocoder();
+      geocoder.geocode({ placeId }, (results, status) => {
+        if (status !== 'OK' || !Array.isArray(results) || !results[0]?.geometry?.location) {
+          mapFrame.style.display = '';
+          detailLocationMapState.mapContainer.style.display = 'none';
+          return;
+        }
+        setMarkerLocation(results[0].geometry.location);
+      });
+    })
+    .catch(() => {
+      mapFrame.style.display = '';
+      if (detailLocationMapState.mapContainer) detailLocationMapState.mapContainer.style.display = 'none';
+    });
 }
 
 function normalizeWebsiteUrl(websiteValue) {

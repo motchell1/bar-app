@@ -184,6 +184,9 @@ function showMapSelectedBarSheet(bar, specialIds, dayKey, dayLabel) {
 
   card.appendChild(cardContent);
   content.appendChild(card);
+  if (window.lucide && typeof window.lucide.createIcons === 'function') {
+    window.lucide.createIcons();
+  }
   bindMapSheetDragToDismiss(sheet);
   sheet.style.display = '';
   sheet.style.transform = '';
@@ -270,6 +273,7 @@ function renderMapTab() {
           center: { lat: 40.438723047481425, lng: -79.99697911133545 },
           zoom: 4,
           mapId,
+          clickableIcons: false,
           mapTypeControl: false,
           streetViewControl: false,
           fullscreenControl: false
