@@ -244,6 +244,13 @@ function mountBaseNodes(document) {
   detailLocationSection.appendChild(detailLocationMap);
   detail.appendChild(detailLocationSection);
 
+  const detailWebsiteSection = document.createElement('section');
+  detailWebsiteSection.setAttribute('id', 'detail-website-section');
+  const detailWebsiteLink = document.createElement('a');
+  detailWebsiteLink.setAttribute('id', 'detail-website-link');
+  detailWebsiteSection.appendChild(detailWebsiteLink);
+  detail.appendChild(detailWebsiteSection);
+
   const special = document.createElement('div');
   special.setAttribute('id', 'special-screen');
   document.body.appendChild(home);
@@ -805,6 +812,107 @@ test('showDetail hides location map when google_api_key is missing from startup 
 
   assert.equal(document.getElementById('detail-location-section').style.display, 'none');
   assert.equal(document.getElementById('detail-location-map').getAttribute('src'), undefined);
+});
+
+test('showDetail renders website section when bar has website_url', async () => {
+  const document = new DocumentMock();
+  mountBaseNodes(document);
+  const ctx = loadAppWithoutBoot(document);
+
+  vm.runInContext(`
+    startupPayload = {
+      general_data: { current_day: 'MON' },
+      bars: {
+        '1': {
+          name: 'Website Bar',
+          neighborhood: 'Downtown',
+          image_url: 'bar.jpg',
+          website_url: 'www.websitebar.com',
+          is_open_now: false,
+          has_special_this_week: true
+        }
+      },
+      open_hours: {
+        '1': { MON: { display_text: '4:00 PM – 10:00 PM', open_time: '16:00', close_time: '22:00' } }
+      },
+      specials: {
+        '11': {
+          bar_id: 1,
+          day: 'MON',
+          special_type: 'drink',
+          description: '$5 Beer',
+          all_day: false,
+          start_time: '16:00',
+          end_time: '18:00',
+          current_status: 'active'
+        }
+      },
+      specials_by_day: {
+        MON: [{ bar_id: 1, specials: ['11'] }],
+        TUE: [],
+        WED: [],
+        THU: [],
+        FRI: [],
+        SAT: [],
+        SUN: []
+      }
+    };
+  `, ctx);
+
+  await ctx.showDetail(1, 'bars');
+
+  assert.equal(document.getElementById('detail-website-section').style.display, '');
+  assert.equal(document.getElementById('detail-website-link').getAttribute('href'), 'https://www.websitebar.com');
+});
+
+test('showDetail hides website section when bar has no website_url', async () => {
+  const document = new DocumentMock();
+  mountBaseNodes(document);
+  const ctx = loadAppWithoutBoot(document);
+
+  vm.runInContext(`
+    startupPayload = {
+      general_data: { current_day: 'MON' },
+      bars: {
+        '1': {
+          name: 'No Website Bar',
+          neighborhood: 'Downtown',
+          image_url: 'bar.jpg',
+          is_open_now: false,
+          has_special_this_week: true
+        }
+      },
+      open_hours: {
+        '1': { MON: { display_text: '4:00 PM – 10:00 PM', open_time: '16:00', close_time: '22:00' } }
+      },
+      specials: {
+        '11': {
+          bar_id: 1,
+          day: 'MON',
+          special_type: 'drink',
+          description: '$5 Beer',
+          all_day: false,
+          start_time: '16:00',
+          end_time: '18:00',
+          current_status: 'active'
+        }
+      },
+      specials_by_day: {
+        MON: [{ bar_id: 1, specials: ['11'] }],
+        TUE: [],
+        WED: [],
+        THU: [],
+        FRI: [],
+        SAT: [],
+        SUN: []
+      }
+    };
+  `, ctx);
+
+  await ctx.showDetail(1, 'bars');
+
+  assert.equal(document.getElementById('detail-website-section').style.display, 'none');
+  assert.equal(document.getElementById('detail-website-link').getAttribute('href'), undefined);
 });
 
 
