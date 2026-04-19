@@ -627,6 +627,70 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
     `;
   }
 
+  function getCreateSpecialModalMarkup() {
+    if (!state.creatingSpecial) return '';
+
+    const neighborhoodOptions = [...new Set(state.allBars
+      .map((row) => String(row.neighborhood || '').trim())
+      .filter(Boolean))]
+      .sort((a, b) => a.localeCompare(b));
+    const newSpecialNeighborhood = String(state.newSpecialForm.neighborhood || '');
+    const availableBars = state.allBars
+      .filter((bar) => !newSpecialNeighborhood || String(bar.neighborhood || '') === newSpecialNeighborhood)
+      .sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
+
+    return `
+      <div class="admin-modal-backdrop" data-close-create-special-modal="true">
+        <div class="admin-modal" role="dialog" aria-label="Create special">
+          <h3>Create New Special</h3>
+          <label>Neighborhood
+            <select class="admin-input" data-new-special-field="neighborhood">
+              <option value="">Select neighborhood</option>
+              ${neighborhoodOptions.map((name) => `<option value="${escapeAttribute(name)}" ${newSpecialNeighborhood === name ? 'selected' : ''}>${name}</option>`).join('')}
+            </select>
+          </label>
+          <label>Bar
+            <select class="admin-input" data-new-special-field="bar_id" ${newSpecialNeighborhood ? '' : 'disabled'}>
+              <option value="">Select bar</option>
+              ${availableBars.map((bar) => `<option value="${bar.bar_id}" ${String(state.newSpecialForm.bar_id) === String(bar.bar_id) ? 'selected' : ''}>${bar.name}</option>`).join('')}
+            </select>
+          </label>
+          <label>Description
+            <input class="admin-input" data-new-special-field="description" value="${escapeAttribute(state.newSpecialForm.description)}" />
+          </label>
+          <label>Type
+            <select class="admin-input" data-new-special-field="type">
+              <option value="food" ${state.newSpecialForm.type === 'food' ? 'selected' : ''}>food</option>
+              <option value="drink" ${state.newSpecialForm.type === 'drink' ? 'selected' : ''}>drink</option>
+              <option value="combo" ${state.newSpecialForm.type === 'combo' ? 'selected' : ''}>combo</option>
+            </select>
+          </label>
+          <div class="admin-day-checkboxes">
+            ${CANDIDATE_DAY_KEYS.map((day) => `
+              <label><input type="checkbox" data-new-special-day="${day}" ${state.newSpecialForm.days_of_week.includes(day) ? 'checked' : ''}/> ${day}</label>
+            `).join('')}
+          </div>
+          <label>All Day
+            <select class="admin-input" data-new-special-field="all_day">
+              <option value="Y" ${state.newSpecialForm.all_day === 'Y' ? 'selected' : ''}>Y</option>
+              <option value="N" ${state.newSpecialForm.all_day === 'N' ? 'selected' : ''}>N</option>
+            </select>
+          </label>
+          <label>Start Time
+            <input class="admin-input" placeholder="HH:MM" data-new-special-field="start_time" value="${escapeAttribute(state.newSpecialForm.start_time)}"/>
+          </label>
+          <label>End Time
+            <input class="admin-input" placeholder="HH:MM" data-new-special-field="end_time" value="${escapeAttribute(state.newSpecialForm.end_time)}"/>
+          </label>
+          <div class="admin-actions-row">
+            <button type="button" class="admin-action-btn approve" data-new-special-save ${state.savingNewSpecial ? 'disabled' : ''}>Save New Special</button>
+            <button type="button" class="admin-secondary-btn" data-close-create-special-modal="true" ${state.savingNewSpecial ? 'disabled' : ''}>Cancel</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
   function getDetailModalMarkup() {
     if (!state.detailSpecials.length) return '';
     const specials = [...state.detailSpecials].sort((a, b) => {
@@ -1186,13 +1250,19 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
     const createToggle = screenElement.querySelector('[data-special-create-toggle]');
     if (createToggle) {
       createToggle.addEventListener('click', () => {
-        state.creatingSpecial = !state.creatingSpecial;
-        if (!state.creatingSpecial) {
-          state.newSpecialForm = defaultNewSpecialForm();
-        }
+        state.creatingSpecial = true;
         render();
       });
     }
+
+    screenElement.querySelectorAll('[data-close-create-special-modal="true"]').forEach((element) => {
+      element.addEventListener('click', (event) => {
+        if (event.currentTarget !== event.target) return;
+        state.creatingSpecial = false;
+        state.newSpecialForm = defaultNewSpecialForm();
+        render();
+      });
+    });
 
     screenElement.querySelectorAll('[data-new-special-field]').forEach((input) => {
       input.addEventListener('change', (event) => {
@@ -1530,10 +1600,6 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
       .map((row) => String(row.neighborhood || '').trim())
       .filter(Boolean))]
       .sort((a, b) => a.localeCompare(b));
-    const newSpecialNeighborhood = String(state.newSpecialForm.neighborhood || '');
-    const availableBars = state.allBars
-      .filter((bar) => !newSpecialNeighborhood || String(bar.neighborhood || '') === newSpecialNeighborhood)
-      .sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
     const typeOptions = [...new Set(state.groupedSpecials
       .map((row) => String(row.type || '').trim().toLowerCase())
       .filter(Boolean))]
@@ -1570,58 +1636,10 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
             <option value="N" ${state.specialFilterAllDay === 'N' ? 'selected' : ''}>All Day: No</option>
           </select>
         </div>
-        <button type="button" class="admin-tool-button" data-special-create-toggle>
-          ${state.creatingSpecial ? 'Cancel New Special' : 'Add New Special'}
-        </button>
-        ${state.creatingSpecial ? `
-          <section class="admin-special-detail-card" aria-label="Create special">
-            <p><strong>Create new special</strong></p>
-            <label>Neighborhood
-              <select class="admin-input" data-new-special-field="neighborhood">
-                <option value="">Select neighborhood</option>
-                ${neighborhoodOptions.map((name) => `<option value="${escapeAttribute(name)}" ${newSpecialNeighborhood === name ? 'selected' : ''}>${name}</option>`).join('')}
-              </select>
-            </label>
-            <label>Bar
-              <select class="admin-input" data-new-special-field="bar_id" ${newSpecialNeighborhood ? '' : 'disabled'}>
-                <option value="">Select bar</option>
-                ${availableBars.map((bar) => `<option value="${bar.bar_id}" ${String(state.newSpecialForm.bar_id) === String(bar.bar_id) ? 'selected' : ''}>${bar.name}</option>`).join('')}
-              </select>
-            </label>
-            <label>Description
-              <input class="admin-input" data-new-special-field="description" value="${escapeAttribute(state.newSpecialForm.description)}" />
-            </label>
-            <label>Type
-              <select class="admin-input" data-new-special-field="type">
-                <option value="food" ${state.newSpecialForm.type === 'food' ? 'selected' : ''}>food</option>
-                <option value="drink" ${state.newSpecialForm.type === 'drink' ? 'selected' : ''}>drink</option>
-                <option value="combo" ${state.newSpecialForm.type === 'combo' ? 'selected' : ''}>combo</option>
-              </select>
-            </label>
-            <div class="admin-day-checkboxes">
-              ${CANDIDATE_DAY_KEYS.map((day) => `
-                <label><input type="checkbox" data-new-special-day="${day}" ${state.newSpecialForm.days_of_week.includes(day) ? 'checked' : ''}/> ${day}</label>
-              `).join('')}
-            </div>
-            <label>All Day
-              <select class="admin-input" data-new-special-field="all_day">
-                <option value="Y" ${state.newSpecialForm.all_day === 'Y' ? 'selected' : ''}>Y</option>
-                <option value="N" ${state.newSpecialForm.all_day === 'N' ? 'selected' : ''}>N</option>
-              </select>
-            </label>
-            <label>Start Time
-              <input class="admin-input" placeholder="HH:MM" data-new-special-field="start_time" value="${escapeAttribute(state.newSpecialForm.start_time)}"/>
-            </label>
-            <label>End Time
-              <input class="admin-input" placeholder="HH:MM" data-new-special-field="end_time" value="${escapeAttribute(state.newSpecialForm.end_time)}"/>
-            </label>
-            <div class="admin-actions-row">
-              <button type="button" class="admin-action-btn approve" data-new-special-save ${state.savingNewSpecial ? 'disabled' : ''}>Save New Special</button>
-            </div>
-          </section>
-        ` : ''}
+        <button type="button" class="admin-tool-button" data-special-create-toggle>Add New Special</button>
         ${state.errorMessage ? `<p class="admin-error">${state.errorMessage}</p>` : ''}
         ${buildSpecialManagementTable()}
+        ${getCreateSpecialModalMarkup()}
       </section>
     `;
 
