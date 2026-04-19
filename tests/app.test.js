@@ -769,9 +769,6 @@ test('showDetail reuses startup payload details when has_special_this_week is tr
   const mapFrame = document.getElementById('detail-location-map');
   const mapSrc = mapFrame.getAttribute('src');
   assert.equal(mapSrc, 'https://www.google.com/maps/embed/v1/place?key=client-google-key&q=place_id%3Aabc123');
-  assert.equal(mapFrame.style.pointerEvents, 'none');
-  assert.equal(mapFrame.getAttribute('tabindex'), '-1');
-  assert.equal(mapFrame.getAttribute('aria-hidden'), 'true');
 });
 
 test('showDetail hides location map when google_api_key is missing from startup general_data', async () => {

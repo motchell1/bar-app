@@ -10,6 +10,12 @@ function getOrderedDaysForDetail(todayKey) {
   return DAYS_FULL.slice(todayIndex).concat(DAYS_FULL.slice(0, todayIndex));
 }
 
+const detailLocationMapState = {
+  map: null,
+  marker: null,
+  mapContainer: null
+};
+
 function getBarFromPayload(barOrId) {
   const barId = String(typeof barOrId === 'object' ? barOrId?.bar_id : barOrId);
   const barData = startupPayload?.bars?.[barId];
@@ -144,7 +150,6 @@ function initBarFavoriteButton() {
 function updateBarLocationSection(selectedBar) {
   const section = document.getElementById('detail-location-section');
   const mapFrame = document.getElementById('detail-location-map');
-  const mapWrap = mapFrame?.parentElement;
   if (!section || !mapFrame) return;
 
   const placeId = selectedBar?.google_place_id;
@@ -152,16 +157,8 @@ function updateBarLocationSection(selectedBar) {
   if (!placeId || !googleApiKey) {
     section.style.display = 'none';
     mapFrame.removeAttribute('src');
-    mapFrame.style.pointerEvents = '';
-    mapFrame.removeAttribute('tabindex');
-    mapFrame.removeAttribute('aria-hidden');
-    if (mapWrap) {
-      mapWrap.style.cursor = '';
-      mapWrap.removeAttribute('role');
-      mapWrap.removeAttribute('tabindex');
-      mapWrap.removeAttribute('aria-label');
-      mapWrap.onclick = null;
-      mapWrap.onkeydown = null;
+    if (detailLocationMapState.mapContainer) {
+      detailLocationMapState.mapContainer.style.display = 'none';
     }
     return;
   }
@@ -169,25 +166,74 @@ function updateBarLocationSection(selectedBar) {
   const encodedPlaceQuery = encodeURIComponent(`place_id:${placeId}`);
   const encodedApiKey = encodeURIComponent(googleApiKey);
   mapFrame.setAttribute('src', `https://www.google.com/maps/embed/v1/place?key=${encodedApiKey}&q=${encodedPlaceQuery}`);
-  mapFrame.style.pointerEvents = 'none';
-  mapFrame.setAttribute('tabindex', '-1');
-  mapFrame.setAttribute('aria-hidden', 'true');
-
-  const openMapsLink = `https://www.google.com/maps/search/?api=1&query_place_id=${encodeURIComponent(placeId)}`;
-  if (mapWrap) {
-    const openMapPin = () => window.open(openMapsLink, '_blank', 'noopener');
-    mapWrap.style.cursor = 'pointer';
-    mapWrap.setAttribute('role', 'link');
-    mapWrap.setAttribute('tabindex', '0');
-    mapWrap.setAttribute('aria-label', 'Open bar location in Google Maps');
-    mapWrap.onclick = openMapPin;
-    mapWrap.onkeydown = (event) => {
-      if (event.key !== 'Enter' && event.key !== ' ') return;
-      event.preventDefault();
-      openMapPin();
-    };
-  }
+  mapFrame.style.display = '';
   section.style.display = '';
+
+  if (typeof loadGoogleMapsApi !== 'function') return;
+
+  loadGoogleMapsApi()
+    .then(() => {
+      if (!window.google?.maps?.Map || !window.google.maps.Geocoder) return;
+      const mapWrap = mapFrame.parentElement;
+      if (!mapWrap) return;
+
+      if (!detailLocationMapState.mapContainer) {
+        const mapContainer = document.createElement('div');
+        mapContainer.className = mapFrame.className;
+        mapContainer.id = 'detail-location-map-canvas';
+        mapWrap.appendChild(mapContainer);
+        detailLocationMapState.mapContainer = mapContainer;
+      }
+
+      detailLocationMapState.mapContainer.style.display = '';
+      mapFrame.style.display = 'none';
+
+      if (!detailLocationMapState.map) {
+        detailLocationMapState.map = new google.maps.Map(detailLocationMapState.mapContainer, {
+          center: { lat: 0, lng: 0 },
+          zoom: 15,
+          clickableIcons: false,
+          mapTypeControl: false,
+          streetViewControl: false,
+          fullscreenControl: false
+        });
+      }
+
+      const geocoder = new google.maps.Geocoder();
+      geocoder.geocode({ placeId }, (results, status) => {
+        if (status !== 'OK' || !Array.isArray(results) || !results[0]?.geometry?.location) {
+          mapFrame.style.display = '';
+          detailLocationMapState.mapContainer.style.display = 'none';
+          return;
+        }
+
+        const location = results[0].geometry.location;
+        detailLocationMapState.map.setCenter(location);
+
+        if (google.maps.marker?.AdvancedMarkerElement) {
+          if (detailLocationMapState.marker) detailLocationMapState.marker.map = null;
+          detailLocationMapState.marker = new google.maps.marker.AdvancedMarkerElement({
+            map: detailLocationMapState.map,
+            position: location
+          });
+          return;
+        }
+
+        if (!detailLocationMapState.marker) {
+          detailLocationMapState.marker = new google.maps.Marker({
+            map: detailLocationMapState.map,
+            position: location
+          });
+        } else {
+          detailLocationMapState.marker.setPosition(location);
+          detailLocationMapState.marker.setMap(detailLocationMapState.map);
+        }
+      });
+    })
+    .catch(() => {
+      mapFrame.style.display = '';
+      if (detailLocationMapState.mapContainer) detailLocationMapState.mapContainer.style.display = 'none';
+    });
 }
 
 function normalizeWebsiteUrl(websiteValue) {
