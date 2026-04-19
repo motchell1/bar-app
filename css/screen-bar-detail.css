@@ -112,6 +112,21 @@
   border: 0;
 }
 
+.detail-website-link {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  font-size: 0.95em;
+  color: #0b63d1;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  word-break: break-word;
+}
+
+.detail-website-link:hover {
+  color: #094fa6;
+}
+
 #detail-screen .bar-report-section {
   box-shadow: none;
   border: 1px solid #e6ecf5;

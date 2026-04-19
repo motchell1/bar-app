@@ -160,6 +160,31 @@ function updateBarLocationSection(selectedBar) {
   section.style.display = '';
 }
 
+function normalizeWebsiteUrl(websiteValue) {
+  const rawValue = String(websiteValue || '').trim();
+  if (!rawValue) return '';
+  if (/^https?:\/\//i.test(rawValue)) return rawValue;
+  return `https://${rawValue}`;
+}
+
+function updateBarWebsiteSection(selectedBar) {
+  const section = document.getElementById('detail-website-section');
+  const link = document.getElementById('detail-website-link');
+  if (!section || !link) return;
+
+  const normalizedUrl = normalizeWebsiteUrl(selectedBar?.website_url || selectedBar?.website || '');
+  if (!normalizedUrl) {
+    section.style.display = 'none';
+    link.textContent = '';
+    link.removeAttribute('href');
+    return;
+  }
+
+  section.style.display = '';
+  link.setAttribute('href', normalizedUrl);
+  link.textContent = normalizedUrl;
+}
+
 function renderBarDetailContent(selectedBar, detailPayload) {
   const todayKey = detailPayload?.general_data?.current_day || startupPayload?.general_data?.current_day || getDayKeyFromName(DAYS_FULL[new Date().getDay()]);
   const orderedDays = getOrderedDaysForDetail(todayKey);
@@ -315,6 +340,7 @@ async function showDetail(barOrId, previousScreen = currentTab) {
   currentBarContext = selectedBar;
   resetBarReportForm();
   updateBarLocationSection(selectedBar);
+  updateBarWebsiteSection(selectedBar);
 
   const startupDetailPayload = buildBarDetailPayloadFromStartup(selectedBar.bar_id);
   if (startupDetailPayload) {
@@ -340,6 +366,10 @@ async function showDetail(barOrId, previousScreen = currentTab) {
       return;
     }
 
+    updateBarWebsiteSection({
+      ...selectedBar,
+      website_url: detailPayload?.bar?.website_url || selectedBar?.website_url
+    });
     renderBarDetailContent(selectedBar, detailPayload);
   } catch (err) {
     console.error('Failed to load bar details:', err);
