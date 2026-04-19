@@ -928,6 +928,10 @@ test('showDetail fetches and renders bar-specific hours and specials', async () 
       json: async () => ({
         bar_details_payload: {
           general_data: { current_day: 'MON' },
+          bar: {
+            bar_id: 1,
+            website_url: 'https://detailbar.com'
+          },
           open_hours: {
             MON: { display_text: '4:00 PM – 10:00 PM', open_time: '16:00', close_time: '22:00' }
           },
@@ -977,6 +981,7 @@ test('showDetail fetches and renders bar-specific hours and specials', async () 
   assert.equal(document.getElementById('detail-name').textContent, 'DETAIL BAR');
   assert.equal(document.getElementById('detail-hours').children.length > 0, true, 'renders fetched open hours');
   assert.equal(document.querySelectorAll('.special-item').length > 0, true, 'renders fetched specials');
+  assert.equal(document.getElementById('detail-website-link').getAttribute('href'), 'https://detailbar.com', 'renders website from getBarDetails payload');
 
   await ctx.showDetail(1, 'bars');
   assert.equal(calls.length, 1, 'reuses cached bar details on second open');

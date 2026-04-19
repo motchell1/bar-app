@@ -366,6 +366,10 @@ async function showDetail(barOrId, previousScreen = currentTab) {
       return;
     }
 
+    updateBarWebsiteSection({
+      ...selectedBar,
+      website_url: detailPayload?.bar?.website_url || selectedBar?.website_url
+    });
     renderBarDetailContent(selectedBar, detailPayload);
   } catch (err) {
     console.error('Failed to load bar details:', err);

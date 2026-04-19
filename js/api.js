@@ -34,6 +34,7 @@ function buildLegacyBarsData(payload) {
       latitude: bar.latitude,
       longitude: bar.longitude,
       image_url: bar.image_url,
+      website_url: bar.website_url,
       favorite: bar.favorite,
       hours_by_day: openHoursLookup[barId] || {},
       specials_by_day: barSpecialsByDay

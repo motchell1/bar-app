@@ -8,7 +8,7 @@ The folders inside `functions/` each correspond to an AWS Lambda function.
   Returns the startup payload used when the app launches. This payload now includes only active bars and only open-hours rows for bars that currently have an active special in the returned week view. It is also responsible for sending bar metadata such as name, neighborhood, `image_url`, and `has_special_this_week`. Bars with `has_special_this_week = true` already have the detail-screen hours/specials needed by the client in startup data. `getStartupData` builds each `image_url` from `BAR_IMAGE_FOLDER_URL` + `/` + `image_file`.
 
 - **`getBarDetails`**  
-  Returns only open hours and specials for a single active bar when the user opens the bar details screen. It should not return bar name, image, or other bar metadata because the client already has that from `getStartupData`. The client should call this only for bars whose details were not already included in `getStartupData` (for example, bars where `has_special_this_week = false`).
+  Returns open hours and specials for a single active bar when the user opens the bar details screen. The payload also includes a lightweight `bar` object containing `bar_id` and `website_url` so the client can render the Website section even when metadata is limited in cached state. The client should call this only for bars whose details were not already included in `getStartupData` (for example, bars where `has_special_this_week = false`).
 
 - **`refreshOpenHours`**  
   Works together with **`fetchGoogleAPIHours`** to retrieve current open-hours data directly from Google and update the database. This process is currently triggered manually.
