@@ -168,6 +168,19 @@ body {
   gap: 8px;
 }
 
+.admin-day-checkboxes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.admin-day-checkboxes label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
 .admin-actions-row {
   display: flex;
   gap: 8px;

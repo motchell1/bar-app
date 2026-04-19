@@ -586,6 +586,7 @@ def get_all_specials(cursor):
         """
         SELECT
             s.special_id,
+            s.bar_id,
             b.name AS bar_name,
             b.neighborhood,
             s.day_of_week,
@@ -662,6 +663,7 @@ def get_all_specials(cursor):
         specials.append(
             {
                 'special_id': special_id,
+                'bar_id': row.get('bar_id'),
                 'bar_name': row.get('bar_name'),
                 'neighborhood': row.get('neighborhood'),
                 'day_of_week': row.get('day_of_week'),
@@ -944,6 +946,49 @@ def update_special(cursor, event):
     }
 
 
+def insert_special(cursor, event):
+    bar_id = event.get('bar_id')
+    if not bar_id:
+        raise ValueError('bar_id is required for insert_special')
+
+    description = str(event.get('description') or '').strip()
+    if not description:
+        raise ValueError('description is required for insert_special')
+
+    special_type = str(event.get('type') or '').strip().lower()
+    if special_type not in {'food', 'drink', 'combo'}:
+        raise ValueError('type must be one of: food, drink, combo')
+
+    days_of_week = _normalize_days_input(event.get('days_of_week'))
+    if not days_of_week:
+        raise ValueError('days_of_week is required for insert_special')
+
+    all_day = _normalize_yn_flag(event.get('all_day') or 'Y')
+    if all_day not in {'Y', 'N'}:
+        raise ValueError('all_day must be Y or N')
+
+    start_time = _normalize_time_value(event.get('start_time')) or None
+    end_time = _normalize_time_value(event.get('end_time')) or None
+
+    inserted_special_ids = []
+    for day_of_week in days_of_week:
+        cursor.execute(
+            """
+            INSERT INTO special
+            (bar_id, day_of_week, all_day, start_time, end_time, description, type, insert_method, is_active)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, 'MANUAL', 'Y')
+            """,
+            (bar_id, day_of_week, all_day, start_time, end_time, description, special_type),
+        )
+        inserted_special_ids.append(cursor.lastrowid)
+
+    return {
+        'special_ids': inserted_special_ids,
+        'inserted_count': len(inserted_special_ids),
+        'insert_method': 'MANUAL',
+    }
+
+
 def update_special_candidate(cursor, event):
     special_candidate_id = event.get('special_candidate_id')
     if not special_candidate_id:
@@ -1039,6 +1084,7 @@ def lambda_handler(event, context):
         'update_special_candidate_approval',
         'get_all_specials',
         'update_special',
+        'insert_special',
         'update_special_candidate',
         'get_all_bars',
         'get_bar_details',
@@ -1053,7 +1099,7 @@ def lambda_handler(event, context):
                         'mode must be one of get_unapproved_special_candidates, '
                         'get_rejected_special_candidates, '
                         'remove_rejected_special_candidate, '
-                        'update_special_candidate_approval, get_all_specials, update_special, '
+                        'update_special_candidate_approval, get_all_specials, update_special, insert_special, '
                         'update_special_candidate, get_all_bars, get_bar_details, update_bar, update_open_hours'
                     )
                 }
@@ -1093,6 +1139,8 @@ def lambda_handler(event, context):
                 result = update_open_hours(cursor, event)
             elif mode == 'update_special_candidate':
                 result = update_special_candidate(cursor, event)
+            elif mode == 'insert_special':
+                result = insert_special(cursor, event)
             else:
                 result = update_special(cursor, event)
             conn.commit()

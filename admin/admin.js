@@ -78,6 +78,18 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
     specialManagementSort: { key: 'neighborhood', direction: 'asc' },
     barManagementSort: { key: 'name', direction: 'asc' },
     rejectedSpecialSort: { key: 'neighborhood', direction: 'asc' },
+    creatingSpecial: false,
+    savingNewSpecial: false,
+    newSpecialForm: {
+      neighborhood: '',
+      bar_id: '',
+      description: '',
+      type: 'food',
+      days_of_week: [...CANDIDATE_DAY_KEYS],
+      all_day: 'Y',
+      start_time: '',
+      end_time: ''
+    },
     errorMessage: ''
   };
 
@@ -104,6 +116,7 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
     state.detailBar = null;
     state.detailOpenHours = [];
     state.detailBarEditing = false;
+    state.creatingSpecial = false;
     render();
   });
 
@@ -520,6 +533,34 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
     }
   }
 
+  async function createSpecial(payload) {
+    state.savingNewSpecial = true;
+    state.errorMessage = '';
+    render();
+
+    try {
+      await callAdminSync({ mode: 'insert_special', ...payload });
+      await loadAllSpecials();
+      state.creatingSpecial = false;
+      state.newSpecialForm = {
+        neighborhood: '',
+        bar_id: '',
+        description: '',
+        type: 'food',
+        days_of_week: [...CANDIDATE_DAY_KEYS],
+        all_day: 'Y',
+        start_time: '',
+        end_time: ''
+      };
+    } catch (err) {
+      console.error('Failed to create special:', err);
+      state.errorMessage = err?.message || 'Failed to create special.';
+    } finally {
+      state.savingNewSpecial = false;
+      render();
+    }
+  }
+
   async function saveBarUpdates(barPayload, openHoursRows) {
     state.savingBar = true;
     state.errorMessage = '';
@@ -596,6 +637,19 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
 
     const renderValue = (special, key, fallback = '—') => {
       if (state.detailEditing && ['day_of_week', 'all_day', 'start_time', 'end_time', 'description', 'type', 'is_active'].includes(key)) {
+        if (key === 'day_of_week') {
+          const selectedDays = [...new Set(state.detailSpecials.map((row) => normalizeDay(row.day_of_week)).filter(Boolean))];
+          return `
+            <span class="admin-day-checkboxes">
+              ${DAY_ORDER.map((day) => `
+                <label>
+                  <input type="checkbox" data-detail-day="${day}" ${selectedDays.includes(day) ? 'checked' : ''} />
+                  ${CANDIDATE_DAY_ALIASES[day] || day}
+                </label>
+              `).join(' ')}
+            </span>
+          `;
+        }
         if (key === 'type') {
           const normalizedType = String(special[key] || '').trim().toLowerCase();
           const resolvedType = ['drink', 'food', 'combo'].includes(normalizedType) ? normalizedType : 'unknown';
@@ -613,7 +667,7 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
       return special[key] === null || special[key] === undefined || special[key] === '' ? fallback : String(special[key]);
     };
 
-    const detailsMarkup = specials.map((special) => {
+    const detailsMarkup = specials.map((special, index) => {
       return `
         <section class="admin-special-detail-card">
           <h4>${DAY_LABELS[normalizeDay(special.day_of_week)] || special.day_of_week || 'Unknown Day'} — Special ${special.special_id}</h4>
@@ -622,7 +676,7 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
             <p><strong>Neighborhood:</strong> ${special.neighborhood || '—'}</p>
             <p><strong>Bar Name:</strong> ${special.bar_name || '—'}</p>
             <p><strong>Description:</strong> ${renderValue(special, 'description')}</p>
-            <p><strong>Day of Week:</strong> ${renderValue(special, 'day_of_week')}</p>
+            <p><strong>Day of Week:</strong> ${state.detailEditing && index > 0 ? (special.day_of_week || '—') : renderValue(special, 'day_of_week')}</p>
             <p><strong>All Day:</strong> ${renderValue(special, 'all_day')}</p>
             <p><strong>Start Time:</strong> ${renderValue(special, 'start_time')}</p>
             <p><strong>End Time:</strong> ${renderValue(special, 'end_time')}</p>
@@ -1099,6 +1153,16 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
 
   function bindSpecialManagementEvents() {
     bindSortableColumnHeaders();
+    const defaultNewSpecialForm = () => ({
+      neighborhood: '',
+      bar_id: '',
+      description: '',
+      type: 'food',
+      days_of_week: [...CANDIDATE_DAY_KEYS],
+      all_day: 'Y',
+      start_time: '',
+      end_time: ''
+    });
 
     const searchInput = screenElement.querySelector('[data-special-search-input]');
     if (searchInput) {
@@ -1118,6 +1182,58 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
         render();
       });
     });
+
+    const createToggle = screenElement.querySelector('[data-special-create-toggle]');
+    if (createToggle) {
+      createToggle.addEventListener('click', () => {
+        state.creatingSpecial = !state.creatingSpecial;
+        if (!state.creatingSpecial) {
+          state.newSpecialForm = defaultNewSpecialForm();
+        }
+        render();
+      });
+    }
+
+    screenElement.querySelectorAll('[data-new-special-field]').forEach((input) => {
+      input.addEventListener('change', (event) => {
+        const field = event.target.getAttribute('data-new-special-field');
+        if (!field) return;
+        state.newSpecialForm[field] = event.target.value;
+        if (field === 'neighborhood') {
+          state.newSpecialForm.bar_id = '';
+        }
+        render();
+      });
+    });
+
+    screenElement.querySelectorAll('[data-new-special-day]').forEach((checkbox) => {
+      checkbox.addEventListener('change', () => {
+        state.newSpecialForm.days_of_week = Array.from(
+          screenElement.querySelectorAll('[data-new-special-day]:checked')
+        ).map((input) => input.getAttribute('data-new-special-day'));
+      });
+    });
+
+    const saveNewSpecialButton = screenElement.querySelector('[data-new-special-save]');
+    if (saveNewSpecialButton) {
+      saveNewSpecialButton.addEventListener('click', async () => {
+        const payload = {
+          bar_id: Number(state.newSpecialForm.bar_id),
+          description: String(state.newSpecialForm.description || '').trim(),
+          type: String(state.newSpecialForm.type || '').trim().toLowerCase(),
+          days_of_week: state.newSpecialForm.days_of_week,
+          all_day: String(state.newSpecialForm.all_day || 'Y').trim().toUpperCase(),
+          start_time: String(state.newSpecialForm.start_time || '').trim(),
+          end_time: String(state.newSpecialForm.end_time || '').trim()
+        };
+        if (!payload.bar_id || !payload.description || !payload.days_of_week.length) {
+          state.errorMessage = 'Neighborhood, bar, description, and at least one day are required.';
+          render();
+          return;
+        }
+        await createSpecial(payload);
+      });
+    }
 
     screenElement.querySelectorAll('.admin-special-row[data-special-id]').forEach((row) => {
       row.addEventListener('click', () => {
@@ -1198,7 +1314,37 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
             }
             payloadBySpecialId.get(specialId)[field] = input.value;
           });
-          await saveSpecialUpdates([...payloadBySpecialId.values()]);
+          const updates = [...payloadBySpecialId.values()];
+          const selectedDays = [...new Set(Array.from(screenElement.querySelectorAll('[data-detail-day]:checked'))
+            .map((input) => normalizeDay(input.getAttribute('data-detail-day')))
+            .filter(Boolean))];
+          const activeSpecialsByDay = new Map(state.detailSpecials.map((row) => [normalizeDay(row.day_of_week), row]));
+          const selectedDaySet = new Set(selectedDays);
+          updates.forEach((payload) => {
+            const matchingSpecial = state.detailSpecials.find((row) => row.special_id === payload.special_id);
+            if (!matchingSpecial) return;
+            const day = normalizeDay(matchingSpecial.day_of_week);
+            if (!selectedDaySet.has(day)) {
+              payload.is_active = 'N';
+            } else if (!payload.is_active) {
+              payload.is_active = matchingSpecial.is_active || 'Y';
+            }
+          });
+          await saveSpecialUpdates(updates);
+
+          const templateSpecial = state.detailSpecials[0];
+          const missingDays = selectedDays.filter((day) => !activeSpecialsByDay.has(day));
+          for (const day of missingDays) {
+            await createSpecial({
+              bar_id: templateSpecial.bar_id,
+              description: updates[0]?.description ?? templateSpecial.description ?? '',
+              type: updates[0]?.type ?? templateSpecial.type ?? 'food',
+              days_of_week: [day],
+              all_day: updates[0]?.all_day ?? templateSpecial.all_day ?? 'Y',
+              start_time: updates[0]?.start_time ?? templateSpecial.start_time ?? '',
+              end_time: updates[0]?.end_time ?? templateSpecial.end_time ?? ''
+            });
+          }
         }
       });
     });
@@ -1320,6 +1466,7 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
         if (tool === 'special-management') {
           state.currentView = 'special-management';
           render();
+          await loadAllBars();
           await loadAllSpecials();
         }
 
@@ -1379,10 +1526,14 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
       return;
     }
 
-    const neighborhoodOptions = [...new Set(state.groupedSpecials
+    const neighborhoodOptions = [...new Set(state.allBars
       .map((row) => String(row.neighborhood || '').trim())
       .filter(Boolean))]
       .sort((a, b) => a.localeCompare(b));
+    const newSpecialNeighborhood = String(state.newSpecialForm.neighborhood || '');
+    const availableBars = state.allBars
+      .filter((bar) => !newSpecialNeighborhood || String(bar.neighborhood || '') === newSpecialNeighborhood)
+      .sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
     const typeOptions = [...new Set(state.groupedSpecials
       .map((row) => String(row.type || '').trim().toLowerCase())
       .filter(Boolean))]
@@ -1419,6 +1570,56 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
             <option value="N" ${state.specialFilterAllDay === 'N' ? 'selected' : ''}>All Day: No</option>
           </select>
         </div>
+        <button type="button" class="admin-tool-button" data-special-create-toggle>
+          ${state.creatingSpecial ? 'Cancel New Special' : 'Add New Special'}
+        </button>
+        ${state.creatingSpecial ? `
+          <section class="admin-special-detail-card" aria-label="Create special">
+            <p><strong>Create new special</strong></p>
+            <label>Neighborhood
+              <select class="admin-input" data-new-special-field="neighborhood">
+                <option value="">Select neighborhood</option>
+                ${neighborhoodOptions.map((name) => `<option value="${escapeAttribute(name)}" ${newSpecialNeighborhood === name ? 'selected' : ''}>${name}</option>`).join('')}
+              </select>
+            </label>
+            <label>Bar
+              <select class="admin-input" data-new-special-field="bar_id" ${newSpecialNeighborhood ? '' : 'disabled'}>
+                <option value="">Select bar</option>
+                ${availableBars.map((bar) => `<option value="${bar.bar_id}" ${String(state.newSpecialForm.bar_id) === String(bar.bar_id) ? 'selected' : ''}>${bar.name}</option>`).join('')}
+              </select>
+            </label>
+            <label>Description
+              <input class="admin-input" data-new-special-field="description" value="${escapeAttribute(state.newSpecialForm.description)}" />
+            </label>
+            <label>Type
+              <select class="admin-input" data-new-special-field="type">
+                <option value="food" ${state.newSpecialForm.type === 'food' ? 'selected' : ''}>food</option>
+                <option value="drink" ${state.newSpecialForm.type === 'drink' ? 'selected' : ''}>drink</option>
+                <option value="combo" ${state.newSpecialForm.type === 'combo' ? 'selected' : ''}>combo</option>
+              </select>
+            </label>
+            <div class="admin-day-checkboxes">
+              ${CANDIDATE_DAY_KEYS.map((day) => `
+                <label><input type="checkbox" data-new-special-day="${day}" ${state.newSpecialForm.days_of_week.includes(day) ? 'checked' : ''}/> ${day}</label>
+              `).join('')}
+            </div>
+            <label>All Day
+              <select class="admin-input" data-new-special-field="all_day">
+                <option value="Y" ${state.newSpecialForm.all_day === 'Y' ? 'selected' : ''}>Y</option>
+                <option value="N" ${state.newSpecialForm.all_day === 'N' ? 'selected' : ''}>N</option>
+              </select>
+            </label>
+            <label>Start Time
+              <input class="admin-input" placeholder="HH:MM" data-new-special-field="start_time" value="${escapeAttribute(state.newSpecialForm.start_time)}"/>
+            </label>
+            <label>End Time
+              <input class="admin-input" placeholder="HH:MM" data-new-special-field="end_time" value="${escapeAttribute(state.newSpecialForm.end_time)}"/>
+            </label>
+            <div class="admin-actions-row">
+              <button type="button" class="admin-action-btn approve" data-new-special-save ${state.savingNewSpecial ? 'disabled' : ''}>Save New Special</button>
+            </div>
+          </section>
+        ` : ''}
         ${state.errorMessage ? `<p class="admin-error">${state.errorMessage}</p>` : ''}
         ${buildSpecialManagementTable()}
       </section>
