@@ -189,9 +189,11 @@ function updateBarLocationSection(selectedBar) {
       mapFrame.style.display = 'none';
 
       if (!detailLocationMapState.map) {
+        const mapId = startupPayload?.general_data?.google_map_id || 'DEMO_MAP_ID';
         detailLocationMapState.map = new google.maps.Map(detailLocationMapState.mapContainer, {
           center: { lat: 0, lng: 0 },
           zoom: 15,
+          mapId,
           clickableIcons: false,
           mapTypeControl: false,
           streetViewControl: false,
@@ -199,16 +201,10 @@ function updateBarLocationSection(selectedBar) {
         });
       }
 
-      const geocoder = new google.maps.Geocoder();
-      geocoder.geocode({ placeId }, (results, status) => {
-        if (status !== 'OK' || !Array.isArray(results) || !results[0]?.geometry?.location) {
-          mapFrame.style.display = '';
-          detailLocationMapState.mapContainer.style.display = 'none';
-          return;
-        }
-
-        const location = results[0].geometry.location;
+      const hasCoordinates = Number.isFinite(Number(selectedBar?.latitude)) && Number.isFinite(Number(selectedBar?.longitude));
+      const setMarkerLocation = (location) => {
         detailLocationMapState.map.setCenter(location);
+        detailLocationMapState.map.setZoom(15);
 
         if (google.maps.marker?.AdvancedMarkerElement) {
           if (detailLocationMapState.marker) detailLocationMapState.marker.map = null;
@@ -228,6 +224,21 @@ function updateBarLocationSection(selectedBar) {
           detailLocationMapState.marker.setPosition(location);
           detailLocationMapState.marker.setMap(detailLocationMapState.map);
         }
+      };
+
+      if (hasCoordinates) {
+        setMarkerLocation({ lat: Number(selectedBar.latitude), lng: Number(selectedBar.longitude) });
+        return;
+      }
+
+      const geocoder = new google.maps.Geocoder();
+      geocoder.geocode({ placeId }, (results, status) => {
+        if (status !== 'OK' || !Array.isArray(results) || !results[0]?.geometry?.location) {
+          mapFrame.style.display = '';
+          detailLocationMapState.mapContainer.style.display = 'none';
+          return;
+        }
+        setMarkerLocation(results[0].geometry.location);
       });
     })
     .catch(() => {
