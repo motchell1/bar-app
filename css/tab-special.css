@@ -54,9 +54,19 @@
   position: relative;
 }
 
+.bar-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
 .bar-name {
   font-size: 1.3em;
   font-weight: bold;
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow-wrap: anywhere;
 }
 
 .bar-neighborhood {
@@ -64,9 +74,10 @@
   color: #777;
   text-transform: uppercase;
   letter-spacing: 1px;
-  position: absolute;
-  top: 16px;
-  right: 16px;
+  text-align: right;
+  flex: 0 0 auto;
+  max-width: 45%;
+  overflow-wrap: anywhere;
 }
 
 .specials-list {

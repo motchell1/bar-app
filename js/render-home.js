@@ -3,6 +3,9 @@ function buildHomeBarSpecials(bar, specialIds, dayKey, dayLabel) {
   const content = document.createElement('div');
   content.className = 'card-content';
 
+  const heading = document.createElement('div');
+  heading.className = 'bar-heading';
+
   const name = document.createElement('div');
   name.className = 'bar-name';
   name.textContent = bar.name;
@@ -11,8 +14,9 @@ function buildHomeBarSpecials(bar, specialIds, dayKey, dayLabel) {
   neighborhood.className = 'bar-neighborhood';
   neighborhood.textContent = bar.neighborhood;
 
-  content.appendChild(name);
-  content.appendChild(neighborhood);
+  heading.appendChild(name);
+  heading.appendChild(neighborhood);
+  content.appendChild(heading);
 
   const specialsList = document.createElement('ul');
   specialsList.className = 'specials-list';
