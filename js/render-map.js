@@ -184,6 +184,9 @@ function showMapSelectedBarSheet(bar, specialIds, dayKey, dayLabel) {
 
   card.appendChild(cardContent);
   content.appendChild(card);
+  if (window.lucide && typeof window.lucide.createIcons === 'function') {
+    window.lucide.createIcons();
+  }
   bindMapSheetDragToDismiss(sheet);
   sheet.style.display = '';
   sheet.style.transform = '';
