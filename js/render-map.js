@@ -273,6 +273,7 @@ function renderMapTab() {
           center: { lat: 40.438723047481425, lng: -79.99697911133545 },
           zoom: 4,
           mapId,
+          clickableIcons: false,
           mapTypeControl: false,
           streetViewControl: false,
           fullscreenControl: false
