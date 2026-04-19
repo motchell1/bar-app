@@ -67,6 +67,9 @@ async function loadBars() {
 
     barsData = startupPayload ? buildLegacyBarsData(startupPayload) : [];
     generateNeighborhoodFilters();
+    if (typeof loadStoredFiltersForTab === 'function') {
+      loadStoredFiltersForTab(currentTab);
+    }
   } catch (err) {
     console.error('Failed to load bars:', err);
   } finally {
