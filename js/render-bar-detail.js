@@ -144,6 +144,7 @@ function initBarFavoriteButton() {
 function updateBarLocationSection(selectedBar) {
   const section = document.getElementById('detail-location-section');
   const mapFrame = document.getElementById('detail-location-map');
+  const mapWrap = mapFrame?.parentElement;
   if (!section || !mapFrame) return;
 
   const placeId = selectedBar?.google_place_id;
@@ -151,12 +152,41 @@ function updateBarLocationSection(selectedBar) {
   if (!placeId || !googleApiKey) {
     section.style.display = 'none';
     mapFrame.removeAttribute('src');
+    mapFrame.style.pointerEvents = '';
+    mapFrame.removeAttribute('tabindex');
+    mapFrame.removeAttribute('aria-hidden');
+    if (mapWrap) {
+      mapWrap.style.cursor = '';
+      mapWrap.removeAttribute('role');
+      mapWrap.removeAttribute('tabindex');
+      mapWrap.removeAttribute('aria-label');
+      mapWrap.onclick = null;
+      mapWrap.onkeydown = null;
+    }
     return;
   }
 
   const encodedPlaceQuery = encodeURIComponent(`place_id:${placeId}`);
   const encodedApiKey = encodeURIComponent(googleApiKey);
   mapFrame.setAttribute('src', `https://www.google.com/maps/embed/v1/place?key=${encodedApiKey}&q=${encodedPlaceQuery}`);
+  mapFrame.style.pointerEvents = 'none';
+  mapFrame.setAttribute('tabindex', '-1');
+  mapFrame.setAttribute('aria-hidden', 'true');
+
+  const openMapsLink = `https://www.google.com/maps/search/?api=1&query_place_id=${encodeURIComponent(placeId)}`;
+  if (mapWrap) {
+    const openMapPin = () => window.open(openMapsLink, '_blank', 'noopener');
+    mapWrap.style.cursor = 'pointer';
+    mapWrap.setAttribute('role', 'link');
+    mapWrap.setAttribute('tabindex', '0');
+    mapWrap.setAttribute('aria-label', 'Open bar location in Google Maps');
+    mapWrap.onclick = openMapPin;
+    mapWrap.onkeydown = (event) => {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      event.preventDefault();
+      openMapPin();
+    };
+  }
   section.style.display = '';
 }
 

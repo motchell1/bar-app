@@ -766,8 +766,12 @@ test('showDetail reuses startup payload details when has_special_this_week is tr
   assert.equal(document.getElementById('detail-name').textContent, 'STARTUP BAR');
   assert.equal(document.getElementById('detail-hours').children.length > 0, true, 'renders startup open hours');
   assert.equal(document.querySelectorAll('.special-item').length > 0, true, 'renders startup specials');
-  const mapSrc = document.getElementById('detail-location-map').getAttribute('src');
+  const mapFrame = document.getElementById('detail-location-map');
+  const mapSrc = mapFrame.getAttribute('src');
   assert.equal(mapSrc, 'https://www.google.com/maps/embed/v1/place?key=client-google-key&q=place_id%3Aabc123');
+  assert.equal(mapFrame.style.pointerEvents, 'none');
+  assert.equal(mapFrame.getAttribute('tabindex'), '-1');
+  assert.equal(mapFrame.getAttribute('aria-hidden'), 'true');
 });
 
 test('showDetail hides location map when google_api_key is missing from startup general_data', async () => {
