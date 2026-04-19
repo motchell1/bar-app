@@ -250,6 +250,15 @@ body {
   vertical-align: top;
 }
 
+.admin-sortable-header {
+  cursor: pointer;
+  user-select: none;
+}
+
+.admin-sortable-header:hover {
+  background: #f3f8ff;
+}
+
 .admin-special-row {
   cursor: pointer;
 }

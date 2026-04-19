@@ -75,7 +75,16 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
     rejectedSpecials: [],
     allSpecials: [],
     groupedSpecials: [],
+    specialManagementSort: { key: 'neighborhood', direction: 'asc' },
+    barManagementSort: { key: 'name', direction: 'asc' },
+    rejectedSpecialSort: { key: 'neighborhood', direction: 'asc' },
     errorMessage: ''
+  };
+
+  const SORTABLE_TABLES = {
+    'special-management': 'specialManagementSort',
+    'bar-management': 'barManagementSort',
+    'rejected-special-management': 'rejectedSpecialSort'
   };
 
   function updateToolbarButtons() {
@@ -188,6 +197,72 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
     if (weekendMatch) return 'Sat-Sun';
 
     return labels.join(', ');
+  }
+
+  function getSortState(tableName) {
+    const sortKey = SORTABLE_TABLES[tableName];
+    return sortKey ? state[sortKey] : null;
+  }
+
+  function getSortIndicator(tableName, columnKey) {
+    const sortState = getSortState(tableName);
+    if (!sortState || sortState.key !== columnKey) return '';
+    return sortState.direction === 'asc' ? ' ▲' : ' ▼';
+  }
+
+  function toggleSort(tableName, columnKey) {
+    const sortKey = SORTABLE_TABLES[tableName];
+    if (!sortKey) return;
+    const current = state[sortKey];
+    const nextDirection = current.key === columnKey && current.direction === 'asc' ? 'desc' : 'asc';
+    state[sortKey] = { key: columnKey, direction: nextDirection };
+  }
+
+  function toTimestamp(value) {
+    if (!value) return 0;
+    const parsed = new Date(value).getTime();
+    return Number.isNaN(parsed) ? 0 : parsed;
+  }
+
+  function toTimeNumber(value) {
+    const [hours, minutes] = String(value || '').split(':').map((part) => Number(part));
+    if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return -1;
+    return (hours * 60) + minutes;
+  }
+
+  function specialSortValue(row, key) {
+    if (key === 'days_of_week') return formatDayGroup(row.days_of_week || []);
+    if (key === 'insert_date' || key === 'update_date') return toTimestamp(row[key]);
+    if (key === 'start_time' || key === 'end_time') return toTimeNumber(row[key]);
+    return String(row[key] || '').toLowerCase();
+  }
+
+  function barSortValue(row, key) {
+    if (key === 'last_special_candidate_run' || key === 'insert_date' || key === 'update_date') return toTimestamp(row[key]);
+    return String(row[key] || '').toLowerCase();
+  }
+
+  function rejectedSortValue(row, key) {
+    if (key === 'insert_date') return toTimestamp(row[key]);
+    if (key === 'start_time' || key === 'end_time') return toTimeNumber(row[key]);
+    if (key === 'days_of_week') return formatDayGroup(row.days_of_week || []);
+    if (key === 'web_ai_search_matches' || key === 'web_crawl_matches') return Number(row[key]) || 0;
+    return String(row[key] || '').toLowerCase();
+  }
+
+  function sortRows(rows, tableName, valueResolver) {
+    const sortState = getSortState(tableName);
+    if (!sortState?.key) return [...rows];
+    const directionFactor = sortState.direction === 'asc' ? 1 : -1;
+
+    return [...rows].sort((a, b) => {
+      const valueA = valueResolver(a, sortState.key);
+      const valueB = valueResolver(b, sortState.key);
+      if (typeof valueA === 'number' && typeof valueB === 'number') {
+        return (valueA - valueB) * directionFactor;
+      }
+      return String(valueA).localeCompare(String(valueB)) * directionFactor;
+    });
   }
 
   function groupSpecials(specials) {
@@ -896,7 +971,8 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
       return '<p class="admin-empty">No specials found.</p>';
     }
 
-    const rows = filteredSpecials.map((row) => `
+    const sortedSpecials = sortRows(filteredSpecials, 'special-management', specialSortValue);
+    const rows = sortedSpecials.map((row) => `
       <tr class="admin-special-row" data-special-id="${row.representative_special_id}">
         <td>${row.neighborhood || '—'}</td>
         <td>${row.bar_name || '—'}</td>
@@ -918,18 +994,18 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
         <table class="admin-special-table">
           <thead>
             <tr>
-              <th>Neighborhood</th>
-              <th>Bar Name</th>
-              <th>Description</th>
-              <th>Days of Week</th>
-              <th>All Day</th>
-              <th>Start Time</th>
-              <th>End Time</th>
-              <th>Type</th>
-              <th>Is Active</th>
-              <th>Insert Method</th>
-              <th>Insert Date</th>
-              <th>Update Date</th>
+              <th class="admin-sortable-header" data-sort-table="special-management" data-sort-key="neighborhood">Neighborhood${getSortIndicator('special-management', 'neighborhood')}</th>
+              <th class="admin-sortable-header" data-sort-table="special-management" data-sort-key="bar_name">Bar Name${getSortIndicator('special-management', 'bar_name')}</th>
+              <th class="admin-sortable-header" data-sort-table="special-management" data-sort-key="description">Description${getSortIndicator('special-management', 'description')}</th>
+              <th class="admin-sortable-header" data-sort-table="special-management" data-sort-key="days_of_week">Days of Week${getSortIndicator('special-management', 'days_of_week')}</th>
+              <th class="admin-sortable-header" data-sort-table="special-management" data-sort-key="all_day">All Day${getSortIndicator('special-management', 'all_day')}</th>
+              <th class="admin-sortable-header" data-sort-table="special-management" data-sort-key="start_time">Start Time${getSortIndicator('special-management', 'start_time')}</th>
+              <th class="admin-sortable-header" data-sort-table="special-management" data-sort-key="end_time">End Time${getSortIndicator('special-management', 'end_time')}</th>
+              <th class="admin-sortable-header" data-sort-table="special-management" data-sort-key="type">Type${getSortIndicator('special-management', 'type')}</th>
+              <th class="admin-sortable-header" data-sort-table="special-management" data-sort-key="is_active">Is Active${getSortIndicator('special-management', 'is_active')}</th>
+              <th class="admin-sortable-header" data-sort-table="special-management" data-sort-key="insert_method">Insert Method${getSortIndicator('special-management', 'insert_method')}</th>
+              <th class="admin-sortable-header" data-sort-table="special-management" data-sort-key="insert_date">Insert Date${getSortIndicator('special-management', 'insert_date')}</th>
+              <th class="admin-sortable-header" data-sort-table="special-management" data-sort-key="update_date">Update Date${getSortIndicator('special-management', 'update_date')}</th>
             </tr>
           </thead>
           <tbody>${rows}</tbody>
@@ -945,7 +1021,8 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
       return '<p class="admin-empty">No bars found.</p>';
     }
 
-    const rows = state.allBars.map((bar) => `
+    const sortedBars = sortRows(state.allBars, 'bar-management', barSortValue);
+    const rows = sortedBars.map((bar) => `
       <tr class="admin-bar-row" data-bar-id="${bar.bar_id}">
         <td>${bar.name || '—'}</td>
         <td>${bar.neighborhood || '—'}</td>
@@ -961,12 +1038,12 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
         <table class="admin-special-table">
           <thead>
             <tr>
-              <th>Name</th>
-              <th>Neighborhood</th>
-              <th>Is Active</th>
-              <th>Last Candidate Run</th>
-              <th>Insert Date</th>
-              <th>Update Date</th>
+              <th class="admin-sortable-header" data-sort-table="bar-management" data-sort-key="name">Name${getSortIndicator('bar-management', 'name')}</th>
+              <th class="admin-sortable-header" data-sort-table="bar-management" data-sort-key="neighborhood">Neighborhood${getSortIndicator('bar-management', 'neighborhood')}</th>
+              <th class="admin-sortable-header" data-sort-table="bar-management" data-sort-key="is_active">Is Active${getSortIndicator('bar-management', 'is_active')}</th>
+              <th class="admin-sortable-header" data-sort-table="bar-management" data-sort-key="last_special_candidate_run">Last Candidate Run${getSortIndicator('bar-management', 'last_special_candidate_run')}</th>
+              <th class="admin-sortable-header" data-sort-table="bar-management" data-sort-key="insert_date">Insert Date${getSortIndicator('bar-management', 'insert_date')}</th>
+              <th class="admin-sortable-header" data-sort-table="bar-management" data-sort-key="update_date">Update Date${getSortIndicator('bar-management', 'update_date')}</th>
             </tr>
           </thead>
           <tbody>${rows}</tbody>
@@ -1021,6 +1098,8 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
   }
 
   function bindSpecialManagementEvents() {
+    bindSortableColumnHeaders();
+
     const searchInput = screenElement.querySelector('[data-special-search-input]');
     if (searchInput) {
       searchInput.addEventListener('input', (event) => {
@@ -1126,6 +1205,8 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
   }
 
   function bindBarManagementEvents() {
+    bindSortableColumnHeaders();
+
     screenElement.querySelectorAll('.admin-bar-row[data-bar-id]').forEach((row) => {
       row.addEventListener('click', () => {
         state.actionBarId = Number(row.getAttribute('data-bar-id'));
@@ -1386,17 +1467,19 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
 
   function buildRejectedSpecialManagementTable() {
     const searchTerm = String(state.specialSearchTerm || '').trim().toLowerCase();
-    const rows = state.rejectedSpecials.filter((row) => {
+    const filteredRows = state.rejectedSpecials.filter((row) => {
       const neighborhood = String(row.neighborhood || '').trim().toLowerCase();
       const barName = String(row.bar_name || '').trim().toLowerCase();
       if (!searchTerm) return true;
       return neighborhood.includes(searchTerm) || barName.includes(searchTerm);
     });
 
-    if (!rows.length) {
+    if (!filteredRows.length) {
       if (searchTerm) return '<p class="admin-empty">No rejected specials match that bar or neighborhood.</p>';
       return '<p class="admin-empty">No rejected specials found.</p>';
     }
+
+    const rows = sortRows(filteredRows, 'rejected-special-management', rejectedSortValue);
 
     return `
       <input
@@ -1411,19 +1494,19 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
         <table class="admin-special-table">
           <thead>
             <tr>
-              <th>Neighborhood</th>
-              <th>Bar Name</th>
-              <th>Description</th>
-              <th>Days of Week</th>
-              <th>All Day</th>
-              <th>Start Time</th>
-              <th>End Time</th>
-              <th>Type</th>
-              <th>Method</th>
-              <th>Source</th>
-              <th>Web AI Search Matches</th>
-              <th>Web Crawl Matches</th>
-              <th>Insert Date</th>
+              <th class="admin-sortable-header" data-sort-table="rejected-special-management" data-sort-key="neighborhood">Neighborhood${getSortIndicator('rejected-special-management', 'neighborhood')}</th>
+              <th class="admin-sortable-header" data-sort-table="rejected-special-management" data-sort-key="bar_name">Bar Name${getSortIndicator('rejected-special-management', 'bar_name')}</th>
+              <th class="admin-sortable-header" data-sort-table="rejected-special-management" data-sort-key="description">Description${getSortIndicator('rejected-special-management', 'description')}</th>
+              <th class="admin-sortable-header" data-sort-table="rejected-special-management" data-sort-key="days_of_week">Days of Week${getSortIndicator('rejected-special-management', 'days_of_week')}</th>
+              <th class="admin-sortable-header" data-sort-table="rejected-special-management" data-sort-key="all_day">All Day${getSortIndicator('rejected-special-management', 'all_day')}</th>
+              <th class="admin-sortable-header" data-sort-table="rejected-special-management" data-sort-key="start_time">Start Time${getSortIndicator('rejected-special-management', 'start_time')}</th>
+              <th class="admin-sortable-header" data-sort-table="rejected-special-management" data-sort-key="end_time">End Time${getSortIndicator('rejected-special-management', 'end_time')}</th>
+              <th class="admin-sortable-header" data-sort-table="rejected-special-management" data-sort-key="type">Type${getSortIndicator('rejected-special-management', 'type')}</th>
+              <th class="admin-sortable-header" data-sort-table="rejected-special-management" data-sort-key="fetch_method">Method${getSortIndicator('rejected-special-management', 'fetch_method')}</th>
+              <th class="admin-sortable-header" data-sort-table="rejected-special-management" data-sort-key="source">Source${getSortIndicator('rejected-special-management', 'source')}</th>
+              <th class="admin-sortable-header" data-sort-table="rejected-special-management" data-sort-key="web_ai_search_matches">Web AI Search Matches${getSortIndicator('rejected-special-management', 'web_ai_search_matches')}</th>
+              <th class="admin-sortable-header" data-sort-table="rejected-special-management" data-sort-key="web_crawl_matches">Web Crawl Matches${getSortIndicator('rejected-special-management', 'web_crawl_matches')}</th>
+              <th class="admin-sortable-header" data-sort-table="rejected-special-management" data-sort-key="insert_date">Insert Date${getSortIndicator('rejected-special-management', 'insert_date')}</th>
             </tr>
           </thead>
           <tbody>
@@ -1472,6 +1555,8 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
   }
 
   function bindRejectedSpecialManagementEvents() {
+    bindSortableColumnHeaders();
+
     const searchInput = screenElement.querySelector('[data-rejected-special-search-input]');
     if (searchInput) {
       searchInput.addEventListener('input', (event) => {
@@ -1503,6 +1588,18 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
         if (!specialCandidateId) return;
         state.actionRejectedCandidateId = null;
         await removeRejectedSpecialCandidate(specialCandidateId);
+      });
+    });
+  }
+
+  function bindSortableColumnHeaders() {
+    screenElement.querySelectorAll('[data-sort-table][data-sort-key]').forEach((headerCell) => {
+      headerCell.addEventListener('click', () => {
+        const tableName = headerCell.getAttribute('data-sort-table');
+        const columnKey = headerCell.getAttribute('data-sort-key');
+        if (!tableName || !columnKey) return;
+        toggleSort(tableName, columnKey);
+        render();
       });
     });
   }
