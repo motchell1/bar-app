@@ -158,12 +158,43 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
     if (value instanceof Date) {
       return Number.isNaN(value.getTime()) ? null : value;
     }
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      const epochMs = value < 1e12 ? value * 1000 : value;
+      const epochDate = new Date(epochMs);
+      return Number.isNaN(epochDate.getTime()) ? null : epochDate;
+    }
 
     const raw = String(value).trim();
     if (!raw) return null;
 
+    const utcWithoutTimezoneMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2})(?::(\d{2}))?(?:\.(\d{1,6}))?)?$/);
+    if (utcWithoutTimezoneMatch) {
+      const [
+        ,
+        year,
+        month,
+        day,
+        hour = '00',
+        minute = '00',
+        second = '00',
+        fractional = '0'
+      ] = utcWithoutTimezoneMatch;
+      const milliseconds = Number(fractional.padEnd(3, '0').slice(0, 3));
+      const utcMs = Date.UTC(
+        Number(year),
+        Number(month) - 1,
+        Number(day),
+        Number(hour),
+        Number(minute),
+        Number(second),
+        milliseconds
+      );
+      const utcDate = new Date(utcMs);
+      return Number.isNaN(utcDate.getTime()) ? null : utcDate;
+    }
+
     const hasExplicitTimezone = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(raw);
-    const normalized = hasExplicitTimezone ? raw : raw.replace(' ', 'T');
+    const normalized = raw.replace(' ', 'T');
     const isoValue = hasExplicitTimezone ? normalized : `${normalized}Z`;
     const date = new Date(isoValue);
     if (Number.isNaN(date.getTime())) return null;
