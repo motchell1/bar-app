@@ -148,9 +148,26 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
 
   function formatDateTime(value) {
     if (!value) return '—';
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return String(value);
+    const date = parseDateValue(value);
+    if (!date) return String(value);
     return ADMIN_DATETIME_FORMATTER.format(date);
+  }
+
+  function parseDateValue(value) {
+    if (!value) return null;
+    if (value instanceof Date) {
+      return Number.isNaN(value.getTime()) ? null : value;
+    }
+
+    const raw = String(value).trim();
+    if (!raw) return null;
+
+    const hasExplicitTimezone = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(raw);
+    const normalized = hasExplicitTimezone ? raw : raw.replace(' ', 'T');
+    const isoValue = hasExplicitTimezone ? normalized : `${normalized}Z`;
+    const date = new Date(isoValue);
+    if (Number.isNaN(date.getTime())) return null;
+    return date;
   }
 
   function formatTime(value) {
@@ -232,8 +249,9 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
   }
 
   function toTimestamp(value) {
-    if (!value) return 0;
-    const parsed = new Date(value).getTime();
+    const parsedDate = parseDateValue(value);
+    if (!parsedDate) return 0;
+    const parsed = parsedDate.getTime();
     return Number.isNaN(parsed) ? 0 : parsed;
   }
 
@@ -316,14 +334,14 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
       row.specials.push(special);
       row.daySet.add(normalizeDay(special.day_of_week));
 
-      const rowInsert = new Date(row.insert_date || 0).getTime();
-      const specialInsert = new Date(special.insert_date || 0).getTime();
+      const rowInsert = toTimestamp(row.insert_date);
+      const specialInsert = toTimestamp(special.insert_date);
       if (!row.insert_date || specialInsert < rowInsert) {
         row.insert_date = special.insert_date;
       }
 
-      const rowUpdate = new Date(row.update_date || 0).getTime();
-      const specialUpdate = new Date(special.update_date || 0).getTime();
+      const rowUpdate = toTimestamp(row.update_date);
+      const specialUpdate = toTimestamp(special.update_date);
       if (!row.update_date || specialUpdate > rowUpdate) {
         row.update_date = special.update_date;
       }
@@ -342,8 +360,8 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
         if (barCompare !== 0) return barCompare;
         const descriptionCompare = String(a.description || '').localeCompare(String(b.description || ''));
         if (descriptionCompare !== 0) return descriptionCompare;
-        const dateA = new Date(a.insert_date || 0).getTime();
-        const dateB = new Date(b.insert_date || 0).getTime();
+        const dateA = toTimestamp(a.insert_date);
+        const dateB = toTimestamp(b.insert_date);
         return dateA - dateB;
       });
   }
