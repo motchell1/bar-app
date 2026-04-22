@@ -610,6 +610,31 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
     }
   }
 
+  async function deleteSpecials(specialIds) {
+    const ids = Array.isArray(specialIds) ? specialIds : [specialIds];
+    const validIds = [...new Set(ids.map((id) => Number(id)).filter((id) => Number.isFinite(id) && id > 0))];
+    if (!validIds.length) return;
+
+    state.savingSpecial = true;
+    state.errorMessage = '';
+    render();
+
+    try {
+      for (const specialId of validIds) {
+        await callAdminSync({ mode: 'delete_special', special_id: specialId });
+      }
+      await loadAllSpecials();
+      state.detailSpecials = [];
+      state.detailEditing = false;
+    } catch (err) {
+      console.error('Failed to delete special:', err);
+      state.errorMessage = err?.message || 'Failed to delete special.';
+    } finally {
+      state.savingSpecial = false;
+      render();
+    }
+  }
+
   async function saveBarUpdates(barPayload, openHoursRows) {
     state.savingBar = true;
     state.errorMessage = '';
@@ -655,6 +680,7 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
           <button type="button" class="admin-tool-button" data-special-action="view-details" data-special-id="${state.actionSpecialId}">View Details</button>
           <button type="button" class="admin-tool-button" data-special-action="activate" data-special-id="${state.actionSpecialId}">Activate Special</button>
           <button type="button" class="admin-tool-button" data-special-action="deactivate" data-special-id="${state.actionSpecialId}">Deactivate Special</button>
+          <button type="button" class="admin-tool-button danger" data-special-action="delete" data-special-id="${state.actionSpecialId}">Delete Special</button>
           <button type="button" class="admin-secondary-btn" data-close-action-menu="true">Close</button>
         </div>
       </div>
@@ -1391,6 +1417,21 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
             is_active: action === 'activate' ? 'Y' : 'N'
           }));
           await saveSpecialUpdates(updates.length ? updates : [{ special_id: specialId, is_active: action === 'activate' ? 'Y' : 'N' }]);
+          return;
+        }
+
+        if (action === 'delete') {
+          const groupedRow = getGroupedRowByRepresentativeId(specialId);
+          const specialIdsToDelete = (groupedRow?.specials || []).map((special) => Number(special.special_id)).filter(Boolean);
+          const ids = specialIdsToDelete.length ? specialIdsToDelete : [specialId];
+          const deleteCount = ids.length;
+          const confirmed = window.confirm(
+            deleteCount > 1
+              ? `Delete ${deleteCount} specials from the database? This cannot be undone.`
+              : 'Delete this special from the database? This cannot be undone.'
+          );
+          if (!confirmed) return;
+          await deleteSpecials(ids);
         }
       });
     });
