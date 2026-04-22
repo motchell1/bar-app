@@ -161,6 +161,41 @@ def get_bars_by_neighborhood(cursor, neighborhood: str) -> Dict[str, List[Dict]]
     return {'bars': cursor.fetchall()}
 
 
+def get_duplicate_active_websites(cursor) -> Dict[str, List[Dict]]:
+    cursor.execute(
+        """
+        SELECT
+            LOWER(TRIM(TRAILING '/' FROM website_url)) AS normalized_website_url,
+            COUNT(*) AS active_bar_count,
+            GROUP_CONCAT(bar_id ORDER BY bar_id) AS bar_ids
+        FROM bar
+        WHERE is_active = 'Y'
+          AND website_url IS NOT NULL
+          AND TRIM(website_url) <> ''
+        GROUP BY LOWER(TRIM(TRAILING '/' FROM website_url))
+        HAVING COUNT(*) > 1
+        ORDER BY active_bar_count DESC, normalized_website_url ASC
+        """
+    )
+    rows = cursor.fetchall()
+    duplicate_groups = []
+    for row in rows:
+        bar_ids_csv = row.get('bar_ids') or ''
+        bar_ids = [int(bar_id) for bar_id in bar_ids_csv.split(',') if bar_id]
+        duplicate_groups.append(
+            {
+                'normalized_website_url': row['normalized_website_url'],
+                'active_bar_count': int(row['active_bar_count']),
+                'bar_ids': bar_ids,
+            }
+        )
+
+    return {
+        'duplicate_group_count': len(duplicate_groups),
+        'duplicate_groups': duplicate_groups,
+    }
+
+
 def _parse_confidence(value) -> float:
     if isinstance(value, (int, float)):
         return float(value)
@@ -512,11 +547,11 @@ def publish_candidate_specials(cursor, bar_id: int, run_id: int, auto_publish: s
 def lambda_handler(event, context):
     event = event or {}
     mode = event.get('mode')
-    if mode not in {'determine_if_bar_existing', 'apply_bar_upsert', 'get_bars_by_neighborhood'}:
+    if mode not in {'determine_if_bar_existing', 'apply_bar_upsert', 'get_bars_by_neighborhood', 'detect_duplicate_websites'}:
         return {
             'statusCode': 400,
             'body': json.dumps({
-                'error': 'mode must be one of determine_if_bar_existing, apply_bar_upsert, get_bars_by_neighborhood'
+                'error': 'mode must be one of determine_if_bar_existing, apply_bar_upsert, get_bars_by_neighborhood, detect_duplicate_websites'
             }),
         }
 
@@ -534,6 +569,9 @@ def lambda_handler(event, context):
                 if not neighborhood:
                     raise ValueError('neighborhood is required for get_bars_by_neighborhood')
                 result = get_bars_by_neighborhood(cursor, neighborhood)
+                conn.commit()
+            elif mode == 'detect_duplicate_websites':
+                result = get_duplicate_active_websites(cursor)
                 conn.commit()
         LOGGER.info('dbBarSync %s result=%s', mode, result)
         return {
