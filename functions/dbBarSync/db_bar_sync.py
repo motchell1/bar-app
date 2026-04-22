@@ -167,6 +167,7 @@ def get_duplicate_active_websites(cursor) -> Dict[str, List[Dict]]:
         """
         SELECT
             bar_id,
+            neighborhood,
             website_url
         FROM bar
         WHERE is_active = 'Y'
@@ -188,25 +189,30 @@ def get_duplicate_active_websites(cursor) -> Dict[str, List[Dict]]:
             host = host[4:]
         return host
 
-    domain_groups: Dict[str, List[int]] = {}
+    domain_groups: Dict[str, Dict[str, List[int]]] = {}
     for row in rows:
         domain = _extract_domain(row.get('website_url'))
+        neighborhood = (row.get('neighborhood') or '').strip()
         if not domain:
             continue
-        domain_groups.setdefault(domain, []).append(int(row['bar_id']))
+        if not neighborhood:
+            continue
+        domain_groups.setdefault(domain, {}).setdefault(neighborhood, []).append(int(row['bar_id']))
 
     duplicate_groups = []
-    for domain, bar_ids in sorted(domain_groups.items(), key=lambda item: (-len(item[1]), item[0])):
-        if len(bar_ids) < 2:
-            continue
-        sorted_bar_ids = sorted(bar_ids)
-        duplicate_groups.append(
-            {
-                'domain': domain,
-                'active_bar_count': len(sorted_bar_ids),
-                'bar_ids': sorted_bar_ids,
-            }
-        )
+    for domain, neighborhood_map in sorted(domain_groups.items(), key=lambda item: item[0]):
+        for neighborhood, bar_ids in sorted(neighborhood_map.items(), key=lambda item: item[0]):
+            if len(bar_ids) < 2:
+                continue
+            sorted_bar_ids = sorted(bar_ids)
+            duplicate_groups.append(
+                {
+                    'domain': domain,
+                    'neighborhood': neighborhood,
+                    'active_bar_count': len(sorted_bar_ids),
+                    'bar_ids': sorted_bar_ids,
+                }
+            )
 
     return {
         'duplicate_group_count': len(duplicate_groups),
