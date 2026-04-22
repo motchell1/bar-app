@@ -989,6 +989,41 @@ def insert_special(cursor, event):
     }
 
 
+def delete_special(cursor, event):
+    special_id = event.get('special_id')
+    if not special_id:
+        raise ValueError('special_id is required for delete_special')
+
+    cursor.execute(
+        """
+        UPDATE special_candidate
+        SET approved_special_id = NULL
+        WHERE approved_special_id = %s
+        """,
+        (special_id,),
+    )
+
+    cursor.execute(
+        """
+        DELETE FROM device_special_favorite
+        WHERE special_id = %s
+        """,
+        (special_id,),
+    )
+
+    cursor.execute(
+        """
+        DELETE FROM special
+        WHERE special_id = %s
+        """,
+        (special_id,),
+    )
+    if cursor.rowcount == 0:
+        raise ValueError('special_id was not found')
+
+    return {'special_id': special_id, 'deleted': True}
+
+
 def update_special_candidate(cursor, event):
     special_candidate_id = event.get('special_candidate_id')
     if not special_candidate_id:
@@ -1084,6 +1119,7 @@ def lambda_handler(event, context):
         'update_special_candidate_approval',
         'get_all_specials',
         'update_special',
+        'delete_special',
         'insert_special',
         'update_special_candidate',
         'get_all_bars',
@@ -1099,7 +1135,7 @@ def lambda_handler(event, context):
                         'mode must be one of get_unapproved_special_candidates, '
                         'get_rejected_special_candidates, '
                         'remove_rejected_special_candidate, '
-                        'update_special_candidate_approval, get_all_specials, update_special, insert_special, '
+                        'update_special_candidate_approval, get_all_specials, update_special, delete_special, insert_special, '
                         'update_special_candidate, get_all_bars, get_bar_details, update_bar, update_open_hours'
                     )
                 }
@@ -1139,6 +1175,8 @@ def lambda_handler(event, context):
                 result = update_open_hours(cursor, event)
             elif mode == 'update_special_candidate':
                 result = update_special_candidate(cursor, event)
+            elif mode == 'delete_special':
+                result = delete_special(cursor, event)
             elif mode == 'insert_special':
                 result = insert_special(cursor, event)
             else:
