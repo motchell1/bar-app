@@ -1306,8 +1306,20 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
     const searchInput = screenElement.querySelector('[data-special-search-input]');
     if (searchInput) {
       searchInput.addEventListener('input', (event) => {
+        const { selectionStart, selectionEnd } = event.target;
         state.specialSearchTerm = event.target.value;
         render();
+        const nextInput = screenElement.querySelector('[data-special-search-input]');
+        if (nextInput) {
+          nextInput.focus();
+          if (
+            typeof selectionStart === 'number'
+            && typeof selectionEnd === 'number'
+            && typeof nextInput.setSelectionRange === 'function'
+          ) {
+            nextInput.setSelectionRange(selectionStart, selectionEnd);
+          }
+        }
       });
     }
 
@@ -1869,8 +1881,20 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
     const searchInput = screenElement.querySelector('[data-rejected-special-search-input]');
     if (searchInput) {
       searchInput.addEventListener('input', (event) => {
+        const { selectionStart, selectionEnd } = event.target;
         state.specialSearchTerm = event.target.value;
         render();
+        const nextInput = screenElement.querySelector('[data-rejected-special-search-input]');
+        if (nextInput) {
+          nextInput.focus();
+          if (
+            typeof selectionStart === 'number'
+            && typeof selectionEnd === 'number'
+            && typeof nextInput.setSelectionRange === 'function'
+          ) {
+            nextInput.setSelectionRange(selectionStart, selectionEnd);
+          }
+        }
       });
     }
 
