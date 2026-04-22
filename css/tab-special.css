@@ -210,13 +210,8 @@
 }
 
 .active-upcoming-divider {
-  text-align: center;
-  font-size: 0.8em;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: #6b7280;
-  margin: -8px 0 4px;
-  padding: 8px 0;
+  margin: -6px 0 6px;
+  height: 0;
   border-top: 1px solid #d1d5db;
 }
 

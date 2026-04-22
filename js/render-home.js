@@ -1,3 +1,5 @@
+const SPECIALS_SCROLL_OFFSET_PX = 10;
+
 function buildHomeBarSpecials(bar, specialIds, dayKey, dayLabel) {
   const specialsLookup = startupPayload?.specials || {};
   const content = document.createElement('div');
@@ -190,7 +192,6 @@ function renderBarsWeek() {
         if (withoutActiveOrUpcoming.length > 0 && withActiveOrUpcoming.length > 0) {
           const divider = document.createElement('div');
           divider.className = 'active-upcoming-divider';
-          divider.textContent = 'Active or upcoming specials below';
           container.appendChild(divider);
           scrollTargetCard = withActiveOrUpcoming[0].card;
         }
@@ -228,7 +229,7 @@ function renderBarsWeek() {
         const top = cardRect && homeRect
           ? (cardRect.top - homeRect.top + currentScrollTop)
           : fallbackTop;
-        homeScreen.scrollTop = Math.max(0, top);
+        homeScreen.scrollTop = Math.max(0, top - SPECIALS_SCROLL_OFFSET_PX);
       } else {
         homeScreen.scrollTop = 0;
       }

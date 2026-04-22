@@ -722,10 +722,10 @@ test('renderBarsWeek inserts divider before first bar with active or upcoming sp
 
   const divider = document.querySelector('.active-upcoming-divider');
   assert.ok(divider, 'renders active/upcoming divider');
-  assert.equal(divider.textContent, 'Active or upcoming specials below');
+  assert.equal(divider.textContent, '');
   assert.equal(cards[0].querySelector('.bar-name').textContent, 'Past Specials Bar');
   assert.equal(cards[1].querySelector('.bar-name').textContent, 'Upcoming Specials Bar');
-  assert.equal(homeScreen.scrollTop, cards[1].offsetTop, 'scrolls to first bar after divider');
+  assert.equal(homeScreen.scrollTop, cards[1].offsetTop - 10, 'scrolls slightly above first bar after divider');
 });
 
 test('buildSpecialItem clickable rows stop parent click handling and navigate to special detail', async () => {
