@@ -118,6 +118,41 @@ def _normalize_text_value(value) -> str:
     return str(value or '').strip()
 
 
+def _build_open_hours_lookup(open_hours_rows: List[Dict]) -> Dict[str, Dict]:
+    lookup = {}
+    for row in open_hours_rows:
+        day_key = _normalize_day_of_week(row.get('day_of_week'))
+        if not day_key:
+            continue
+        lookup[day_key] = {
+            'open_time': _normalize_time_value(row.get('open_time')),
+            'close_time': _normalize_time_value(row.get('close_time')),
+            'is_closed': _normalize_yn_flag(row.get('is_closed')),
+        }
+    return lookup
+
+
+def _should_convert_to_all_day(day_of_week, all_day, start_time, end_time, open_hours_lookup: Dict[str, Dict]) -> bool:
+    day_key = _normalize_day_of_week(day_of_week)
+    if not day_key:
+        return False
+    if _normalize_yn_flag(all_day) != 'N':
+        return False
+    normalized_start = _normalize_time_value(start_time)
+    normalized_end = _normalize_time_value(end_time)
+    if not normalized_start or not normalized_end:
+        return False
+
+    hours_row = open_hours_lookup.get(day_key)
+    if not hours_row or hours_row.get('is_closed') == 'Y':
+        return False
+
+    return (
+        normalized_start == _normalize_time_value(hours_row.get('open_time'))
+        and normalized_end == _normalize_time_value(hours_row.get('close_time'))
+    )
+
+
 def _is_candidate_same_as_special(candidate_row: Dict, special_row: Dict) -> bool:
     return (
         _normalize_day_of_week(candidate_row.get('day_of_week')) == _normalize_day_of_week(special_row.get('day_of_week'))
@@ -315,6 +350,16 @@ def insert_special_candidate(cursor, run: Dict, candidates: List[Dict]) -> Dict[
 def publish_special_candidate_run(cursor, bar_id: int, run_id: int, auto_publish: str = 'N') -> Dict[str, int]:
     cursor.execute(
         """
+        SELECT day_of_week, open_time, close_time, is_closed
+        FROM open_hours
+        WHERE bar_id = %s
+        """,
+        (bar_id,),
+    )
+    open_hours_lookup = _build_open_hours_lookup(cursor.fetchall())
+
+    cursor.execute(
+        """
         SELECT special_candidate_id, description, type, days_of_week, start_time, end_time, all_day
         FROM special_candidate
         WHERE bar_id = %s
@@ -328,15 +373,22 @@ def publish_special_candidate_run(cursor, bar_id: int, run_id: int, auto_publish
     candidate_rows = []
     for candidate in approved_candidates:
         for day in _parse_days_of_week(candidate.get('days_of_week')):
+            start_time = candidate.get('start_time')
+            end_time = candidate.get('end_time')
+            all_day = candidate.get('all_day')
+            if _should_convert_to_all_day(day, all_day, start_time, end_time, open_hours_lookup):
+                all_day = 'Y'
+                start_time = None
+                end_time = None
             candidate_rows.append(
                 {
                     'candidate_id': candidate['special_candidate_id'],
                     'description': candidate.get('description'),
                     'type': candidate.get('type'),
                     'day_of_week': day,
-                    'start_time': candidate.get('start_time'),
-                    'end_time': candidate.get('end_time'),
-                    'all_day': candidate.get('all_day'),
+                    'start_time': start_time,
+                    'end_time': end_time,
+                    'all_day': all_day,
                 }
             )
 
@@ -351,6 +403,28 @@ def publish_special_candidate_run(cursor, bar_id: int, run_id: int, auto_publish
         (bar_id,),
     )
     existing_specials = cursor.fetchall()
+    for special in existing_specials:
+        if _should_convert_to_all_day(
+            special.get('day_of_week'),
+            special.get('all_day'),
+            special.get('start_time'),
+            special.get('end_time'),
+            open_hours_lookup,
+        ):
+            cursor.execute(
+                """
+                UPDATE special
+                SET all_day = 'Y',
+                    start_time = NULL,
+                    end_time = NULL,
+                    update_date = NOW()
+                WHERE special_id = %s
+                """,
+                (special['special_id'],),
+            )
+            special['all_day'] = 'Y'
+            special['start_time'] = None
+            special['end_time'] = None
 
     approved_candidate_ids = [candidate['special_candidate_id'] for candidate in approved_candidates if candidate.get('special_candidate_id')]
     for candidate_id in approved_candidate_ids:
