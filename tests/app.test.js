@@ -458,7 +458,7 @@ test('submitSpecialReport posts special report payload and resets form', async (
   await ctx.submitSpecialReport({ preventDefault() {} });
 
   assert.equal(fetchCalls.length, 1, 'calls fetch once');
-  assert.equal(fetchCalls[0].url, 'https://3kz7x6tvvi.execute-api.us-east-2.amazonaws.com/default/insertUserReport');
+  assert.equal(fetchCalls[0].url, 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaws.com/default/insertUserReport');
   assert.equal(fetchCalls[0].options.method, 'POST');
 
   const body = JSON.parse(fetchCalls[0].options.body);
