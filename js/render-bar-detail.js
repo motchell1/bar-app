@@ -290,6 +290,20 @@ function updateBarDescriptionSection(selectedBar) {
 }
 
 function renderBarDetailContent(selectedBar, detailPayload) {
+  const normalizedBarId = String(
+    detailPayload?.bar?.bar_id
+      ?? selectedBar?.bar_id
+      ?? selectedBar?.id
+      ?? ''
+  );
+  const startupBar = startupPayload?.bars?.[normalizedBarId] || null;
+  const mergedBarForDescription = {
+    ...startupBar,
+    ...selectedBar,
+    description: detailPayload?.bar?.description ?? startupBar?.description ?? selectedBar?.description
+  };
+  updateBarDescriptionSection(mergedBarForDescription);
+
   const todayKey = detailPayload?.general_data?.current_day || startupPayload?.general_data?.current_day || getDayKeyFromName(DAYS_FULL[new Date().getDay()]);
   const orderedDays = getOrderedDaysForDetail(todayKey);
   const openHoursForBar = detailPayload?.open_hours || {};
