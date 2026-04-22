@@ -22,7 +22,7 @@ def get_connection():
 def query_bar_exists(cursor, bar_id):
     cursor.execute(
         """
-        SELECT bar_id, website_url
+        SELECT bar_id, website_url, description
         FROM bar
         WHERE bar_id = %s AND is_active = 'Y'
         """,
@@ -221,7 +221,8 @@ def build_bar_details_payload(bar_id):
                 },
                 'bar': {
                     'bar_id': bar['bar_id'],
-                    'website_url': bar.get('website_url')
+                    'website_url': bar.get('website_url'),
+                    'description': bar.get('description')
                 },
                 'open_hours': open_hours,
                 'specials': specials,
