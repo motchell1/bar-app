@@ -167,6 +167,7 @@ def get_duplicate_active_websites(cursor) -> Dict[str, List[Dict]]:
         """
         SELECT
             bar_id,
+            name AS bar_name,
             neighborhood,
             website_url
         FROM bar
@@ -189,28 +190,44 @@ def get_duplicate_active_websites(cursor) -> Dict[str, List[Dict]]:
             host = host[4:]
         return host
 
-    domain_groups: Dict[str, Dict[str, List[int]]] = {}
+    domain_groups: Dict[str, Dict[str, List[Dict]]] = {}
     for row in rows:
         domain = _extract_domain(row.get('website_url'))
         neighborhood = (row.get('neighborhood') or '').strip()
+        bar_name = (row.get('bar_name') or '').strip()
+        website_url = (row.get('website_url') or '').strip()
         if not domain:
             continue
         if not neighborhood:
             continue
-        domain_groups.setdefault(domain, {}).setdefault(neighborhood, []).append(int(row['bar_id']))
+        domain_groups.setdefault(domain, {}).setdefault(neighborhood, []).append(
+            {
+                'bar_id': int(row['bar_id']),
+                'bar_name': bar_name,
+                'website_url': website_url,
+            }
+        )
 
     duplicate_groups = []
     for domain, neighborhood_map in sorted(domain_groups.items(), key=lambda item: item[0]):
-        for neighborhood, bar_ids in sorted(neighborhood_map.items(), key=lambda item: item[0]):
-            if len(bar_ids) < 2:
+        for neighborhood, bars in sorted(neighborhood_map.items(), key=lambda item: item[0]):
+            if len(bars) < 2:
                 continue
-            sorted_bar_ids = sorted(bar_ids)
+            sorted_bars = sorted(
+                bars,
+                key=lambda bar: (
+                    bar.get('bar_name', '').lower(),
+                    bar.get('bar_id', 0),
+                ),
+            )
+            sorted_bar_ids = [bar['bar_id'] for bar in sorted_bars]
             duplicate_groups.append(
                 {
                     'domain': domain,
                     'neighborhood': neighborhood,
                     'active_bar_count': len(sorted_bar_ids),
                     'bar_ids': sorted_bar_ids,
+                    'bars': sorted_bars,
                 }
             )
 
