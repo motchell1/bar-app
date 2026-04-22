@@ -4,6 +4,7 @@ import os
 from difflib import SequenceMatcher
 from datetime import datetime, time, timedelta
 from typing import Dict, List
+from urllib.parse import urlparse
 
 import pymysql
 
@@ -165,28 +166,45 @@ def get_duplicate_active_websites(cursor) -> Dict[str, List[Dict]]:
     cursor.execute(
         """
         SELECT
-            LOWER(TRIM(TRAILING '/' FROM website_url)) AS normalized_website_url,
-            COUNT(*) AS active_bar_count,
-            GROUP_CONCAT(bar_id ORDER BY bar_id) AS bar_ids
+            bar_id,
+            website_url
         FROM bar
         WHERE is_active = 'Y'
           AND website_url IS NOT NULL
           AND TRIM(website_url) <> ''
-        GROUP BY LOWER(TRIM(TRAILING '/' FROM website_url))
-        HAVING COUNT(*) > 1
-        ORDER BY active_bar_count DESC, normalized_website_url ASC
         """
     )
     rows = cursor.fetchall()
-    duplicate_groups = []
+
+    def _extract_domain(website_url: str) -> str:
+        value = (website_url or '').strip().lower()
+        if not value:
+            return ''
+        if '://' not in value:
+            value = f'https://{value}'
+        parsed = urlparse(value)
+        host = (parsed.netloc or '').split('@')[-1].split(':')[0].strip('.')
+        if host.startswith('www.'):
+            host = host[4:]
+        return host
+
+    domain_groups: Dict[str, List[int]] = {}
     for row in rows:
-        bar_ids_csv = row.get('bar_ids') or ''
-        bar_ids = [int(bar_id) for bar_id in bar_ids_csv.split(',') if bar_id]
+        domain = _extract_domain(row.get('website_url'))
+        if not domain:
+            continue
+        domain_groups.setdefault(domain, []).append(int(row['bar_id']))
+
+    duplicate_groups = []
+    for domain, bar_ids in sorted(domain_groups.items(), key=lambda item: (-len(item[1]), item[0])):
+        if len(bar_ids) < 2:
+            continue
+        sorted_bar_ids = sorted(bar_ids)
         duplicate_groups.append(
             {
-                'normalized_website_url': row['normalized_website_url'],
-                'active_bar_count': int(row['active_bar_count']),
-                'bar_ids': bar_ids,
+                'domain': domain,
+                'active_bar_count': len(sorted_bar_ids),
+                'bar_ids': sorted_bar_ids,
             }
         )
 
