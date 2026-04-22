@@ -663,6 +663,71 @@ test('renderBarsWeek groups specials with matching day, time, and type into one 
   assert.equal(items[0].querySelector('.special-description').textContent, '$5 Lager • $6 IPA');
 });
 
+test('renderBarsWeek inserts divider before first bar with active or upcoming specials and scrolls to it', async () => {
+  const document = new DocumentMock();
+  mountBaseNodes(document);
+  const ctx = loadAppWithoutBoot(document);
+
+  vm.runInContext(`
+    startupPayload = {
+      general_data: { current_day: 'MON' },
+      bars: {
+        '1': { name: 'Past Specials Bar', neighborhood: 'Downtown', image_url: null, currently_open: false },
+        '2': { name: 'Upcoming Specials Bar', neighborhood: 'Downtown', image_url: null, currently_open: true }
+      },
+      open_hours: {
+        '1': { MON: { display_text: '4:00 PM - 2:00 AM' } },
+        '2': { MON: { display_text: '4:00 PM - 2:00 AM' } }
+      },
+      specials: {
+        '11': { bar_id: 1, description: '$5 Beer', special_type: 'drink', all_day: false, start_time: '16:00', end_time: '18:00', current_status: 'past' },
+        '22': { bar_id: 2, description: '$6 IPA', special_type: 'drink', all_day: false, start_time: '19:00', end_time: '21:00', current_status: 'upcoming' }
+      },
+      specials_by_day: {
+        MON: [{ bar_id: 1, specials: ['11'] }, { bar_id: 2, specials: ['22'] }],
+        TUE: [],
+        WED: [],
+        THU: [],
+        FRI: [],
+        SAT: [],
+        SUN: []
+      }
+    };
+    currentTab = 'specials';
+    activeFilters.types = [];
+    activeFilters.neighborhoods = [];
+    activeFilters.favoritesOnly = false;
+  `, ctx);
+
+  const homeScreen = document.getElementById('home-screen');
+  homeScreen.scrollTop = 0;
+
+  const cards = [];
+  let nextOffset = 0;
+  const originalAppendChild = homeScreen.appendChild.bind(homeScreen);
+  const homeBars = document.getElementById('home-bars');
+  const originalContainerAppend = homeBars.appendChild.bind(homeBars);
+  homeBars.appendChild = (child) => {
+    if (child.className && child.className.includes('bar-card')) {
+      child.offsetTop = nextOffset;
+      nextOffset += 120;
+      cards.push(child);
+    }
+    return originalContainerAppend(child);
+  };
+  homeScreen.appendChild = originalAppendChild;
+
+  ctx.renderBarsWeek();
+  await new Promise((resolve) => setTimeout(resolve, 1));
+
+  const divider = document.querySelector('.active-upcoming-divider');
+  assert.ok(divider, 'renders active/upcoming divider');
+  assert.equal(divider.textContent, '');
+  assert.equal(cards[0].querySelector('.bar-name').textContent, 'Past Specials Bar');
+  assert.equal(cards[1].querySelector('.bar-name').textContent, 'Upcoming Specials Bar');
+  assert.equal(homeScreen.scrollTop, cards[1].offsetTop - 10, 'scrolls slightly above first bar after divider');
+});
+
 test('buildSpecialItem clickable rows stop parent click handling and navigate to special detail', async () => {
   const document = new DocumentMock();
   mountBaseNodes(document);

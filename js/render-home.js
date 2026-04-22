@@ -1,3 +1,5 @@
+const SPECIALS_SCROLL_OFFSET_PX = 10;
+
 function buildHomeBarSpecials(bar, specialIds, dayKey, dayLabel) {
   const specialsLookup = startupPayload?.specials || {};
   const content = document.createElement('div');
@@ -22,6 +24,7 @@ function buildHomeBarSpecials(bar, specialIds, dayKey, dayLabel) {
   specialsList.className = 'specials-list';
 
   let renderedSpecials = 0;
+  let hasActiveOrUpcoming = false;
 
   const isToday = dayKey === startupPayload?.general_data?.current_day;
 
@@ -51,6 +54,11 @@ function buildHomeBarSpecials(bar, specialIds, dayKey, dayLabel) {
     });
     specialsList.appendChild(li);
     renderedSpecials += 1;
+
+    const status = String(special.current_status || '').toLowerCase();
+    if (status === 'active' || status === 'live' || status === 'upcoming') {
+      hasActiveOrUpcoming = true;
+    }
   });
 
   if (renderedSpecials === 0) return null;
@@ -95,7 +103,7 @@ function buildHomeBarSpecials(bar, specialIds, dayKey, dayLabel) {
   }
 
   content.appendChild(hoursDiv);
-  return content;
+  return { content, hasActiveOrUpcoming };
 }
 
 function renderBarsWeek() {
@@ -117,7 +125,9 @@ function renderBarsWeek() {
   });
 
 
-  orderedDays.forEach(({ dayKey, dayLabel }) => {
+  let scrollTargetCard = null;
+
+  orderedDays.forEach(({ dayKey, dayLabel }, dayIndex) => {
     const barsForDay = startupPayload?.specials_by_day?.[dayKey] || [];
 
     const dayHeader = document.createElement('div');
@@ -126,6 +136,7 @@ function renderBarsWeek() {
     container.appendChild(dayHeader);
 
     let renderedCardCountForDay = 0;
+    const renderedCardsForDay = [];
 
     barsForDay.forEach((entry) => {
       const barId = String(entry.bar_id);
@@ -160,13 +171,36 @@ function renderBarsWeek() {
         card.appendChild(img);
       }
 
-      const homeContent = buildHomeBarSpecials(bar, entry.specials || [], dayKey, dayLabel);
-      if (!homeContent) return;
+      const homeSpecials = buildHomeBarSpecials(bar, entry.specials || [], dayKey, dayLabel);
+      if (!homeSpecials) return;
 
-      card.appendChild(homeContent);
-      container.appendChild(card);
+      card.appendChild(homeSpecials.content);
+      renderedCardsForDay.push({
+        card,
+        hasActiveOrUpcoming: homeSpecials.hasActiveOrUpcoming
+      });
       renderedCardCountForDay += 1;
     });
+
+    if (renderedCardsForDay.length > 0) {
+      if (dayIndex === 0) {
+        const withoutActiveOrUpcoming = renderedCardsForDay.filter((entry) => !entry.hasActiveOrUpcoming);
+        const withActiveOrUpcoming = renderedCardsForDay.filter((entry) => entry.hasActiveOrUpcoming);
+
+        withoutActiveOrUpcoming.forEach((entry) => container.appendChild(entry.card));
+
+        if (withoutActiveOrUpcoming.length > 0 && withActiveOrUpcoming.length > 0) {
+          const divider = document.createElement('div');
+          divider.className = 'active-upcoming-divider';
+          container.appendChild(divider);
+          scrollTargetCard = withActiveOrUpcoming[0].card;
+        }
+
+        withActiveOrUpcoming.forEach((entry) => container.appendChild(entry.card));
+      } else {
+        renderedCardsForDay.forEach((entry) => container.appendChild(entry.card));
+      }
+    }
 
     if (renderedCardCountForDay === 0) {
       const noSpecialsLine = document.createElement('div');
@@ -181,6 +215,26 @@ function renderBarsWeek() {
   });
 
   requestAnimationFrame(() => {
+    const homeScreen = document.getElementById('home-screen');
+    if (homeScreen) {
+      if (scrollTargetCard) {
+        const cardRect = typeof scrollTargetCard.getBoundingClientRect === 'function'
+          ? scrollTargetCard.getBoundingClientRect()
+          : null;
+        const homeRect = typeof homeScreen.getBoundingClientRect === 'function'
+          ? homeScreen.getBoundingClientRect()
+          : null;
+        const currentScrollTop = Number(homeScreen.scrollTop || 0);
+        const fallbackTop = Number(scrollTargetCard.offsetTop || 0);
+        const top = cardRect && homeRect
+          ? (cardRect.top - homeRect.top + currentScrollTop)
+          : fallbackTop;
+        homeScreen.scrollTop = Math.max(0, top - SPECIALS_SCROLL_OFFSET_PX);
+      } else {
+        homeScreen.scrollTop = 0;
+      }
+    }
+
     container.style.opacity = 1;
     lucide.createIcons();
   });
