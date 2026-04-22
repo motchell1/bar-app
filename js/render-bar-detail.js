@@ -57,7 +57,8 @@ function buildBarDetailPayloadFromStartup(barId) {
       bar_id: Number(normalizedBarId),
       name: barData.name,
       neighborhood: barData.neighborhood,
-      image_url: barData.image_url
+      image_url: barData.image_url,
+      description: barData.description
     },
     general_data: generalData,
     open_hours: startupPayload?.open_hours?.[normalizedBarId] || {},
@@ -272,6 +273,22 @@ function updateBarWebsiteSection(selectedBar) {
   link.textContent = normalizedUrl;
 }
 
+function updateBarDescriptionSection(selectedBar) {
+  const section = document.getElementById('detail-description-section');
+  const descriptionEl = document.getElementById('detail-description');
+  if (!section || !descriptionEl) return;
+
+  const description = String(selectedBar?.description || '').trim();
+  if (!description) {
+    section.style.display = 'none';
+    descriptionEl.textContent = '';
+    return;
+  }
+
+  section.style.display = '';
+  descriptionEl.textContent = description;
+}
+
 function renderBarDetailContent(selectedBar, detailPayload) {
   const todayKey = detailPayload?.general_data?.current_day || startupPayload?.general_data?.current_day || getDayKeyFromName(DAYS_FULL[new Date().getDay()]);
   const orderedDays = getOrderedDaysForDetail(todayKey);
@@ -428,6 +445,7 @@ async function showDetail(barOrId, previousScreen = currentTab) {
   resetBarReportForm();
   updateBarLocationSection(selectedBar);
   updateBarWebsiteSection(selectedBar);
+  updateBarDescriptionSection(selectedBar);
 
   const startupDetailPayload = buildBarDetailPayloadFromStartup(selectedBar.bar_id);
   if (startupDetailPayload) {
@@ -456,6 +474,10 @@ async function showDetail(barOrId, previousScreen = currentTab) {
     updateBarWebsiteSection({
       ...selectedBar,
       website_url: detailPayload?.bar?.website_url || selectedBar?.website_url
+    });
+    updateBarDescriptionSection({
+      ...selectedBar,
+      description: detailPayload?.bar?.description || selectedBar?.description
     });
     renderBarDetailContent(selectedBar, detailPayload);
   } catch (err) {

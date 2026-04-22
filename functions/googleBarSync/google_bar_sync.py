@@ -31,6 +31,7 @@ GOOGLE_FIELD_MASK = ','.join([
     'places.rating',
     'places.priceLevel',
     'places.websiteUri',
+    'places.editorialSummary',
     'places.photos',
     'nextPageToken'
 ])
@@ -236,6 +237,7 @@ def build_candidate_bar(place: Dict, neighborhood_name: str) -> Optional[Dict]:
         return None
 
     opening_hours = place.get('currentOpeningHours') or {}
+    editorial_summary = place.get('editorialSummary') or {}
     photos = place.get('photos') or []
     photo_name = (photos[0] or {}).get('name') if photos else None
 
@@ -246,6 +248,7 @@ def build_candidate_bar(place: Dict, neighborhood_name: str) -> Optional[Dict]:
         'latitude': lat,
         'longitude': lng,
         'website_url': place.get('websiteUri'),
+        'description': (editorial_summary.get('text') or '').strip() or None,
         'neighborhood': neighborhood_name,
         'business_status': place.get('businessStatus'),
         'hours': format_open_hours(opening_hours.get('periods', [])),

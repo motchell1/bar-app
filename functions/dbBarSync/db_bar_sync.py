@@ -67,8 +67,8 @@ def insert_new_bars(cursor, new_bars: List[Dict]) -> Dict[str, int]:
     for bar in new_bars:
         cursor.execute(
             """
-            INSERT INTO bar (name, google_place_id, address, neighborhood, latitude, longitude, website_url, image_file, is_active)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            INSERT INTO bar (name, google_place_id, address, neighborhood, latitude, longitude, website_url, description, image_file, is_active)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """,
             (
                 bar['name'],
@@ -78,6 +78,7 @@ def insert_new_bars(cursor, new_bars: List[Dict]) -> Dict[str, int]:
                 bar.get('latitude'),
                 bar.get('longitude'),
                 bar.get('website_url'),
+                bar.get('description'),
                 bar.get('image_file'),
                 'Y' if is_bar_operational(bar) else 'N',
             ),
@@ -100,6 +101,7 @@ def upsert_open_hours(cursor, bars: List[Dict]) -> int:
             SET is_active = %s,
                 latitude = %s,
                 longitude = %s,
+                description = %s,
                 update_date = NOW()
             WHERE bar_id = %s
             """,
@@ -107,6 +109,7 @@ def upsert_open_hours(cursor, bars: List[Dict]) -> int:
                 'Y' if is_bar_operational(bar) else 'N',
                 bar.get('latitude'),
                 bar.get('longitude'),
+                bar.get('description'),
                 bar_id,
             ),
         )
