@@ -6,7 +6,6 @@ from datetime import datetime, time, timedelta
 from typing import Dict, List
 from urllib.parse import urlparse
 
-import boto3
 import pymysql
 
 LOGGER = logging.getLogger()
@@ -19,9 +18,6 @@ DB_NAME = os.environ['DB_NAME']
 WEB_SCRAPE_AUTO_APPROVAL_THRESHOLD = .5
 WEB_AI_SEARCH_AUTO_APPROVAL_THRESHOLD = .8
 IGNORE_MANUAL_SPECIALS_ON_PUBLISH = 'Y'
-ALERT_SNS_TOPIC_ARN = os.environ.get('ALERT_SNS_TOPIC_ARN', '').strip()
-AWS_REGION = os.environ.get('AWS_REGION', '').strip() or None
-SNS_CLIENT = boto3.client('sns', region_name=AWS_REGION) if ALERT_SNS_TOPIC_ARN else None
 
 
 def get_connection():
@@ -247,48 +243,6 @@ def get_duplicate_active_websites(cursor) -> Dict[str, List[Dict]]:
         'duplicate_group_count': len(duplicate_groups),
         'duplicate_groups': duplicate_groups,
     }
-
-
-def send_duplicate_websites_alert(result: Dict) -> Dict[str, object]:
-    if not ALERT_SNS_TOPIC_ARN:
-        LOGGER.warning('ALERT_SNS_TOPIC_ARN is not configured; skipping duplicate website email alert')
-        return {'email_sent': False, 'email_reason': 'ALERT_SNS_TOPIC_ARN_NOT_CONFIGURED'}
-
-    duplicate_groups = result.get('duplicate_groups', [])
-    if not duplicate_groups:
-        LOGGER.info('detect_duplicate_websites: no duplicate groups found; skipping email alert')
-        return {'email_sent': False, 'email_reason': 'NO_DUPLICATES_FOUND'}
-
-    subject = f"[Bar App] Duplicate website domains detected ({len(duplicate_groups)} groups)"
-    message_lines = [
-        'Duplicate website-domain groups were detected for active bars in the same neighborhood with active specials.',
-        '',
-        f"duplicate_group_count: {result.get('duplicate_group_count', 0)}",
-        '',
-    ]
-
-    for group in duplicate_groups:
-        message_lines.append(
-            f"- Domain: {group.get('domain')} | Neighborhood: {group.get('neighborhood')} | Bars: {group.get('active_bar_count')}"
-        )
-        for bar in group.get('bars', []):
-            message_lines.append(
-                f"  • bar_id={bar.get('bar_id')} | bar_name={bar.get('bar_name')} | website_url={bar.get('website_url')}"
-            )
-        message_lines.append('')
-
-    LOGGER.info(
-        'detect_duplicate_websites: publishing SNS alert topic=%s duplicate_groups=%s',
-        ALERT_SNS_TOPIC_ARN,
-        len(duplicate_groups),
-    )
-    SNS_CLIENT.publish(
-        TopicArn=ALERT_SNS_TOPIC_ARN,
-        Subject=subject[:100],
-        Message='\n'.join(message_lines).strip(),
-    )
-    LOGGER.info('detect_duplicate_websites: SNS alert publish succeeded')
-    return {'email_sent': True, 'email_reason': 'SENT'}
 
 
 def _parse_confidence(value) -> float:
@@ -684,7 +638,6 @@ def lambda_handler(event, context):
                     mode,
                     result.get('duplicate_group_count', 0),
                 )
-                result.update(send_duplicate_websites_alert(result))
                 conn.commit()
         LOGGER.info('dbBarSync request_id=%s mode=%s completed result=%s', request_id, mode, result)
         return {
