@@ -4,6 +4,7 @@ import os
 from difflib import SequenceMatcher
 from datetime import datetime, time, timedelta
 from typing import Dict, List
+from urllib.parse import urlparse
 
 import pymysql
 
@@ -159,6 +160,89 @@ def get_bars_by_neighborhood(cursor, neighborhood: str) -> Dict[str, List[Dict]]
         (neighborhood,),
     )
     return {'bars': cursor.fetchall()}
+
+
+def get_duplicate_active_websites(cursor) -> Dict[str, List[Dict]]:
+    LOGGER.info('detect_duplicate_websites: querying active bars with active specials')
+    cursor.execute(
+        """
+        SELECT
+            bar_id,
+            name AS bar_name,
+            neighborhood,
+            website_url
+        FROM bar
+        WHERE is_active = 'Y'
+          AND website_url IS NOT NULL
+          AND TRIM(website_url) <> ''
+          AND EXISTS (
+              SELECT 1
+              FROM special
+              WHERE special.bar_id = bar.bar_id
+                AND special.is_active = 'Y'
+          )
+        """
+    )
+    rows = cursor.fetchall()
+    LOGGER.info('detect_duplicate_websites: fetched %s candidate bars', len(rows))
+
+    def _extract_domain(website_url: str) -> str:
+        value = (website_url or '').strip().lower()
+        if not value:
+            return ''
+        if '://' not in value:
+            value = f'https://{value}'
+        parsed = urlparse(value)
+        host = (parsed.netloc or '').split('@')[-1].split(':')[0].strip('.')
+        if host.startswith('www.'):
+            host = host[4:]
+        return host
+
+    domain_groups: Dict[str, Dict[str, List[Dict]]] = {}
+    for row in rows:
+        domain = _extract_domain(row.get('website_url'))
+        neighborhood = (row.get('neighborhood') or '').strip()
+        bar_name = (row.get('bar_name') or '').strip()
+        website_url = (row.get('website_url') or '').strip()
+        if not domain:
+            continue
+        if not neighborhood:
+            continue
+        domain_groups.setdefault(domain, {}).setdefault(neighborhood, []).append(
+            {
+                'bar_id': int(row['bar_id']),
+                'bar_name': bar_name,
+                'website_url': website_url,
+            }
+        )
+
+    duplicate_groups = []
+    for domain, neighborhood_map in sorted(domain_groups.items(), key=lambda item: item[0]):
+        for neighborhood, bars in sorted(neighborhood_map.items(), key=lambda item: item[0]):
+            if len(bars) < 2:
+                continue
+            sorted_bars = sorted(
+                bars,
+                key=lambda bar: (
+                    bar.get('bar_name', '').lower(),
+                    bar.get('bar_id', 0),
+                ),
+            )
+            sorted_bar_ids = [bar['bar_id'] for bar in sorted_bars]
+            duplicate_groups.append(
+                {
+                    'domain': domain,
+                    'neighborhood': neighborhood,
+                    'active_bar_count': len(sorted_bar_ids),
+                    'bar_ids': sorted_bar_ids,
+                    'bars': sorted_bars,
+                }
+            )
+
+    return {
+        'duplicate_group_count': len(duplicate_groups),
+        'duplicate_groups': duplicate_groups,
+    }
 
 
 def _parse_confidence(value) -> float:
@@ -512,11 +596,13 @@ def publish_candidate_specials(cursor, bar_id: int, run_id: int, auto_publish: s
 def lambda_handler(event, context):
     event = event or {}
     mode = event.get('mode')
-    if mode not in {'determine_if_bar_existing', 'apply_bar_upsert', 'get_bars_by_neighborhood'}:
+    request_id = getattr(context, 'aws_request_id', 'unknown')
+    LOGGER.info('dbBarSync request_id=%s mode=%s received', request_id, mode)
+    if mode not in {'determine_if_bar_existing', 'apply_bar_upsert', 'get_bars_by_neighborhood', 'detect_duplicate_websites'}:
         return {
             'statusCode': 400,
             'body': json.dumps({
-                'error': 'mode must be one of determine_if_bar_existing, apply_bar_upsert, get_bars_by_neighborhood'
+                'error': 'mode must be one of determine_if_bar_existing, apply_bar_upsert, get_bars_by_neighborhood, detect_duplicate_websites'
             }),
         }
 
@@ -524,18 +610,36 @@ def lambda_handler(event, context):
     try:
         with conn.cursor() as cursor:
             if mode == 'determine_if_bar_existing':
+                LOGGER.info('dbBarSync request_id=%s mode=%s starting categorize_bars', request_id, mode)
                 result = categorize_bars(cursor, event.get('bars', []))
                 conn.commit()
             elif mode == 'apply_bar_upsert':
+                LOGGER.info('dbBarSync request_id=%s mode=%s starting apply_changes', request_id, mode)
                 result = apply_changes(cursor, event.get('new_bars', []), event.get('existing_bars', []))
                 conn.commit()
             elif mode == 'get_bars_by_neighborhood':
                 neighborhood = event.get('neighborhood')
                 if not neighborhood:
                     raise ValueError('neighborhood is required for get_bars_by_neighborhood')
+                LOGGER.info(
+                    'dbBarSync request_id=%s mode=%s starting get_bars_by_neighborhood neighborhood=%s',
+                    request_id,
+                    mode,
+                    neighborhood,
+                )
                 result = get_bars_by_neighborhood(cursor, neighborhood)
                 conn.commit()
-        LOGGER.info('dbBarSync %s result=%s', mode, result)
+            elif mode == 'detect_duplicate_websites':
+                LOGGER.info('dbBarSync request_id=%s mode=%s starting duplicate detection', request_id, mode)
+                result = get_duplicate_active_websites(cursor)
+                LOGGER.info(
+                    'dbBarSync request_id=%s mode=%s duplicate_group_count=%s',
+                    request_id,
+                    mode,
+                    result.get('duplicate_group_count', 0),
+                )
+                conn.commit()
+        LOGGER.info('dbBarSync request_id=%s mode=%s completed result=%s', request_id, mode, result)
         return {
             'statusCode': 200,
             'body': json.dumps(result),
