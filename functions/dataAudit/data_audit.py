@@ -10,10 +10,9 @@ LOGGER.setLevel(logging.INFO)
 
 DB_BAR_SYNC_LAMBDA_NAME = os.environ['DB_BAR_SYNC_LAMBDA_NAME']
 ALERT_SNS_TOPIC_ARN = os.environ.get('ALERT_SNS_TOPIC_ARN', '').strip()
-AWS_REGION = os.environ.get('AWS_REGION', '').strip() or None
 
-LAMBDA_CLIENT = boto3.client('lambda', region_name=AWS_REGION)
-SNS_CLIENT = boto3.client('sns', region_name=AWS_REGION) if ALERT_SNS_TOPIC_ARN else None
+LAMBDA_CLIENT = boto3.client('lambda')
+SNS_CLIENT = boto3.client('sns') if ALERT_SNS_TOPIC_ARN else None
 
 
 def invoke_db_bar_sync(payload: Dict) -> Dict:

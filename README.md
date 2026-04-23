@@ -45,9 +45,6 @@ The folders inside `functions/` each correspond to an AWS Lambda function.
   - `DB_BAR_SYNC_LAMBDA_NAME`
   - `ALERT_SNS_TOPIC_ARN` (SNS topic ARN with subscribed email recipients)
 
-  Optional environment variables:
-  - `AWS_REGION` (used for Lambda/SNS clients)
-
 
 - **`dbSpecialSync`**  
   Handles special-candidate persistence and publish flows. `insert_special_candidate` creates a `special_candidate_run` and inserts candidate rows, and `publish_special_candidate_run` applies approved candidates to active `special` rows.
