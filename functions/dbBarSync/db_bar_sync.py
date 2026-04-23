@@ -4,7 +4,9 @@ import os
 from difflib import SequenceMatcher
 from datetime import datetime, time, timedelta
 from typing import Dict, List
+from urllib.parse import urlparse
 
+import boto3
 import pymysql
 
 LOGGER = logging.getLogger()
@@ -17,6 +19,9 @@ DB_NAME = os.environ['DB_NAME']
 WEB_SCRAPE_AUTO_APPROVAL_THRESHOLD = .5
 WEB_AI_SEARCH_AUTO_APPROVAL_THRESHOLD = .8
 IGNORE_MANUAL_SPECIALS_ON_PUBLISH = 'Y'
+ALERT_SNS_TOPIC_ARN = os.environ.get('ALERT_SNS_TOPIC_ARN', '').strip()
+AWS_REGION = os.environ.get('AWS_REGION', '').strip() or None
+SNS_CLIENT = boto3.client('sns', region_name=AWS_REGION) if ALERT_SNS_TOPIC_ARN else None
 
 
 def get_connection():
@@ -159,6 +164,122 @@ def get_bars_by_neighborhood(cursor, neighborhood: str) -> Dict[str, List[Dict]]
         (neighborhood,),
     )
     return {'bars': cursor.fetchall()}
+
+
+def get_duplicate_active_websites(cursor) -> Dict[str, List[Dict]]:
+    cursor.execute(
+        """
+        SELECT
+            bar_id,
+            name AS bar_name,
+            neighborhood,
+            website_url
+        FROM bar
+        WHERE is_active = 'Y'
+          AND website_url IS NOT NULL
+          AND TRIM(website_url) <> ''
+          AND EXISTS (
+              SELECT 1
+              FROM special
+              WHERE special.bar_id = bar.bar_id
+                AND special.is_active = 'Y'
+          )
+        """
+    )
+    rows = cursor.fetchall()
+
+    def _extract_domain(website_url: str) -> str:
+        value = (website_url or '').strip().lower()
+        if not value:
+            return ''
+        if '://' not in value:
+            value = f'https://{value}'
+        parsed = urlparse(value)
+        host = (parsed.netloc or '').split('@')[-1].split(':')[0].strip('.')
+        if host.startswith('www.'):
+            host = host[4:]
+        return host
+
+    domain_groups: Dict[str, Dict[str, List[Dict]]] = {}
+    for row in rows:
+        domain = _extract_domain(row.get('website_url'))
+        neighborhood = (row.get('neighborhood') or '').strip()
+        bar_name = (row.get('bar_name') or '').strip()
+        website_url = (row.get('website_url') or '').strip()
+        if not domain:
+            continue
+        if not neighborhood:
+            continue
+        domain_groups.setdefault(domain, {}).setdefault(neighborhood, []).append(
+            {
+                'bar_id': int(row['bar_id']),
+                'bar_name': bar_name,
+                'website_url': website_url,
+            }
+        )
+
+    duplicate_groups = []
+    for domain, neighborhood_map in sorted(domain_groups.items(), key=lambda item: item[0]):
+        for neighborhood, bars in sorted(neighborhood_map.items(), key=lambda item: item[0]):
+            if len(bars) < 2:
+                continue
+            sorted_bars = sorted(
+                bars,
+                key=lambda bar: (
+                    bar.get('bar_name', '').lower(),
+                    bar.get('bar_id', 0),
+                ),
+            )
+            sorted_bar_ids = [bar['bar_id'] for bar in sorted_bars]
+            duplicate_groups.append(
+                {
+                    'domain': domain,
+                    'neighborhood': neighborhood,
+                    'active_bar_count': len(sorted_bar_ids),
+                    'bar_ids': sorted_bar_ids,
+                    'bars': sorted_bars,
+                }
+            )
+
+    return {
+        'duplicate_group_count': len(duplicate_groups),
+        'duplicate_groups': duplicate_groups,
+    }
+
+
+def send_duplicate_websites_alert(result: Dict) -> Dict[str, object]:
+    if not ALERT_SNS_TOPIC_ARN:
+        LOGGER.warning('ALERT_SNS_TOPIC_ARN is not configured; skipping duplicate website email alert')
+        return {'email_sent': False, 'email_reason': 'ALERT_SNS_TOPIC_ARN_NOT_CONFIGURED'}
+
+    duplicate_groups = result.get('duplicate_groups', [])
+    if not duplicate_groups:
+        return {'email_sent': False, 'email_reason': 'NO_DUPLICATES_FOUND'}
+
+    subject = f"[Bar App] Duplicate website domains detected ({len(duplicate_groups)} groups)"
+    message_lines = [
+        'Duplicate website-domain groups were detected for active bars in the same neighborhood with active specials.',
+        '',
+        f"duplicate_group_count: {result.get('duplicate_group_count', 0)}",
+        '',
+    ]
+
+    for group in duplicate_groups:
+        message_lines.append(
+            f"- Domain: {group.get('domain')} | Neighborhood: {group.get('neighborhood')} | Bars: {group.get('active_bar_count')}"
+        )
+        for bar in group.get('bars', []):
+            message_lines.append(
+                f"  • bar_id={bar.get('bar_id')} | bar_name={bar.get('bar_name')} | website_url={bar.get('website_url')}"
+            )
+        message_lines.append('')
+
+    SNS_CLIENT.publish(
+        TopicArn=ALERT_SNS_TOPIC_ARN,
+        Subject=subject[:100],
+        Message='\n'.join(message_lines).strip(),
+    )
+    return {'email_sent': True, 'email_reason': 'SENT'}
 
 
 def _parse_confidence(value) -> float:
@@ -512,11 +633,11 @@ def publish_candidate_specials(cursor, bar_id: int, run_id: int, auto_publish: s
 def lambda_handler(event, context):
     event = event or {}
     mode = event.get('mode')
-    if mode not in {'determine_if_bar_existing', 'apply_bar_upsert', 'get_bars_by_neighborhood'}:
+    if mode not in {'determine_if_bar_existing', 'apply_bar_upsert', 'get_bars_by_neighborhood', 'detect_duplicate_websites'}:
         return {
             'statusCode': 400,
             'body': json.dumps({
-                'error': 'mode must be one of determine_if_bar_existing, apply_bar_upsert, get_bars_by_neighborhood'
+                'error': 'mode must be one of determine_if_bar_existing, apply_bar_upsert, get_bars_by_neighborhood, detect_duplicate_websites'
             }),
         }
 
@@ -534,6 +655,10 @@ def lambda_handler(event, context):
                 if not neighborhood:
                     raise ValueError('neighborhood is required for get_bars_by_neighborhood')
                 result = get_bars_by_neighborhood(cursor, neighborhood)
+                conn.commit()
+            elif mode == 'detect_duplicate_websites':
+                result = get_duplicate_active_websites(cursor)
+                result.update(send_duplicate_websites_alert(result))
                 conn.commit()
         LOGGER.info('dbBarSync %s result=%s', mode, result)
         return {

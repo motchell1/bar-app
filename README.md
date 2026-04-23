@@ -28,13 +28,14 @@ The folders inside `functions/` each correspond to an AWS Lambda function.
   - `NEIGHBORHOODS_JSON_S3_KEY` (S3 object key in `S3_BUCKET_NAME`; used when no local file is found)
 
 - **`dbBarSync`**  
-  This Lambda is invoked only by `googleBarSync`. It handles bar-centric sync tasks. `determine_if_bar_existing` splits candidates into `new_bars` and `existing_bars` by `google_place_id`; `apply_bar_upsert` inserts new bars, upserts open-hours rows, and marks any bar whose Google `business_status` is not `OPERATIONAL` as inactive; `get_bars_by_neighborhood` returns bars for downstream jobs. It uses the same RDS connection variable pattern as the existing database Lambdas.
+  This Lambda is invoked only by `googleBarSync`. It handles bar-centric sync tasks. `determine_if_bar_existing` splits candidates into `new_bars` and `existing_bars` by `google_place_id`; `apply_bar_upsert` inserts new bars, upserts open-hours rows, and marks any bar whose Google `business_status` is not `OPERATIONAL` as inactive; `get_bars_by_neighborhood` returns bars for downstream jobs; `detect_duplicate_websites` returns duplicate website-domain groups among active bars only when the bars are in the same neighborhood and have at least one active special (for alerting workflows), including each matching bar's `bar_name` and full `website_url`; when duplicates are found and `ALERT_SNS_TOPIC_ARN` is configured, it also publishes an SNS message (email-capable via SNS email subscription).
 
   Required environment variables:
   - `RDS_HOST`
   - `DB_USER`
   - `DB_PASSWORD`
   - `DB_NAME`
+  - `ALERT_SNS_TOPIC_ARN` (optional; SNS topic ARN for duplicate-website email alerts)
   - `WEB_SCRAPE_AUTO_APPROVAL_THRESHOLD` (optional; defaults to `1.0`)
   - `WEB_AI_SEARCH_AUTO_APPROVAL_THRESHOLD` (optional; defaults to `1.0`)
 
