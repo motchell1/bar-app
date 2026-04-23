@@ -41,6 +41,13 @@ The folders inside `functions/` each correspond to an AWS Lambda function.
 - **`dataAudit`**  
   Invokes `dbBarSync` mode `detect_duplicate_websites`, then sends an SNS message when duplicate groups are returned. This lets audit scheduling/alerts run independently from DB sync logic.
 
+  Example payload:
+  ```json
+  {
+    "mode": "detect_duplicate_websites"
+  }
+  ```
+
   Required environment variables:
   - `DB_BAR_SYNC_LAMBDA_NAME`
   - `ALERT_SNS_TOPIC_ARN` (SNS topic ARN with subscribed email recipients)
