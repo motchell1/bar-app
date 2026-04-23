@@ -174,6 +174,12 @@ def get_duplicate_active_websites(cursor) -> Dict[str, List[Dict]]:
         WHERE is_active = 'Y'
           AND website_url IS NOT NULL
           AND TRIM(website_url) <> ''
+          AND EXISTS (
+              SELECT 1
+              FROM special
+              WHERE special.bar_id = bar.bar_id
+                AND special.is_active = 'Y'
+          )
         """
     )
     rows = cursor.fetchall()
