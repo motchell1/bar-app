@@ -16,6 +16,7 @@ OPENAI_MODEL = os.environ.get('OPENAI_MODEL', 'gpt-4.1-mini')
 OPENAI_RESPONSES_URL = 'https://api.openai.com/v1/responses'
 DB_BAR_SYNC_LAMBDA_NAME = os.environ.get('DB_BAR_SYNC_LAMBDA_NAME')
 DB_SPECIAL_SYNC_LAMBDA_NAME = os.environ.get('DB_SPECIAL_SYNC_LAMBDA_NAME')
+DATA_AUDIT_LAMBDA_NAME = os.environ.get('DATA_AUDIT_LAMBDA_NAME')
 MAX_LINKS_TO_VISIT = 3
 MAX_TEXT_CHARS_PER_PAGE = 20000
 KEYWORD_MATCH_CHAR_WINDOW_SIZE = int(os.environ.get('KEYWORD_MATCH_CHAR_WINDOW_SIZE', '220'))
@@ -227,6 +228,10 @@ def invoke_db_bar_sync(payload):
 
 def invoke_db_special_sync(payload):
     return _invoke_lambda(DB_SPECIAL_SYNC_LAMBDA_NAME, payload, 'DB_SPECIAL_SYNC_LAMBDA_NAME')
+
+
+def invoke_data_audit(payload):
+    return _invoke_lambda(DATA_AUDIT_LAMBDA_NAME, payload, 'DATA_AUDIT_LAMBDA_NAME')
 
 
 def fetch_html(url):
@@ -1001,6 +1006,15 @@ def lambda_handler(event, context):
             len(total_candidates),
             inserted_count
         )
+        data_audit_invoked = False
+        data_audit_error = None
+        try:
+            invoke_data_audit({'mode': 'pending_special_candidates'})
+            data_audit_invoked = True
+        except Exception as audit_exc:
+            data_audit_error = str(audit_exc)
+            LOGGER.exception('Failed to invoke dataAudit pending_special_candidates mode')
+
         return {
             'statusCode': 200,
             'body': json.dumps({
@@ -1012,7 +1026,9 @@ def lambda_handler(event, context):
                 'website_crawl_specials': crawl_specials_count,
                 'web_ai_search_specials': web_ai_search_specials_count,
                 'candidate_runs_created': runs_created,
-                'candidate_runs_auto_published': auto_published_runs
+                'candidate_runs_auto_published': auto_published_runs,
+                'data_audit_invoked': data_audit_invoked,
+                'data_audit_error': data_audit_error,
             })
         }
     except ValueError as exc:
