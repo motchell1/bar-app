@@ -83,26 +83,19 @@ def publish_duplicate_alert(result: Dict) -> Dict[str, object]:
 
 def publish_duplicate_specials_alert(result: Dict) -> Dict[str, object]:
     same_description_count = int(result.get('same_description_different_times_count', 0) or 0)
-    same_time_count = int(result.get('same_time_different_descriptions_count', 0) or 0)
-    total_duplicate_groups = same_description_count + same_time_count
-    if total_duplicate_groups == 0:
+    if same_description_count == 0:
         LOGGER.info('dataAudit: no duplicate-special groups found; skipping alert publish')
         return {'email_sent': False, 'email_reason': 'NO_DUPLICATES_FOUND'}
 
-    subject = f"[Bar App] Duplicate specials detected ({total_duplicate_groups} groups)"
+    subject = f"[Bar App] Duplicate specials detected ({same_description_count} groups)"
     message_lines = [
         'Duplicate active-special groups were detected.',
         '',
         f'same_description_different_times_count: {same_description_count}',
-        f'same_time_different_descriptions_count: {same_time_count}',
         '',
         'Groups with same bar/day/type/description but different times:',
     ]
     message_lines.extend(_format_same_description_different_times(result.get('same_description_different_times', [])))
-
-    message_lines.append('')
-    message_lines.append('Groups with same bar/day/type/time window but different descriptions:')
-    message_lines.extend(_format_same_time_different_descriptions(result.get('same_time_different_descriptions', [])))
 
     text_message = '\n'.join(message_lines).strip()
     return send_alert_email(subject=subject, text_message=text_message)
@@ -132,37 +125,8 @@ def _format_same_description_different_times(groups):
             for special in group.get('specials', []):
                 lines.append(
                     f"    - special_id={special.get('special_id')} | all_day={special.get('all_day')} | "
-                    f"start_time={special.get('start_time')} | end_time={special.get('end_time')}"
-                )
-        lines.append('')
-    return lines
-
-
-def _format_same_time_different_descriptions(groups):
-    if not groups:
-        return ['(none)']
-    grouped_by_bar = {}
-    for group in groups:
-        bar_key = (
-            group.get('bar_id'),
-            group.get('bar_name'),
-            group.get('neighborhood'),
-        )
-        grouped_by_bar.setdefault(bar_key, []).append(group)
-
-    lines = []
-    for (bar_id, bar_name, neighborhood), bar_groups in grouped_by_bar.items():
-        lines.append(
-            f"- Bar: bar_id={bar_id} | bar_name={bar_name} | neighborhood={neighborhood}"
-        )
-        for group in bar_groups:
-            lines.append(
-                f"  • day={group.get('day_of_week')} | type={group.get('type')} | all_day={group.get('all_day')} | "
-                f"start_time={group.get('start_time')} | end_time={group.get('end_time')}"
-            )
-            for special in group.get('specials', []):
-                lines.append(
-                    f"    - special_id={special.get('special_id')} | description={special.get('description')}"
+                    f"start_time={special.get('start_time')} | end_time={special.get('end_time')} | "
+                    f"fetch_method={special.get('fetch_method')} | source={special.get('source')}"
                 )
         lines.append('')
     return lines

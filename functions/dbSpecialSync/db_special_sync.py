@@ -563,9 +563,17 @@ def detect_duplicate_specials(cursor, bar_id: int = None) -> Dict[str, object]:
             s.description,
             s.all_day,
             s.start_time,
-            s.end_time
+            s.end_time,
+            sc.fetch_method,
+            sc.source
         FROM special s
         JOIN bar b ON b.bar_id = s.bar_id
+        LEFT JOIN special_candidate sc
+            ON sc.special_candidate_id = (
+                SELECT MAX(sc2.special_candidate_id)
+                FROM special_candidate sc2
+                WHERE sc2.approved_special_id = s.special_id
+            )
         WHERE {where_clause}
         ORDER BY s.bar_id, s.day_of_week, s.type, s.special_id
         """,
@@ -608,6 +616,8 @@ def detect_duplicate_specials(cursor, bar_id: int = None) -> Dict[str, object]:
                 'all_day': row.get('all_day'),
                 'start_time': row.get('start_time'),
                 'end_time': row.get('end_time'),
+                'fetch_method': row.get('fetch_method'),
+                'source': row.get('source'),
             }
         )
         group['_time_windows'].add((row.get('all_day'), row.get('start_time'), row.get('end_time')))
@@ -621,55 +631,14 @@ def detect_duplicate_specials(cursor, bar_id: int = None) -> Dict[str, object]:
         del group['_time_windows']
         same_description_groups.append(group)
 
-    same_time_map = {}
-    for row in active_special_rows:
-        key = (
-            row.get('bar_id'),
-            row.get('bar_name'),
-            row.get('neighborhood'),
-            row.get('day_of_week'),
-            row.get('type'),
-            row.get('all_day'),
-            row.get('start_time'),
-            row.get('end_time'),
-        )
-        group = same_time_map.setdefault(
-            key,
-            {
-                'bar_id': row.get('bar_id'),
-                'bar_name': row.get('bar_name'),
-                'neighborhood': row.get('neighborhood'),
-                'day_of_week': row.get('day_of_week'),
-                'type': row.get('type'),
-                'all_day': row.get('all_day'),
-                'start_time': row.get('start_time'),
-                'end_time': row.get('end_time'),
-                'specials': [],
-                '_descriptions': set(),
-            },
-        )
-        description = row.get('description')
-        group['specials'].append({'special_id': row.get('special_id'), 'description': description})
-        group['_descriptions'].add(description)
-
-    same_time_groups = []
-    for group in same_time_map.values():
-        if len(group['_descriptions']) <= 1:
-            continue
-        group['special_count'] = len(group['specials'])
-        group['distinct_descriptions'] = len(group['_descriptions'])
-        del group['_descriptions']
-        same_time_groups.append(group)
-
     same_description_groups.sort(key=lambda row: (row.get('bar_id'), row.get('day_of_week'), row.get('type'), row.get('description') or ''))
-    same_time_groups.sort(key=lambda row: (row.get('bar_id'), row.get('day_of_week'), row.get('type'), row.get('start_time') or '', row.get('end_time') or ''))
 
     return {
         'bar_id_filter': bar_id,
         'same_description_different_times': same_description_groups,
-        'same_time_different_descriptions': same_time_groups,
+        'same_time_different_descriptions': [],
         'same_description_different_times_count': len(same_description_groups),
-        'same_time_different_descriptions_count': len(same_time_groups),
+        'same_time_different_descriptions_count': 0,
     }
 
 
