@@ -11,12 +11,9 @@ LOGGER.setLevel(logging.INFO)
 DB_BAR_SYNC_LAMBDA_NAME = os.environ['DB_BAR_SYNC_LAMBDA_NAME']
 DB_SPECIAL_SYNC_LAMBDA_NAME = os.environ['DB_SPECIAL_SYNC_LAMBDA_NAME']
 ALERT_SNS_TOPIC_ARN = os.environ.get('ALERT_SNS_TOPIC_ARN', '').strip()
-ALERT_EMAIL_FROM = os.environ.get('ALERT_EMAIL_FROM', '').strip()
-ALERT_EMAIL_TO = [address.strip() for address in os.environ.get('ALERT_EMAIL_TO', '').split(',') if address.strip()]
 
 LAMBDA_CLIENT = boto3.client('lambda')
 SNS_CLIENT = boto3.client('sns') if ALERT_SNS_TOPIC_ARN else None
-SES_CLIENT = boto3.client('ses') if ALERT_EMAIL_FROM and ALERT_EMAIL_TO else None
 
 
 def invoke_db_bar_sync(payload: Dict) -> Dict:
@@ -81,8 +78,7 @@ def publish_duplicate_alert(result: Dict) -> Dict[str, object]:
         message_lines.append('')
 
     text_message = '\n'.join(message_lines).strip()
-    send_result = send_alert_email(subject=subject, text_message=text_message)
-    return send_result
+    return send_alert_email(subject=subject, text_message=text_message)
 
 
 def publish_duplicate_specials_alert(result: Dict) -> Dict[str, object]:
@@ -102,179 +98,69 @@ def publish_duplicate_specials_alert(result: Dict) -> Dict[str, object]:
         '',
         'Groups with same bar/day/type/description but different times:',
     ]
-    message_lines.extend(
-        _build_plaintext_table(
-            result.get('same_description_different_times', []),
-            [
-                ('bar_id', 'Bar'),
-                ('day_of_week', 'Day'),
-                ('type', 'Type'),
-                ('description', 'Description'),
-                ('special_count', 'Specials'),
-                ('distinct_time_windows', 'Distinct Times'),
-            ],
-        )
-    )
+    message_lines.extend(_format_same_description_different_times(result.get('same_description_different_times', [])))
 
     message_lines.append('')
     message_lines.append('Groups with same bar/day/type/time window but different descriptions:')
-    message_lines.extend(
-        _build_plaintext_table(
-            result.get('same_time_different_descriptions', []),
-            [
-                ('bar_id', 'Bar'),
-                ('day_of_week', 'Day'),
-                ('type', 'Type'),
-                ('all_day', 'All Day'),
-                ('start_time', 'Start'),
-                ('end_time', 'End'),
-                ('special_count', 'Specials'),
-                ('distinct_descriptions', 'Distinct Descriptions'),
-            ],
-        )
-    )
+    message_lines.extend(_format_same_time_different_descriptions(result.get('same_time_different_descriptions', [])))
 
     text_message = '\n'.join(message_lines).strip()
-    html_message = _build_duplicate_specials_html_email(
-        same_description_count=same_description_count,
-        same_time_count=same_time_count,
-        same_description_rows=result.get('same_description_different_times', []),
-        same_time_rows=result.get('same_time_different_descriptions', []),
-    )
-    return send_alert_email(subject=subject, text_message=text_message, html_message=html_message)
+    return send_alert_email(subject=subject, text_message=text_message)
 
 
-def _build_plaintext_table(rows, columns, max_cell_len: int = 40):
-    if not rows:
+def _format_same_description_different_times(groups):
+    if not groups:
         return ['(none)']
-
-    headers = [label for _, label in columns]
-    widths = [len(header) for header in headers]
-
-    normalized_rows = []
-    for row in rows:
-        values = []
-        for index, (key, _) in enumerate(columns):
-            value = str(row.get(key, '') if row.get(key, '') is not None else '')
-            if len(value) > max_cell_len:
-                value = f"{value[: max_cell_len - 1]}…"
-            widths[index] = min(max(widths[index], len(value)), max_cell_len)
-            values.append(value)
-        normalized_rows.append(values)
-
-    def _format_line(values):
-        return ' | '.join(value.ljust(widths[index]) for index, value in enumerate(values))
-
-    separator = '-+-'.join('-' * width for width in widths)
-    lines = [_format_line(headers), separator]
-    lines.extend(_format_line(values) for values in normalized_rows)
+    lines = []
+    for group in groups:
+        lines.append(
+            f"- Bar: bar_id={group.get('bar_id')} | bar_name={group.get('bar_name')} | neighborhood={group.get('neighborhood')}"
+        )
+        lines.append(
+            f"  • day={group.get('day_of_week')} | type={group.get('type')} | description={group.get('description')}"
+        )
+        for special in group.get('specials', []):
+            lines.append(
+                f"    - special_id={special.get('special_id')} | all_day={special.get('all_day')} | "
+                f"start_time={special.get('start_time')} | end_time={special.get('end_time')}"
+            )
+        lines.append('')
     return lines
 
 
-def _escape_html(value) -> str:
-    return (
-        str(value)
-        .replace('&', '&amp;')
-        .replace('<', '&lt;')
-        .replace('>', '&gt;')
-        .replace('"', '&quot;')
-        .replace("'", '&#39;')
-    )
-
-
-def _build_html_table(rows, columns):
-    header_cells = ''.join(f"<th style='border:1px solid #ddd;padding:8px;text-align:left;background:#f5f5f5'>{_escape_html(label)}</th>" for _, label in columns)
-    if not rows:
-        body_rows = f"<tr><td colspan='{len(columns)}' style='border:1px solid #ddd;padding:8px;color:#666'>(none)</td></tr>"
-    else:
-        rendered_rows = []
-        for row in rows:
-            cells = ''.join(
-                f"<td style='border:1px solid #ddd;padding:8px;vertical-align:top'>{_escape_html(row.get(key, '') if row.get(key, '') is not None else '')}</td>"
-                for key, _ in columns
+def _format_same_time_different_descriptions(groups):
+    if not groups:
+        return ['(none)']
+    lines = []
+    for group in groups:
+        lines.append(
+            f"- Bar: bar_id={group.get('bar_id')} | bar_name={group.get('bar_name')} | neighborhood={group.get('neighborhood')}"
+        )
+        lines.append(
+            f"  • day={group.get('day_of_week')} | type={group.get('type')} | all_day={group.get('all_day')} | "
+            f"start_time={group.get('start_time')} | end_time={group.get('end_time')}"
+        )
+        for special in group.get('specials', []):
+            lines.append(
+                f"    - special_id={special.get('special_id')} | description={special.get('description')}"
             )
-            rendered_rows.append(f'<tr>{cells}</tr>')
-        body_rows = ''.join(rendered_rows)
-    return (
-        "<table style='border-collapse:collapse;width:100%;font-family:Arial,sans-serif;font-size:14px;margin:10px 0'>"
-        f"<thead><tr>{header_cells}</tr></thead>"
-        f"<tbody>{body_rows}</tbody>"
-        '</table>'
+        lines.append('')
+    return lines
+
+
+def send_alert_email(subject: str, text_message: str) -> Dict[str, object]:
+    if not SNS_CLIENT:
+        LOGGER.warning('dataAudit: ALERT_SNS_TOPIC_ARN is not configured; skipping alert publish')
+        return {'email_sent': False, 'email_reason': 'ALERT_SNS_TOPIC_ARN_NOT_CONFIGURED'}
+
+    LOGGER.info('dataAudit: sending alert through SNS topic=%s', ALERT_SNS_TOPIC_ARN)
+    SNS_CLIENT.publish(
+        TopicArn=ALERT_SNS_TOPIC_ARN,
+        Subject=subject[:100],
+        Message=text_message,
     )
-
-
-def _build_duplicate_specials_html_email(
-    same_description_count: int,
-    same_time_count: int,
-    same_description_rows,
-    same_time_rows,
-) -> str:
-    first_table = _build_html_table(
-        same_description_rows,
-        [
-            ('bar_id', 'Bar'),
-            ('day_of_week', 'Day'),
-            ('type', 'Type'),
-            ('description', 'Description'),
-            ('special_count', 'Specials'),
-            ('distinct_time_windows', 'Distinct Times'),
-        ],
-    )
-    second_table = _build_html_table(
-        same_time_rows,
-        [
-            ('bar_id', 'Bar'),
-            ('day_of_week', 'Day'),
-            ('type', 'Type'),
-            ('all_day', 'All Day'),
-            ('start_time', 'Start'),
-            ('end_time', 'End'),
-            ('special_count', 'Specials'),
-            ('distinct_descriptions', 'Distinct Descriptions'),
-        ],
-    )
-    return (
-        "<html><body style='font-family:Arial,sans-serif;color:#222'>"
-        '<h2>Duplicate active-special groups were detected</h2>'
-        f"<p><strong>same_description_different_times_count:</strong> {_escape_html(same_description_count)}<br>"
-        f"<strong>same_time_different_descriptions_count:</strong> {_escape_html(same_time_count)}</p>"
-        '<h3>Groups with same bar/day/type/description but different times</h3>'
-        f'{first_table}'
-        '<h3>Groups with same bar/day/type/time window but different descriptions</h3>'
-        f'{second_table}'
-        '</body></html>'
-    )
-
-
-def send_alert_email(subject: str, text_message: str, html_message: str = None) -> Dict[str, object]:
-    if SES_CLIENT:
-        LOGGER.info('dataAudit: sending alert through SES from=%s to=%s', ALERT_EMAIL_FROM, ALERT_EMAIL_TO)
-        body = {'Text': {'Data': text_message, 'Charset': 'UTF-8'}}
-        if html_message:
-            body['Html'] = {'Data': html_message, 'Charset': 'UTF-8'}
-        SES_CLIENT.send_email(
-            Source=ALERT_EMAIL_FROM,
-            Destination={'ToAddresses': ALERT_EMAIL_TO},
-            Message={
-                'Subject': {'Data': subject[:100], 'Charset': 'UTF-8'},
-                'Body': body,
-            },
-        )
-        LOGGER.info('dataAudit: SES email send succeeded')
-        return {'email_sent': True, 'email_reason': 'SENT_VIA_SES'}
-
-    if SNS_CLIENT:
-        LOGGER.info('dataAudit: sending alert through SNS topic=%s', ALERT_SNS_TOPIC_ARN)
-        SNS_CLIENT.publish(
-            TopicArn=ALERT_SNS_TOPIC_ARN,
-            Subject=subject[:100],
-            Message=text_message,
-        )
-        LOGGER.info('dataAudit: SNS publish succeeded')
-        return {'email_sent': True, 'email_reason': 'SENT_VIA_SNS'}
-
-    LOGGER.warning('dataAudit: no alert delivery channel configured (SES or SNS)')
-    return {'email_sent': False, 'email_reason': 'NO_ALERT_CHANNEL_CONFIGURED'}
+    LOGGER.info('dataAudit: SNS publish succeeded')
+    return {'email_sent': True, 'email_reason': 'SENT'}
 
 
 def lambda_handler(event, context):
