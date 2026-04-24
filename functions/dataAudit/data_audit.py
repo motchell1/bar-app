@@ -91,6 +91,54 @@ def publish_duplicate_alert(result: Dict) -> Dict[str, object]:
     return {'email_sent': True, 'email_reason': 'SENT'}
 
 
+def publish_duplicate_specials_alert(result: Dict) -> Dict[str, object]:
+    if not ALERT_SNS_TOPIC_ARN:
+        LOGGER.warning('dataAudit: ALERT_SNS_TOPIC_ARN is not configured; skipping duplicate-specials alert publish')
+        return {'email_sent': False, 'email_reason': 'ALERT_SNS_TOPIC_ARN_NOT_CONFIGURED'}
+
+    same_description_count = int(result.get('same_description_different_times_count', 0) or 0)
+    same_time_count = int(result.get('same_time_different_descriptions_count', 0) or 0)
+    total_duplicate_groups = same_description_count + same_time_count
+    if total_duplicate_groups == 0:
+        LOGGER.info('dataAudit: no duplicate-special groups found; skipping alert publish')
+        return {'email_sent': False, 'email_reason': 'NO_DUPLICATES_FOUND'}
+
+    subject = f"[Bar App] Duplicate specials detected ({total_duplicate_groups} groups)"
+    message_lines = [
+        'Duplicate active-special groups were detected.',
+        '',
+        f'same_description_different_times_count: {same_description_count}',
+        f'same_time_different_descriptions_count: {same_time_count}',
+        '',
+        'Groups with same bar/day/type/description but different times:',
+    ]
+
+    for row in result.get('same_description_different_times', []):
+        message_lines.append(
+            f"- bar_id={row.get('bar_id')} | day={row.get('day_of_week')} | type={row.get('type')} | "
+            f"description={row.get('description')} | specials={row.get('special_count')} | "
+            f"distinct_time_windows={row.get('distinct_time_windows')}"
+        )
+
+    message_lines.append('')
+    message_lines.append('Groups with same bar/day/type/time window but different descriptions:')
+    for row in result.get('same_time_different_descriptions', []):
+        message_lines.append(
+            f"- bar_id={row.get('bar_id')} | day={row.get('day_of_week')} | type={row.get('type')} | "
+            f"all_day={row.get('all_day')} | start={row.get('start_time')} | end={row.get('end_time')} | "
+            f"specials={row.get('special_count')} | distinct_descriptions={row.get('distinct_descriptions')}"
+        )
+
+    LOGGER.info('dataAudit: publishing duplicate-specials SNS alert topic=%s groups=%s', ALERT_SNS_TOPIC_ARN, total_duplicate_groups)
+    SNS_CLIENT.publish(
+        TopicArn=ALERT_SNS_TOPIC_ARN,
+        Subject=subject[:100],
+        Message='\n'.join(message_lines).strip(),
+    )
+    LOGGER.info('dataAudit: duplicate-specials SNS publish succeeded')
+    return {'email_sent': True, 'email_reason': 'SENT'}
+
+
 def lambda_handler(event, context):
     event = event or {}
     request_id = getattr(context, 'aws_request_id', 'unknown')
@@ -117,6 +165,7 @@ def lambda_handler(event, context):
             result.get('same_description_different_times_count', 0),
             result.get('same_time_different_descriptions_count', 0),
         )
+        result.update(publish_duplicate_specials_alert(result))
         return {
             'statusCode': 200,
             'body': json.dumps(result),
