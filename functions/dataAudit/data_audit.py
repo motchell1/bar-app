@@ -126,8 +126,8 @@ def _format_same_description_different_times(groups):
                 lines.append(
                     f"    - special_id={special.get('special_id')} | all_day={special.get('all_day')} | "
                     f"start_time={special.get('start_time')} | end_time={special.get('end_time')} | "
+                    f"insert_method={special.get('insert_method')} | "
                     f"special_candidate_id={special.get('special_candidate_id')} | "
-                    f"special_candidate_insert_method={special.get('special_candidate_insert_method')} | "
                     f"fetch_method={special.get('fetch_method')} | source={special.get('source')}"
                 )
         lines.append('')
