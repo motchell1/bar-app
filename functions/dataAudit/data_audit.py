@@ -111,19 +111,29 @@ def publish_duplicate_specials_alert(result: Dict) -> Dict[str, object]:
 def _format_same_description_different_times(groups):
     if not groups:
         return ['(none)']
-    lines = []
+    grouped_by_bar = {}
     for group in groups:
-        lines.append(
-            f"- Bar: bar_id={group.get('bar_id')} | bar_name={group.get('bar_name')} | neighborhood={group.get('neighborhood')}"
+        bar_key = (
+            group.get('bar_id'),
+            group.get('bar_name'),
+            group.get('neighborhood'),
         )
+        grouped_by_bar.setdefault(bar_key, []).append(group)
+
+    lines = []
+    for (bar_id, bar_name, neighborhood), bar_groups in grouped_by_bar.items():
         lines.append(
-            f"  • day={group.get('day_of_week')} | type={group.get('type')} | description={group.get('description')}"
+            f"- Bar: bar_id={bar_id} | bar_name={bar_name} | neighborhood={neighborhood}"
         )
-        for special in group.get('specials', []):
+        for group in bar_groups:
             lines.append(
-                f"    - special_id={special.get('special_id')} | all_day={special.get('all_day')} | "
-                f"start_time={special.get('start_time')} | end_time={special.get('end_time')}"
+                f"  • day={group.get('day_of_week')} | type={group.get('type')} | description={group.get('description')}"
             )
+            for special in group.get('specials', []):
+                lines.append(
+                    f"    - special_id={special.get('special_id')} | all_day={special.get('all_day')} | "
+                    f"start_time={special.get('start_time')} | end_time={special.get('end_time')}"
+                )
         lines.append('')
     return lines
 
@@ -131,19 +141,29 @@ def _format_same_description_different_times(groups):
 def _format_same_time_different_descriptions(groups):
     if not groups:
         return ['(none)']
-    lines = []
+    grouped_by_bar = {}
     for group in groups:
-        lines.append(
-            f"- Bar: bar_id={group.get('bar_id')} | bar_name={group.get('bar_name')} | neighborhood={group.get('neighborhood')}"
+        bar_key = (
+            group.get('bar_id'),
+            group.get('bar_name'),
+            group.get('neighborhood'),
         )
+        grouped_by_bar.setdefault(bar_key, []).append(group)
+
+    lines = []
+    for (bar_id, bar_name, neighborhood), bar_groups in grouped_by_bar.items():
         lines.append(
-            f"  • day={group.get('day_of_week')} | type={group.get('type')} | all_day={group.get('all_day')} | "
-            f"start_time={group.get('start_time')} | end_time={group.get('end_time')}"
+            f"- Bar: bar_id={bar_id} | bar_name={bar_name} | neighborhood={neighborhood}"
         )
-        for special in group.get('specials', []):
+        for group in bar_groups:
             lines.append(
-                f"    - special_id={special.get('special_id')} | description={special.get('description')}"
+                f"  • day={group.get('day_of_week')} | type={group.get('type')} | all_day={group.get('all_day')} | "
+                f"start_time={group.get('start_time')} | end_time={group.get('end_time')}"
             )
+            for special in group.get('specials', []):
+                lines.append(
+                    f"    - special_id={special.get('special_id')} | description={special.get('description')}"
+                )
         lines.append('')
     return lines
 
