@@ -592,6 +592,15 @@ def detect_duplicate_specials(cursor, bar_id: int = None) -> Dict[str, object]:
     )
     same_time_rows = cursor.fetchall()
 
+    for row in same_description_rows:
+        row['day_of_week'] = _normalize_day_of_week(row.get('day_of_week'))
+
+    for row in same_time_rows:
+        row['day_of_week'] = _normalize_day_of_week(row.get('day_of_week'))
+        row['all_day'] = _normalize_yn_flag(row.get('all_day'))
+        row['start_time'] = _normalize_time_value(row.get('start_time'))
+        row['end_time'] = _normalize_time_value(row.get('end_time'))
+
     return {
         'bar_id_filter': bar_id,
         'same_description_different_times': same_description_rows,
