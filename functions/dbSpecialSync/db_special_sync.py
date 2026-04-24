@@ -675,7 +675,7 @@ def lambda_handler(event, context):
                 if not run_id:
                     raise ValueError('run_id is required for publish_special_candidate_run')
                 result = publish_special_candidate_run(cursor, bar_id, run_id, auto_publish)
-            else:
+            elif mode == 'detect_duplicate_specials':
                 bar_id = event.get('bar_id')
                 parsed_bar_id = int(bar_id) if bar_id not in {None, ''} else None
                 result = detect_duplicate_specials(cursor, parsed_bar_id)

@@ -8,49 +8,29 @@ import boto3
 LOGGER = logging.getLogger()
 LOGGER.setLevel(logging.INFO)
 
-DB_BAR_SYNC_LAMBDA_NAME = os.environ['DB_BAR_SYNC_LAMBDA_NAME']
-DB_SPECIAL_SYNC_LAMBDA_NAME = os.environ['DB_SPECIAL_SYNC_LAMBDA_NAME']
+DB_ADMIN_SYNC_LAMBDA_NAME = os.environ['DB_ADMIN_SYNC_LAMBDA_NAME']
 ALERT_SNS_TOPIC_ARN = os.environ.get('ALERT_SNS_TOPIC_ARN', '').strip()
 
 LAMBDA_CLIENT = boto3.client('lambda')
 SNS_CLIENT = boto3.client('sns') if ALERT_SNS_TOPIC_ARN else None
 
 
-def invoke_db_bar_sync(payload: Dict) -> Dict:
-    LOGGER.info('dataAudit: invoking dbBarSync payload=%s', payload)
+def invoke_db_admin_sync(payload: Dict) -> Dict:
+    LOGGER.info('dataAudit: invoking dbAdminSync payload=%s', payload)
     response = LAMBDA_CLIENT.invoke(
-        FunctionName=DB_BAR_SYNC_LAMBDA_NAME,
+        FunctionName=DB_ADMIN_SYNC_LAMBDA_NAME,
         InvocationType='RequestResponse',
         Payload=json.dumps(payload).encode('utf-8'),
     )
     if response.get('FunctionError'):
-        raise RuntimeError(f"dbBarSync invocation failed: {response['FunctionError']}")
+        raise RuntimeError(f"dbAdminSync invocation failed: {response['FunctionError']}")
 
     response_payload = json.loads(response['Payload'].read())
     status_code = response_payload.get('statusCode', 500)
     body = response_payload.get('body')
     parsed_body = json.loads(body) if isinstance(body, str) else (body or {})
     if status_code >= 400:
-        raise RuntimeError(f'dbBarSync returned {status_code}: {parsed_body}')
-    return parsed_body
-
-
-def invoke_db_special_sync(payload: Dict) -> Dict:
-    LOGGER.info('dataAudit: invoking dbSpecialSync payload=%s', payload)
-    response = LAMBDA_CLIENT.invoke(
-        FunctionName=DB_SPECIAL_SYNC_LAMBDA_NAME,
-        InvocationType='RequestResponse',
-        Payload=json.dumps(payload).encode('utf-8'),
-    )
-    if response.get('FunctionError'):
-        raise RuntimeError(f"dbSpecialSync invocation failed: {response['FunctionError']}")
-
-    response_payload = json.loads(response['Payload'].read())
-    status_code = response_payload.get('statusCode', 500)
-    body = response_payload.get('body')
-    parsed_body = json.loads(body) if isinstance(body, str) else (body or {})
-    if status_code >= 400:
-        raise RuntimeError(f'dbSpecialSync returned {status_code}: {parsed_body}')
+        raise RuntimeError(f'dbAdminSync returned {status_code}: {parsed_body}')
     return parsed_body
 
 
@@ -96,6 +76,26 @@ def publish_duplicate_specials_alert(result: Dict) -> Dict[str, object]:
         'Groups with same bar/day/type/description but different times:',
     ]
     message_lines.extend(_format_same_description_different_times(result.get('same_description_different_times', [])))
+
+    text_message = '\n'.join(message_lines).strip()
+    return send_alert_email(subject=subject, text_message=text_message)
+
+
+def publish_pending_approval_alert(result: Dict) -> Dict[str, object]:
+    pending_count = int(result.get('not_approved_count', 0) or 0)
+    subject = f"Specials Pending Approval ({pending_count} specials)"
+    message_lines = [
+        f"There are {pending_count} pending approval.",
+        '',
+        'NOT_APPROVED special count by neighborhood:',
+    ]
+
+    by_neighborhood = result.get('by_neighborhood', [])
+    if not by_neighborhood:
+        message_lines.append('(none)')
+    else:
+        for row in by_neighborhood:
+            message_lines.append(f"- {row.get('neighborhood')}: {int(row.get('count', 0) or 0)}")
 
     text_message = '\n'.join(message_lines).strip()
     return send_alert_email(subject=subject, text_message=text_message)
@@ -157,7 +157,7 @@ def lambda_handler(event, context):
     LOGGER.info('dataAudit request_id=%s mode=%s received', request_id, mode)
 
     if mode == 'detect_duplicate_websites':
-        result = invoke_db_bar_sync({'mode': 'detect_duplicate_websites'})
+        result = invoke_db_admin_sync({'mode': 'detect_duplicate_websites'})
         LOGGER.info('dataAudit request_id=%s duplicate_group_count=%s', request_id, result.get('duplicate_group_count', 0))
         result.update(publish_duplicate_alert(result))
         return {
@@ -169,7 +169,7 @@ def lambda_handler(event, context):
         payload = {'mode': 'detect_duplicate_specials'}
         if event.get('bar_id') not in {None, ''}:
             payload['bar_id'] = event.get('bar_id')
-        result = invoke_db_special_sync(payload)
+        result = invoke_db_admin_sync(payload)
         LOGGER.info(
             'dataAudit request_id=%s same_description_different_times=%s same_time_different_descriptions=%s',
             request_id,
@@ -182,7 +182,24 @@ def lambda_handler(event, context):
             'body': json.dumps(result),
         }
 
+    if mode == 'pending_special_candidates':
+        result = invoke_db_admin_sync({'mode': 'get_not_approved_special_candidate_summary'})
+        LOGGER.info(
+            'dataAudit request_id=%s not_approved_count=%s',
+            request_id,
+            result.get('not_approved_count', 0),
+        )
+        result.update(publish_pending_approval_alert(result))
+        return {
+            'statusCode': 200,
+            'body': json.dumps(result),
+        }
+
     return {
         'statusCode': 400,
-        'body': json.dumps({'error': 'mode must be detect_duplicate_websites or detect_duplicate_specials'}),
+        'body': json.dumps(
+            {
+                'error': 'mode must be detect_duplicate_websites, detect_duplicate_specials, or pending_special_candidates'
+            }
+        ),
     }
