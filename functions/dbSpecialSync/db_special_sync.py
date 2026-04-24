@@ -544,13 +544,118 @@ def publish_special_candidate_run(cursor, bar_id: int, run_id: int, auto_publish
     }
 
 
+def detect_duplicate_specials(cursor, bar_id: int = None) -> Dict[str, object]:
+    params: List[object] = []
+    where_clause = "s.is_active = 'Y' AND b.is_active = 'Y'"
+    if bar_id is not None:
+        where_clause += ' AND s.bar_id = %s'
+        params.append(bar_id)
+
+    cursor.execute(
+        f"""
+        SELECT
+            s.special_id,
+            s.bar_id,
+            b.name AS bar_name,
+            b.neighborhood,
+            s.day_of_week,
+            s.type,
+            s.description,
+            s.insert_method,
+            s.insert_date,
+            s.all_day,
+            s.start_time,
+            s.end_time,
+            sc.special_candidate_id,
+            sc.fetch_method,
+            sc.source
+        FROM special s
+        JOIN bar b ON b.bar_id = s.bar_id
+        LEFT JOIN special_candidate sc
+            ON sc.special_candidate_id = (
+                SELECT MAX(sc2.special_candidate_id)
+                FROM special_candidate sc2
+                WHERE sc2.approved_special_id = s.special_id
+            )
+        WHERE {where_clause}
+        ORDER BY s.bar_id, s.day_of_week, s.type, s.special_id
+        """,
+        tuple(params),
+    )
+    active_special_rows = cursor.fetchall()
+
+    for row in active_special_rows:
+        row['day_of_week'] = _normalize_day_of_week(row.get('day_of_week'))
+        row['all_day'] = _normalize_yn_flag(row.get('all_day'))
+        row['start_time'] = _normalize_time_value(row.get('start_time'))
+        row['end_time'] = _normalize_time_value(row.get('end_time'))
+        row['insert_date'] = _normalize_date_value(row.get('insert_date'))
+
+    same_description_map = {}
+    for row in active_special_rows:
+        key = (
+            row.get('bar_id'),
+            row.get('bar_name'),
+            row.get('neighborhood'),
+            row.get('day_of_week'),
+            row.get('type'),
+            row.get('description'),
+        )
+        group = same_description_map.setdefault(
+            key,
+            {
+                'bar_id': row.get('bar_id'),
+                'bar_name': row.get('bar_name'),
+                'neighborhood': row.get('neighborhood'),
+                'day_of_week': row.get('day_of_week'),
+                'type': row.get('type'),
+                'description': row.get('description'),
+                'specials': [],
+                '_time_windows': set(),
+            },
+        )
+        group['specials'].append(
+            {
+                'special_id': row.get('special_id'),
+                'all_day': row.get('all_day'),
+                'start_time': row.get('start_time'),
+                'end_time': row.get('end_time'),
+                'insert_method': row.get('insert_method'),
+                'insert_date': row.get('insert_date'),
+                'special_candidate_id': row.get('special_candidate_id'),
+                'fetch_method': row.get('fetch_method'),
+                'source': row.get('source'),
+            }
+        )
+        group['_time_windows'].add((row.get('all_day'), row.get('start_time'), row.get('end_time')))
+
+    same_description_groups = []
+    for group in same_description_map.values():
+        if len(group['_time_windows']) <= 1:
+            continue
+        group['special_count'] = len(group['specials'])
+        group['distinct_time_windows'] = len(group['_time_windows'])
+        del group['_time_windows']
+        same_description_groups.append(group)
+
+    same_description_groups.sort(key=lambda row: (row.get('bar_id'), row.get('day_of_week'), row.get('type'), row.get('description') or ''))
+
+    return {
+        'bar_id_filter': bar_id,
+        'same_description_different_times': same_description_groups,
+        'same_time_different_descriptions': [],
+        'same_description_different_times_count': len(same_description_groups),
+        'same_time_different_descriptions_count': 0,
+    }
+
+
 def lambda_handler(event, context):
     event = event or {}
     mode = event.get('mode')
-    if mode not in {'insert_special_candidate', 'publish_special_candidate_run'}:
+    if mode not in {'insert_special_candidate', 'publish_special_candidate_run', 'detect_duplicate_specials'}:
         return {
             'statusCode': 400,
-            'body': json.dumps({'error': 'mode must be one of insert_special_candidate, publish_special_candidate_run'}),
+            'body': json.dumps({'error': 'mode must be one of insert_special_candidate, publish_special_candidate_run, detect_duplicate_specials'}),
         }
 
     conn = get_connection()
@@ -561,7 +666,7 @@ def lambda_handler(event, context):
                 if not run.get('bar_id'):
                     raise ValueError('run.bar_id is required for insert_special_candidate')
                 result = insert_special_candidate(cursor, run, event.get('candidates', []))
-            else:
+            elif mode == 'publish_special_candidate_run':
                 bar_id = event.get('bar_id')
                 run_id = event.get('run_id')
                 auto_publish = event.get('auto_publish', 'N')
@@ -570,6 +675,10 @@ def lambda_handler(event, context):
                 if not run_id:
                     raise ValueError('run_id is required for publish_special_candidate_run')
                 result = publish_special_candidate_run(cursor, bar_id, run_id, auto_publish)
+            else:
+                bar_id = event.get('bar_id')
+                parsed_bar_id = int(bar_id) if bar_id not in {None, ''} else None
+                result = detect_duplicate_specials(cursor, parsed_bar_id)
             conn.commit()
 
         LOGGER.info('dbSpecialSync %s result=%s', mode, result)
