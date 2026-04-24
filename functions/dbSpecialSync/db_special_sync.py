@@ -544,13 +544,70 @@ def publish_special_candidate_run(cursor, bar_id: int, run_id: int, auto_publish
     }
 
 
+def detect_duplicate_specials(cursor, bar_id: int = None) -> Dict[str, object]:
+    filters = ["is_active = 'Y'"]
+    params: List[object] = []
+    if bar_id is not None:
+        filters.append('bar_id = %s')
+        params.append(bar_id)
+    where_clause = ' AND '.join(filters)
+
+    cursor.execute(
+        f"""
+        SELECT
+            bar_id,
+            day_of_week,
+            type,
+            description,
+            COUNT(*) AS special_count,
+            COUNT(DISTINCT CONCAT(COALESCE(start_time, ''), '->', COALESCE(end_time, ''), '|', COALESCE(all_day, ''))) AS distinct_time_windows
+        FROM special
+        WHERE {where_clause}
+        GROUP BY bar_id, day_of_week, type, description
+        HAVING special_count > 1 AND distinct_time_windows > 1
+        ORDER BY bar_id, day_of_week, type, description
+        """,
+        tuple(params),
+    )
+    same_description_rows = cursor.fetchall()
+
+    cursor.execute(
+        f"""
+        SELECT
+            bar_id,
+            day_of_week,
+            type,
+            all_day,
+            start_time,
+            end_time,
+            COUNT(*) AS special_count,
+            COUNT(DISTINCT description) AS distinct_descriptions
+        FROM special
+        WHERE {where_clause}
+        GROUP BY bar_id, day_of_week, type, all_day, start_time, end_time
+        HAVING special_count > 1 AND distinct_descriptions > 1
+        ORDER BY bar_id, day_of_week, type, all_day, start_time, end_time
+        """,
+        tuple(params),
+    )
+    same_time_rows = cursor.fetchall()
+
+    return {
+        'bar_id_filter': bar_id,
+        'same_description_different_times': same_description_rows,
+        'same_time_different_descriptions': same_time_rows,
+        'same_description_different_times_count': len(same_description_rows),
+        'same_time_different_descriptions_count': len(same_time_rows),
+    }
+
+
 def lambda_handler(event, context):
     event = event or {}
     mode = event.get('mode')
-    if mode not in {'insert_special_candidate', 'publish_special_candidate_run'}:
+    if mode not in {'insert_special_candidate', 'publish_special_candidate_run', 'detect_duplicate_specials'}:
         return {
             'statusCode': 400,
-            'body': json.dumps({'error': 'mode must be one of insert_special_candidate, publish_special_candidate_run'}),
+            'body': json.dumps({'error': 'mode must be one of insert_special_candidate, publish_special_candidate_run, detect_duplicate_specials'}),
         }
 
     conn = get_connection()
@@ -561,7 +618,7 @@ def lambda_handler(event, context):
                 if not run.get('bar_id'):
                     raise ValueError('run.bar_id is required for insert_special_candidate')
                 result = insert_special_candidate(cursor, run, event.get('candidates', []))
-            else:
+            elif mode == 'publish_special_candidate_run':
                 bar_id = event.get('bar_id')
                 run_id = event.get('run_id')
                 auto_publish = event.get('auto_publish', 'N')
@@ -570,6 +627,10 @@ def lambda_handler(event, context):
                 if not run_id:
                     raise ValueError('run_id is required for publish_special_candidate_run')
                 result = publish_special_candidate_run(cursor, bar_id, run_id, auto_publish)
+            else:
+                bar_id = event.get('bar_id')
+                parsed_bar_id = int(bar_id) if bar_id not in {None, ''} else None
+                result = detect_duplicate_specials(cursor, parsed_bar_id)
             conn.commit()
 
         LOGGER.info('dbSpecialSync %s result=%s', mode, result)

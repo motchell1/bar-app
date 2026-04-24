@@ -9,6 +9,7 @@ LOGGER = logging.getLogger()
 LOGGER.setLevel(logging.INFO)
 
 DB_BAR_SYNC_LAMBDA_NAME = os.environ['DB_BAR_SYNC_LAMBDA_NAME']
+DB_SPECIAL_SYNC_LAMBDA_NAME = os.environ['DB_SPECIAL_SYNC_LAMBDA_NAME']
 ALERT_SNS_TOPIC_ARN = os.environ.get('ALERT_SNS_TOPIC_ARN', '').strip()
 
 LAMBDA_CLIENT = boto3.client('lambda')
@@ -31,6 +32,25 @@ def invoke_db_bar_sync(payload: Dict) -> Dict:
     parsed_body = json.loads(body) if isinstance(body, str) else (body or {})
     if status_code >= 400:
         raise RuntimeError(f'dbBarSync returned {status_code}: {parsed_body}')
+    return parsed_body
+
+
+def invoke_db_special_sync(payload: Dict) -> Dict:
+    LOGGER.info('dataAudit: invoking dbSpecialSync payload=%s', payload)
+    response = LAMBDA_CLIENT.invoke(
+        FunctionName=DB_SPECIAL_SYNC_LAMBDA_NAME,
+        InvocationType='RequestResponse',
+        Payload=json.dumps(payload).encode('utf-8'),
+    )
+    if response.get('FunctionError'):
+        raise RuntimeError(f"dbSpecialSync invocation failed: {response['FunctionError']}")
+
+    response_payload = json.loads(response['Payload'].read())
+    status_code = response_payload.get('statusCode', 500)
+    body = response_payload.get('body')
+    parsed_body = json.loads(body) if isinstance(body, str) else (body or {})
+    if status_code >= 400:
+        raise RuntimeError(f'dbSpecialSync returned {status_code}: {parsed_body}')
     return parsed_body
 
 
@@ -77,16 +97,32 @@ def lambda_handler(event, context):
     mode = event.get('mode') or 'detect_duplicate_websites'
     LOGGER.info('dataAudit request_id=%s mode=%s received', request_id, mode)
 
-    if mode != 'detect_duplicate_websites':
+    if mode == 'detect_duplicate_websites':
+        result = invoke_db_bar_sync({'mode': 'detect_duplicate_websites'})
+        LOGGER.info('dataAudit request_id=%s duplicate_group_count=%s', request_id, result.get('duplicate_group_count', 0))
+        result.update(publish_duplicate_alert(result))
         return {
-            'statusCode': 400,
-            'body': json.dumps({'error': 'mode must be detect_duplicate_websites'}),
+            'statusCode': 200,
+            'body': json.dumps(result),
         }
 
-    result = invoke_db_bar_sync({'mode': 'detect_duplicate_websites'})
-    LOGGER.info('dataAudit request_id=%s duplicate_group_count=%s', request_id, result.get('duplicate_group_count', 0))
-    result.update(publish_duplicate_alert(result))
+    if mode == 'detect_duplicate_specials':
+        payload = {'mode': 'detect_duplicate_specials'}
+        if event.get('bar_id') not in {None, ''}:
+            payload['bar_id'] = event.get('bar_id')
+        result = invoke_db_special_sync(payload)
+        LOGGER.info(
+            'dataAudit request_id=%s same_description_different_times=%s same_time_different_descriptions=%s',
+            request_id,
+            result.get('same_description_different_times_count', 0),
+            result.get('same_time_different_descriptions_count', 0),
+        )
+        return {
+            'statusCode': 200,
+            'body': json.dumps(result),
+        }
+
     return {
-        'statusCode': 200,
-        'body': json.dumps(result),
+        'statusCode': 400,
+        'body': json.dumps({'error': 'mode must be detect_duplicate_websites or detect_duplicate_specials'}),
     }
