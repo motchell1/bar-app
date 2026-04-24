@@ -5,6 +5,7 @@ from decimal import Decimal
 from datetime import time, timedelta
 from difflib import SequenceMatcher
 from typing import Dict, List
+from urllib.parse import urlparse
 
 import pymysql
 
@@ -119,6 +120,14 @@ def _to_json_safe_number(value):
     if isinstance(value, Decimal):
         return float(value)
     return value
+
+
+def _normalize_date_value(value) -> str:
+    if value is None:
+        return ''
+    if hasattr(value, 'isoformat'):
+        return value.isoformat()
+    return str(value).strip()
 
 
 def _is_candidate_same_as_special(candidate_row: Dict, special_row: Dict) -> bool:
@@ -348,6 +357,205 @@ def get_unapproved_special_candidates(cursor):
 
     runs = list(grouped_runs.values())
     return {'runs': runs, 'run_count': len(runs), 'special_count': len(rows)}
+
+
+def get_not_approved_special_candidate_summary(cursor) -> Dict[str, object]:
+    cursor.execute(
+        """
+        SELECT
+            COALESCE(NULLIF(TRIM(b.neighborhood), ''), 'Unknown') AS neighborhood,
+            COUNT(*) AS not_approved_count
+        FROM special_candidate sc
+        LEFT JOIN bar b ON b.bar_id = sc.bar_id
+        WHERE sc.approval_status = 'NOT_APPROVED'
+        GROUP BY COALESCE(NULLIF(TRIM(b.neighborhood), ''), 'Unknown')
+        ORDER BY neighborhood ASC
+        """
+    )
+    neighborhood_rows = cursor.fetchall()
+    total_count = sum(int(row.get('not_approved_count', 0) or 0) for row in neighborhood_rows)
+
+    return {
+        'approval_status': 'NOT_APPROVED',
+        'not_approved_count': total_count,
+        'by_neighborhood': [
+            {
+                'neighborhood': row.get('neighborhood'),
+                'count': int(row.get('not_approved_count', 0) or 0),
+            }
+            for row in neighborhood_rows
+        ],
+    }
+
+
+def detect_duplicate_active_websites(cursor) -> Dict[str, List[Dict]]:
+    cursor.execute(
+        """
+        SELECT
+            bar_id,
+            name AS bar_name,
+            neighborhood,
+            website_url
+        FROM bar
+        WHERE is_active = 'Y'
+          AND website_url IS NOT NULL
+          AND TRIM(website_url) <> ''
+          AND EXISTS (
+              SELECT 1
+              FROM special
+              WHERE special.bar_id = bar.bar_id
+                AND special.is_active = 'Y'
+          )
+        """
+    )
+    rows = cursor.fetchall()
+
+    domain_groups: Dict[str, Dict[str, List[Dict]]] = {}
+    for row in rows:
+        value = (row.get('website_url') or '').strip().lower()
+        if not value:
+            continue
+        if '://' not in value:
+            value = f'https://{value}'
+        parsed = urlparse(value)
+        domain = (parsed.netloc or '').split('@')[-1].split(':')[0].strip('.')
+        if domain.startswith('www.'):
+            domain = domain[4:]
+
+        neighborhood = (row.get('neighborhood') or '').strip()
+        if not domain or not neighborhood:
+            continue
+
+        domain_groups.setdefault(domain, {}).setdefault(neighborhood, []).append(
+            {
+                'bar_id': int(row.get('bar_id')),
+                'bar_name': (row.get('bar_name') or '').strip(),
+                'website_url': (row.get('website_url') or '').strip(),
+            }
+        )
+
+    duplicate_groups = []
+    for domain, neighborhood_map in sorted(domain_groups.items(), key=lambda item: item[0]):
+        for neighborhood, bars in sorted(neighborhood_map.items(), key=lambda item: item[0]):
+            if len(bars) < 2:
+                continue
+            sorted_bars = sorted(bars, key=lambda bar: (bar.get('bar_name', '').lower(), bar.get('bar_id', 0)))
+            duplicate_groups.append(
+                {
+                    'domain': domain,
+                    'neighborhood': neighborhood,
+                    'active_bar_count': len(sorted_bars),
+                    'bar_ids': [bar['bar_id'] for bar in sorted_bars],
+                    'bars': sorted_bars,
+                }
+            )
+
+    return {'duplicate_group_count': len(duplicate_groups), 'duplicate_groups': duplicate_groups}
+
+
+def detect_duplicate_specials(cursor, bar_id: int = None) -> Dict[str, object]:
+    params: List[object] = []
+    where_clause = "s.is_active = 'Y' AND b.is_active = 'Y'"
+    if bar_id is not None:
+        where_clause += ' AND s.bar_id = %s'
+        params.append(bar_id)
+
+    cursor.execute(
+        f"""
+        SELECT
+            s.special_id,
+            s.bar_id,
+            b.name AS bar_name,
+            b.neighborhood,
+            s.day_of_week,
+            s.type,
+            s.description,
+            s.insert_method,
+            s.insert_date,
+            s.all_day,
+            s.start_time,
+            s.end_time,
+            sc.special_candidate_id,
+            sc.fetch_method,
+            sc.source
+        FROM special s
+        JOIN bar b ON b.bar_id = s.bar_id
+        LEFT JOIN special_candidate sc
+            ON sc.special_candidate_id = (
+                SELECT MAX(sc2.special_candidate_id)
+                FROM special_candidate sc2
+                WHERE sc2.approved_special_id = s.special_id
+            )
+        WHERE {where_clause}
+        ORDER BY s.bar_id, s.day_of_week, s.type, s.special_id
+        """,
+        tuple(params),
+    )
+    active_special_rows = cursor.fetchall()
+
+    for row in active_special_rows:
+        row['day_of_week'] = _normalize_day_of_week(row.get('day_of_week'))
+        row['all_day'] = _normalize_yn_flag(row.get('all_day'))
+        row['start_time'] = _normalize_time_value(row.get('start_time'))
+        row['end_time'] = _normalize_time_value(row.get('end_time'))
+        row['insert_date'] = _normalize_date_value(row.get('insert_date'))
+
+    same_description_map = {}
+    for row in active_special_rows:
+        key = (
+            row.get('bar_id'),
+            row.get('bar_name'),
+            row.get('neighborhood'),
+            row.get('day_of_week'),
+            row.get('type'),
+            row.get('description'),
+        )
+        group = same_description_map.setdefault(
+            key,
+            {
+                'bar_id': row.get('bar_id'),
+                'bar_name': row.get('bar_name'),
+                'neighborhood': row.get('neighborhood'),
+                'day_of_week': row.get('day_of_week'),
+                'type': row.get('type'),
+                'description': row.get('description'),
+                'specials': [],
+                '_time_windows': set(),
+            },
+        )
+        group['specials'].append(
+            {
+                'special_id': row.get('special_id'),
+                'all_day': row.get('all_day'),
+                'start_time': row.get('start_time'),
+                'end_time': row.get('end_time'),
+                'insert_method': row.get('insert_method'),
+                'insert_date': row.get('insert_date'),
+                'special_candidate_id': row.get('special_candidate_id'),
+                'fetch_method': row.get('fetch_method'),
+                'source': row.get('source'),
+            }
+        )
+        group['_time_windows'].add((row.get('all_day'), row.get('start_time'), row.get('end_time')))
+
+    same_description_groups = []
+    for group in same_description_map.values():
+        if len(group['_time_windows']) <= 1:
+            continue
+        group['special_count'] = len(group['specials'])
+        group['distinct_time_windows'] = len(group['_time_windows'])
+        del group['_time_windows']
+        same_description_groups.append(group)
+
+    same_description_groups.sort(key=lambda row: (row.get('bar_id'), row.get('day_of_week'), row.get('type'), row.get('description') or ''))
+
+    return {
+        'bar_id_filter': bar_id,
+        'same_description_different_times': same_description_groups,
+        'same_time_different_descriptions': [],
+        'same_description_different_times_count': len(same_description_groups),
+        'same_time_different_descriptions_count': 0,
+    }
 
 
 def get_rejected_special_candidates(cursor):
@@ -1114,7 +1322,10 @@ def lambda_handler(event, context):
     mode = event.get('mode')
     if mode not in {
         'get_unapproved_special_candidates',
+        'get_not_approved_special_candidate_summary',
         'get_rejected_special_candidates',
+        'detect_duplicate_websites',
+        'detect_duplicate_specials',
         'remove_rejected_special_candidate',
         'update_special_candidate_approval',
         'get_all_specials',
@@ -1133,7 +1344,9 @@ def lambda_handler(event, context):
                 {
                     'error': (
                         'mode must be one of get_unapproved_special_candidates, '
+                        'get_not_approved_special_candidate_summary, '
                         'get_rejected_special_candidates, '
+                        'detect_duplicate_websites, detect_duplicate_specials, '
                         'remove_rejected_special_candidate, '
                         'update_special_candidate_approval, get_all_specials, update_special, delete_special, insert_special, '
                         'update_special_candidate, get_all_bars, get_bar_details, update_bar, update_open_hours'
@@ -1147,8 +1360,16 @@ def lambda_handler(event, context):
         with conn.cursor() as cursor:
             if mode == 'get_unapproved_special_candidates':
                 result = get_unapproved_special_candidates(cursor)
+            elif mode == 'get_not_approved_special_candidate_summary':
+                result = get_not_approved_special_candidate_summary(cursor)
             elif mode == 'get_rejected_special_candidates':
                 result = get_rejected_special_candidates(cursor)
+            elif mode == 'detect_duplicate_websites':
+                result = detect_duplicate_active_websites(cursor)
+            elif mode == 'detect_duplicate_specials':
+                bar_id = event.get('bar_id')
+                parsed_bar_id = int(bar_id) if bar_id not in {None, ''} else None
+                result = detect_duplicate_specials(cursor, parsed_bar_id)
             elif mode == 'update_special_candidate_approval':
                 special_candidate_id = event.get('special_candidate_id')
                 approval_status = event.get('approval_status')
