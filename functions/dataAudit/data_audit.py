@@ -112,22 +112,37 @@ def publish_duplicate_specials_alert(result: Dict) -> Dict[str, object]:
         '',
         'Groups with same bar/day/type/description but different times:',
     ]
-
-    for row in result.get('same_description_different_times', []):
-        message_lines.append(
-            f"- bar_id={row.get('bar_id')} | day={row.get('day_of_week')} | type={row.get('type')} | "
-            f"description={row.get('description')} | specials={row.get('special_count')} | "
-            f"distinct_time_windows={row.get('distinct_time_windows')}"
+    message_lines.extend(
+        _build_plaintext_table(
+            result.get('same_description_different_times', []),
+            [
+                ('bar_id', 'Bar'),
+                ('day_of_week', 'Day'),
+                ('type', 'Type'),
+                ('description', 'Description'),
+                ('special_count', 'Specials'),
+                ('distinct_time_windows', 'Distinct Times'),
+            ],
         )
+    )
 
     message_lines.append('')
     message_lines.append('Groups with same bar/day/type/time window but different descriptions:')
-    for row in result.get('same_time_different_descriptions', []):
-        message_lines.append(
-            f"- bar_id={row.get('bar_id')} | day={row.get('day_of_week')} | type={row.get('type')} | "
-            f"all_day={row.get('all_day')} | start={row.get('start_time')} | end={row.get('end_time')} | "
-            f"specials={row.get('special_count')} | distinct_descriptions={row.get('distinct_descriptions')}"
+    message_lines.extend(
+        _build_plaintext_table(
+            result.get('same_time_different_descriptions', []),
+            [
+                ('bar_id', 'Bar'),
+                ('day_of_week', 'Day'),
+                ('type', 'Type'),
+                ('all_day', 'All Day'),
+                ('start_time', 'Start'),
+                ('end_time', 'End'),
+                ('special_count', 'Specials'),
+                ('distinct_descriptions', 'Distinct Descriptions'),
+            ],
         )
+    )
 
     LOGGER.info('dataAudit: publishing duplicate-specials SNS alert topic=%s groups=%s', ALERT_SNS_TOPIC_ARN, total_duplicate_groups)
     SNS_CLIENT.publish(
@@ -137,6 +152,33 @@ def publish_duplicate_specials_alert(result: Dict) -> Dict[str, object]:
     )
     LOGGER.info('dataAudit: duplicate-specials SNS publish succeeded')
     return {'email_sent': True, 'email_reason': 'SENT'}
+
+
+def _build_plaintext_table(rows, columns, max_cell_len: int = 40):
+    if not rows:
+        return ['(none)']
+
+    headers = [label for _, label in columns]
+    widths = [len(header) for header in headers]
+
+    normalized_rows = []
+    for row in rows:
+        values = []
+        for index, (key, _) in enumerate(columns):
+            value = str(row.get(key, '') if row.get(key, '') is not None else '')
+            if len(value) > max_cell_len:
+                value = f"{value[: max_cell_len - 1]}…"
+            widths[index] = min(max(widths[index], len(value)), max_cell_len)
+            values.append(value)
+        normalized_rows.append(values)
+
+    def _format_line(values):
+        return ' | '.join(value.ljust(widths[index]) for index, value in enumerate(values))
+
+    separator = '-+-'.join('-' * width for width in widths)
+    lines = [_format_line(headers), separator]
+    lines.extend(_format_line(values) for values in normalized_rows)
+    return lines
 
 
 def lambda_handler(event, context):
