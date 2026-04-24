@@ -564,6 +564,8 @@ def detect_duplicate_specials(cursor, bar_id: int = None) -> Dict[str, object]:
             s.all_day,
             s.start_time,
             s.end_time,
+            sc.special_candidate_id,
+            sc.insert_method AS special_candidate_insert_method,
             sc.fetch_method,
             sc.source
         FROM special s
@@ -616,6 +618,8 @@ def detect_duplicate_specials(cursor, bar_id: int = None) -> Dict[str, object]:
                 'all_day': row.get('all_day'),
                 'start_time': row.get('start_time'),
                 'end_time': row.get('end_time'),
+                'special_candidate_id': row.get('special_candidate_id'),
+                'special_candidate_insert_method': row.get('special_candidate_insert_method'),
                 'fetch_method': row.get('fetch_method'),
                 'source': row.get('source'),
             }
