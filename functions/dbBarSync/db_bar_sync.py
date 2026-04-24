@@ -163,6 +163,7 @@ def get_bars_by_neighborhood(cursor, neighborhood: str) -> Dict[str, List[Dict]]
 
 
 def get_duplicate_active_websites(cursor) -> Dict[str, List[Dict]]:
+    LOGGER.info('detect_duplicate_websites: querying active bars with active specials')
     cursor.execute(
         """
         SELECT
@@ -183,6 +184,7 @@ def get_duplicate_active_websites(cursor) -> Dict[str, List[Dict]]:
         """
     )
     rows = cursor.fetchall()
+    LOGGER.info('detect_duplicate_websites: fetched %s candidate bars', len(rows))
 
     def _extract_domain(website_url: str) -> str:
         value = (website_url or '').strip().lower()
@@ -594,6 +596,8 @@ def publish_candidate_specials(cursor, bar_id: int, run_id: int, auto_publish: s
 def lambda_handler(event, context):
     event = event or {}
     mode = event.get('mode')
+    request_id = getattr(context, 'aws_request_id', 'unknown')
+    LOGGER.info('dbBarSync request_id=%s mode=%s received', request_id, mode)
     if mode not in {'determine_if_bar_existing', 'apply_bar_upsert', 'get_bars_by_neighborhood', 'detect_duplicate_websites'}:
         return {
             'statusCode': 400,
@@ -606,21 +610,36 @@ def lambda_handler(event, context):
     try:
         with conn.cursor() as cursor:
             if mode == 'determine_if_bar_existing':
+                LOGGER.info('dbBarSync request_id=%s mode=%s starting categorize_bars', request_id, mode)
                 result = categorize_bars(cursor, event.get('bars', []))
                 conn.commit()
             elif mode == 'apply_bar_upsert':
+                LOGGER.info('dbBarSync request_id=%s mode=%s starting apply_changes', request_id, mode)
                 result = apply_changes(cursor, event.get('new_bars', []), event.get('existing_bars', []))
                 conn.commit()
             elif mode == 'get_bars_by_neighborhood':
                 neighborhood = event.get('neighborhood')
                 if not neighborhood:
                     raise ValueError('neighborhood is required for get_bars_by_neighborhood')
+                LOGGER.info(
+                    'dbBarSync request_id=%s mode=%s starting get_bars_by_neighborhood neighborhood=%s',
+                    request_id,
+                    mode,
+                    neighborhood,
+                )
                 result = get_bars_by_neighborhood(cursor, neighborhood)
                 conn.commit()
             elif mode == 'detect_duplicate_websites':
+                LOGGER.info('dbBarSync request_id=%s mode=%s starting duplicate detection', request_id, mode)
                 result = get_duplicate_active_websites(cursor)
+                LOGGER.info(
+                    'dbBarSync request_id=%s mode=%s duplicate_group_count=%s',
+                    request_id,
+                    mode,
+                    result.get('duplicate_group_count', 0),
+                )
                 conn.commit()
-        LOGGER.info('dbBarSync %s result=%s', mode, result)
+        LOGGER.info('dbBarSync request_id=%s mode=%s completed result=%s', request_id, mode, result)
         return {
             'statusCode': 200,
             'body': json.dumps(result),
