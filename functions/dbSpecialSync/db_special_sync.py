@@ -589,6 +589,7 @@ def detect_duplicate_specials(cursor, bar_id: int = None) -> Dict[str, object]:
         row['all_day'] = _normalize_yn_flag(row.get('all_day'))
         row['start_time'] = _normalize_time_value(row.get('start_time'))
         row['end_time'] = _normalize_time_value(row.get('end_time'))
+        row['insert_date'] = _normalize_date_value(row.get('insert_date'))
 
     same_description_map = {}
     for row in active_special_rows:
