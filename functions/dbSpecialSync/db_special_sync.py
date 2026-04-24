@@ -556,7 +556,7 @@ def detect_duplicate_specials(cursor, bar_id: int = None) -> Dict[str, object]:
         SELECT
             s.special_id,
             s.bar_id,
-            b.bar_name,
+            b.name AS bar_name,
             b.neighborhood,
             s.day_of_week,
             s.type,
