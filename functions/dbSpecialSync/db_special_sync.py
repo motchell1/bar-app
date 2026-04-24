@@ -546,7 +546,7 @@ def publish_special_candidate_run(cursor, bar_id: int, run_id: int, auto_publish
 
 def detect_duplicate_specials(cursor, bar_id: int = None) -> Dict[str, object]:
     params: List[object] = []
-    where_clause = "s.is_active = 'Y'"
+    where_clause = "s.is_active = 'Y' AND b.is_active = 'Y'"
     if bar_id is not None:
         where_clause += ' AND s.bar_id = %s'
         params.append(bar_id)
