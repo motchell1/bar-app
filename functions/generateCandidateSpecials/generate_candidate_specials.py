@@ -4,6 +4,7 @@ import os
 import re
 import time
 import zlib
+import base64
 from datetime import date, datetime, timedelta
 from html import unescape
 from html.parser import HTMLParser
@@ -236,6 +237,66 @@ def invoke_data_audit(payload):
     return _invoke_lambda(DATA_AUDIT_LAMBDA_NAME, payload, 'DATA_AUDIT_LAMBDA_NAME')
 
 
+def _decode_pdf_stream(stream_payload):
+    if not stream_payload:
+        return b''
+
+    decode_attempts = (
+        lambda payload: zlib.decompress(payload),
+        lambda payload: zlib.decompress(payload, -15),
+        lambda payload: base64.a85decode(payload, adobe=True),
+    )
+    for decode_attempt in decode_attempts:
+        try:
+            decoded = decode_attempt(stream_payload)
+            if decoded:
+                return decoded
+        except Exception:
+            continue
+
+    return stream_payload
+
+
+def _decode_pdf_literal(text):
+    if not text:
+        return ''
+
+    def _replace_octal(match):
+        try:
+            return chr(int(match.group(1), 8))
+        except Exception:
+            return ''
+
+    normalized = text
+    normalized = normalized.replace(r'\n', '\n').replace(r'\r', ' ').replace(r'\t', ' ')
+    normalized = normalized.replace(r'\b', ' ').replace(r'\f', ' ')
+    normalized = normalized.replace(r'\(', '(').replace(r'\)', ')').replace(r'\\', '\\')
+    normalized = re.sub(r'\\([0-7]{1,3})', _replace_octal, normalized)
+    return normalized
+
+
+def _decode_pdf_hex(hex_blob):
+    clean_hex = re.sub(r'[^0-9A-Fa-f]', '', hex_blob or '')
+    if not clean_hex:
+        return ''
+    if len(clean_hex) % 2 != 0:
+        clean_hex += '0'
+    raw = bytes.fromhex(clean_hex)
+    if not raw:
+        return ''
+
+    decode_attempts = []
+    if b'\x00' in raw:
+        decode_attempts.extend(['utf-16-be', 'utf-16-le'])
+    decode_attempts.extend(['utf-8', 'latin-1'])
+    for encoding in decode_attempts:
+        try:
+            return raw.decode(encoding, errors='ignore')
+        except Exception:
+            continue
+    return ''
+
+
 def _extract_pdf_text(pdf_bytes):
     if not pdf_bytes:
         return ''
@@ -243,36 +304,36 @@ def _extract_pdf_text(pdf_bytes):
     extracted_chunks = []
     for match in re.finditer(rb'stream\r?\n(.*?)\r?\nendstream', pdf_bytes, flags=re.DOTALL):
         stream_payload = match.group(1)
-        decoded_payload = None
-        try:
-            decoded_payload = zlib.decompress(stream_payload)
-        except zlib.error:
-            decoded_payload = stream_payload
+        decoded_payload = _decode_pdf_stream(stream_payload)
 
         if not decoded_payload:
             continue
 
         decoded_text = decoded_payload.decode('latin-1', errors='ignore')
-        if 'BT' not in decoded_text and 'Tj' not in decoded_text and 'TJ' not in decoded_text:
+        if 'BT' not in decoded_text and 'Tj' not in decoded_text and 'TJ' not in decoded_text and "'" not in decoded_text:
             continue
 
-        chunks = re.findall(r'\((.*?)\)\s*Tj', decoded_text, flags=re.DOTALL)
-        for array_match in re.findall(r'\[(.*?)\]\s*TJ', decoded_text, flags=re.DOTALL):
-            chunks.extend(re.findall(r'\((.*?)\)', array_match, flags=re.DOTALL))
-
-        for chunk in chunks:
-            normalized = (
-                chunk
-                .replace(r'\n', '\n')
-                .replace(r'\r', ' ')
-                .replace(r'\t', ' ')
-                .replace(r'\(', '(')
-                .replace(r'\)', ')')
-                .replace(r'\\', '\\')
-            )
+        literal_pattern = r'\((?:\\.|[^\\()])*\)'
+        hex_pattern = r'<[0-9A-Fa-f\s]+>'
+        scalar_operand_pattern = rf'({literal_pattern}|{hex_pattern})\s*(Tj|\'|")'
+        for token, _operator in re.findall(scalar_operand_pattern, decoded_text, flags=re.DOTALL):
+            if token.startswith('('):
+                normalized = _decode_pdf_literal(token[1:-1])
+            else:
+                normalized = _decode_pdf_hex(token[1:-1])
             normalized = re.sub(r'\s+', ' ', normalized).strip()
             if normalized:
                 extracted_chunks.append(normalized)
+
+        for array_match in re.findall(r'\[(.*?)\]\s*TJ', decoded_text, flags=re.DOTALL):
+            for literal_token in re.findall(literal_pattern, array_match, flags=re.DOTALL):
+                normalized = re.sub(r'\s+', ' ', _decode_pdf_literal(literal_token[1:-1])).strip()
+                if normalized:
+                    extracted_chunks.append(normalized)
+            for hex_token in re.findall(hex_pattern, array_match, flags=re.DOTALL):
+                normalized = re.sub(r'\s+', ' ', _decode_pdf_hex(hex_token[1:-1])).strip()
+                if normalized:
+                    extracted_chunks.append(normalized)
 
     if not extracted_chunks:
         return ''
