@@ -921,14 +921,23 @@ def generate_from_crawl(homepage_url, bar_name, neighborhood):
         LOGGER.info('Extracted %d same-domain links from homepage', len(links))
         top_links = choose_candidate_links(links)
         stats['web_crawl_candidate_links'] = len(top_links)
-        candidate_links = [homepage_url] + [url for url in top_links if url != homepage_url]
+        candidate_links = [url for url in top_links if url != homepage_url]
     else:
         LOGGER.info('Homepage content is %s; crawling homepage URL directly', homepage_page.get('content_type'))
         stats['web_crawl_candidate_links'] = 1
-        candidate_links = [homepage_url]
+        candidate_links = []
     LOGGER.info('Selected %d initial candidate links for crawl', len(candidate_links))
 
     page_payloads = []
+    homepage_text = ''
+    if homepage_page.get('content_type') == 'pdf':
+        homepage_text = homepage_page.get('text', '')
+    elif homepage_page.get('content_type') == 'html':
+        homepage_text = extract_text(homepage_page.get('text', ''))
+    if homepage_text:
+        page_payloads.append({'url': homepage_url, 'text': homepage_text})
+        LOGGER.info('Captured %d characters from homepage %s', len(homepage_text), homepage_url)
+
     for link in candidate_links:
         if len(page_payloads) >= MAX_LINKS_TO_VISIT:
             break
