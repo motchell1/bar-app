@@ -1121,6 +1121,10 @@ def update_special(cursor, event):
         updates['all_day'] = _normalize_yn_flag(updates['all_day'])
     if 'is_active' in updates:
         updates['is_active'] = _normalize_yn_flag(updates['is_active'])
+    if 'start_time' in updates:
+        updates['start_time'] = _normalize_time_value(updates.get('start_time')) or None
+    if 'end_time' in updates:
+        updates['end_time'] = _normalize_time_value(updates.get('end_time')) or None
 
     set_clause = ', '.join([f"{key} = %s" for key in updates])
     values = list(updates.values()) + [special_id]
