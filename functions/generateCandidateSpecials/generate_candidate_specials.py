@@ -1055,7 +1055,11 @@ def generate_from_search(bar_name, neighborhood):
 def lambda_handler(event, context):
     started_at = time.perf_counter()
     try:
-        LOGGER.info('generate_candidate_specials invocation started')
+        LOGGER.info(
+            'generate_candidate_specials invocation started version=%s module=%s',
+            CANDIDATE_SPECIALS_CRAWL_VERSION,
+            __file__
+        )
         parsed_event = parse_event(event)
         response_neighborhood = parsed_event.get('neighborhood')
         total_candidates = []
