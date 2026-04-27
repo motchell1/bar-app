@@ -23,6 +23,8 @@ MAX_LINKS_TO_VISIT = 3
 MAX_TEXT_CHARS_PER_PAGE = 20000
 MAX_DOWNLOAD_BYTES = int(os.environ.get('MAX_DOWNLOAD_BYTES', str(8 * 1024 * 1024)))
 FETCH_HARD_TIMEOUT_SECONDS = float(os.environ.get('FETCH_HARD_TIMEOUT_SECONDS', '15'))
+PDF_EXTRACT_HARD_TIMEOUT_SECONDS = float(os.environ.get('PDF_EXTRACT_HARD_TIMEOUT_SECONDS', '8'))
+MAX_PDF_STREAMS_TO_SCAN = int(os.environ.get('MAX_PDF_STREAMS_TO_SCAN', '120'))
 KEYWORD_MATCH_CHAR_WINDOW_SIZE = int(os.environ.get('KEYWORD_MATCH_CHAR_WINDOW_SIZE', '220'))
 HTML_CONTENT_HINTS = ('text/html', 'application/xhtml+xml')
 PDF_CONTENT_HINTS = ('application/pdf',)
@@ -304,8 +306,17 @@ def _extract_pdf_text(pdf_bytes):
     if not pdf_bytes:
         return ''
 
+    started_at = time.perf_counter()
     extracted_chunks = []
+    scanned_streams = 0
     for match in re.finditer(rb'stream[\r\n]+(.*?)endstream', pdf_bytes, flags=re.DOTALL):
+        scanned_streams += 1
+        if scanned_streams > MAX_PDF_STREAMS_TO_SCAN:
+            LOGGER.info('Stopping PDF stream scan at cap=%d', MAX_PDF_STREAMS_TO_SCAN)
+            break
+        if (time.perf_counter() - started_at) > PDF_EXTRACT_HARD_TIMEOUT_SECONDS:
+            LOGGER.info('Stopping PDF text extraction at hard timeout %.2fs', PDF_EXTRACT_HARD_TIMEOUT_SECONDS)
+            break
         stream_payload = (match.group(1) or b'').rstrip(b'\r\n')
         decoded_payload = _decode_pdf_stream(stream_payload)
 
@@ -395,14 +406,29 @@ def fetch_page_content(url):
 
     if is_pdf:
         payload = b''.join(payload_chunks)
-        response.close()
+        downloaded_elapsed = time.perf_counter() - started_at
+        extract_started_at = time.perf_counter()
         text = _extract_pdf_text(payload)
+        extract_elapsed = time.perf_counter() - extract_started_at
+        response.close()
         elapsed = time.perf_counter() - started_at
         if text:
-            LOGGER.info('Fetched PDF URL in %.2fs: %s', elapsed, url)
+            LOGGER.info(
+                'Fetched PDF URL in %.2fs (download=%.2fs extract=%.2fs): %s',
+                elapsed,
+                downloaded_elapsed,
+                extract_elapsed,
+                url
+            )
             return {'content_type': 'pdf', 'text': text}
 
-        LOGGER.info('Fetched PDF URL in %.2fs but extracted no text: %s', elapsed, url)
+        LOGGER.info(
+            'Fetched PDF URL in %.2fs (download=%.2fs extract=%.2fs) but extracted no text: %s',
+            elapsed,
+            downloaded_elapsed,
+            extract_elapsed,
+            url
+        )
         return None
 
     if not is_html:
