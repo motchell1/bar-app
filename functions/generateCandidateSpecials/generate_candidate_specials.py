@@ -21,6 +21,8 @@ DB_SPECIAL_SYNC_LAMBDA_NAME = os.environ.get('DB_SPECIAL_SYNC_LAMBDA_NAME')
 DATA_AUDIT_LAMBDA_NAME = os.environ.get('DATA_AUDIT_LAMBDA_NAME')
 MAX_LINKS_TO_VISIT = 3
 MAX_TEXT_CHARS_PER_PAGE = 20000
+MAX_DOWNLOAD_BYTES = int(os.environ.get('MAX_DOWNLOAD_BYTES', str(8 * 1024 * 1024)))
+FETCH_HARD_TIMEOUT_SECONDS = float(os.environ.get('FETCH_HARD_TIMEOUT_SECONDS', '15'))
 KEYWORD_MATCH_CHAR_WINDOW_SIZE = int(os.environ.get('KEYWORD_MATCH_CHAR_WINDOW_SIZE', '220'))
 HTML_CONTENT_HINTS = ('text/html', 'application/xhtml+xml')
 PDF_CONTENT_HINTS = ('application/pdf',)
@@ -354,7 +356,7 @@ def fetch_page_content(url):
     LOGGER.info('Fetching URL: %s', url)
     response = requests.get(
         url,
-        timeout=10,
+        timeout=(5, 10),
         stream=True,
         headers={'User-Agent': 'bar-specials-bot/1.0'}
     )
@@ -375,8 +377,23 @@ def fetch_page_content(url):
     )
     is_html = any(hint in content_type for hint in HTML_CONTENT_HINTS) or not content_type
 
+    payload_chunks = []
+    downloaded_bytes = 0
+    byte_cap = MAX_DOWNLOAD_BYTES if is_pdf else (MAX_TEXT_CHARS_PER_PAGE * 4)
+    for chunk in response.iter_content(chunk_size=32 * 1024):
+        if not chunk:
+            continue
+        downloaded_bytes += len(chunk)
+        payload_chunks.append(chunk)
+        if downloaded_bytes >= byte_cap:
+            LOGGER.info('Stopping read at byte cap (%d bytes) for URL: %s', byte_cap, final_url)
+            break
+        if (time.perf_counter() - started_at) > FETCH_HARD_TIMEOUT_SECONDS:
+            LOGGER.info('Stopping read at hard timeout %.2fs for URL: %s', FETCH_HARD_TIMEOUT_SECONDS, final_url)
+            break
+
     if is_pdf:
-        payload = response.content
+        payload = b''.join(payload_chunks)
         response.close()
         text = _extract_pdf_text(payload)
         elapsed = time.perf_counter() - started_at
@@ -398,8 +415,9 @@ def fetch_page_content(url):
         response.close()
         return None
 
+    payload = b''.join(payload_chunks)
     response.encoding = response.encoding or response.apparent_encoding
-    html = response.text[:MAX_TEXT_CHARS_PER_PAGE * 4]
+    html = payload.decode(response.encoding or 'utf-8', errors='ignore')[:MAX_TEXT_CHARS_PER_PAGE * 4]
     response.close()
     elapsed = time.perf_counter() - started_at
     LOGGER.info('Fetched URL in %.2fs: %s', elapsed, url)
@@ -898,14 +916,16 @@ def generate_from_crawl(homepage_url, bar_name, neighborhood):
     if not homepage_page:
         LOGGER.info('Homepage was unsupported or empty; returning empty crawl result')
         return [], stats
-    if homepage_page.get('content_type') != 'html':
-        LOGGER.info('Homepage content was not HTML; returning empty crawl result')
-        return [], stats
-    links = extract_links(homepage_url, homepage_page.get('text', ''))
-    LOGGER.info('Extracted %d same-domain links from homepage', len(links))
-    top_links = choose_candidate_links(links)
-    stats['web_crawl_candidate_links'] = len(top_links)
-    candidate_links = [homepage_url] + [url for url in top_links if url != homepage_url]
+    if homepage_page.get('content_type') == 'html':
+        links = extract_links(homepage_url, homepage_page.get('text', ''))
+        LOGGER.info('Extracted %d same-domain links from homepage', len(links))
+        top_links = choose_candidate_links(links)
+        stats['web_crawl_candidate_links'] = len(top_links)
+        candidate_links = [homepage_url] + [url for url in top_links if url != homepage_url]
+    else:
+        LOGGER.info('Homepage content is %s; crawling homepage URL directly', homepage_page.get('content_type'))
+        stats['web_crawl_candidate_links'] = 1
+        candidate_links = [homepage_url]
     LOGGER.info('Selected %d initial candidate links for crawl', len(candidate_links))
 
     page_payloads = []
