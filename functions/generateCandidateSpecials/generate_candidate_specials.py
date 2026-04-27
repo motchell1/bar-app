@@ -603,6 +603,10 @@ STRICT RULES:
   - Price or discount included in description
   - Food or drink item
   - Clear determination of day/time/recurrance for each item
+  - If special is not all day, clear determination of start and end time
+  - If a price, discount, or deal amount is explicitly stated for an item, it MUST be included in the description
+  - Never output an item name alone if its price/discount is clearly present nearby
+  - If item name and price appear on separate but adjascent lines, merge them into a single description
 
 Extraction strategy (important):
 - Prioritize sections/headings that contain words like: specials, weekly specials, happy hour, deals, promotions.
@@ -640,6 +644,14 @@ Normalization rules:
   - Price or discount amount
   - Food or drink item
   - Clear determination of day/time/recurrance for each item
+  - If a price or discount is visible in the source text but missing from description, fix the description.
+  - If a special is not all-day and the start time or end time is missing, lower the confidence
+  - Omit labels such as "happy hour" or time descriptors from description and keep only the actual offer details in the description.
+- If one of the following are missing from the parsed description, score confidence .5 or less:
+  - Price or discount amount
+  - Food or drink item
+  - Day of week
+  - All_day = N and start_time or end_time is missing
 
 Return ONLY valid JSON (an array). No explanations.
 
@@ -683,9 +695,16 @@ Normalization rules:
 - Set confidence based on evidence strength and source quality. Suggested rubric:
   - 1.00: Special has price or discount type, food or drink item, and clear determination of day/time/recurrance defined for each item corroborated by at least two independent reliable sources with recent updates.
   - 0.85-0.99: Special has price or discount type, food or drink item, and clear determination of day/time/recurrance defined for each item corroborated by only one reliable source with recent updates.
-  - 0.70-0.84: Slight ambiguity of one of: (price or discount type, food or drink item, or day/time/recurrance) or source is questionable
-  - 0.40-0.69: Ambiguity of two of: (price or discount type, food or drink item, or day/time/recurrance)
+  - 0.70-0.84: Slight ambiguity of one of: (price or discount type, food or drink item, day/time/recurrance, start or end time is missing on special that is not all-day) or source is questionable
+  - 0.40-0.69: Ambiguity of two of: (price or discount type, food or drink item, or day/time/recurrance, start or end time is missing on special that is not all-day)
   - 0.10-0.39: stale or weak evidence (old posts, indirect mentions, third-party reposts without confirmation).
+
+Final review:
+- If one of the following is true, score confidence .4 or less:
+  - Price or discount amount missing from description field
+  - Food or drink item missing from description field
+  - days_of_week field is missing
+  - all_day = N and start_time or end_time is missing
 
 Only include items when a concrete source URL is available. Only include items that are an actual discount - don't just include events without a food or drink discount.
 Return ONLY valid JSON. No explanations.
