@@ -679,6 +679,32 @@ def remove_rejected_special_candidate(cursor, special_candidate_id: int):
     }
 
 
+def delete_special_candidate_run(cursor, run_id: int):
+    cursor.execute(
+        """
+        DELETE FROM special_candidate
+        WHERE run_id = %s
+        """,
+        (run_id,),
+    )
+    deleted_special_candidates = cursor.rowcount
+
+    cursor.execute(
+        """
+        DELETE FROM special_candidate_run
+        WHERE run_id = %s
+        """,
+        (run_id,),
+    )
+    deleted_runs = cursor.rowcount
+
+    return {
+        'run_id': run_id,
+        'deleted_special_candidates': deleted_special_candidates,
+        'deleted_runs': deleted_runs,
+    }
+
+
 def update_special_candidate_approval(cursor, special_candidate_id: int, approval_status: str):
     normalized_status = str(approval_status or '').strip().upper()
     if normalized_status not in {'APPROVED', 'REJECTED'}:
@@ -1331,6 +1357,7 @@ def lambda_handler(event, context):
         'detect_duplicate_websites',
         'detect_duplicate_specials',
         'remove_rejected_special_candidate',
+        'delete_special_candidate_run',
         'update_special_candidate_approval',
         'get_all_specials',
         'update_special',
@@ -1352,6 +1379,7 @@ def lambda_handler(event, context):
                         'get_rejected_special_candidates, '
                         'detect_duplicate_websites, detect_duplicate_specials, '
                         'remove_rejected_special_candidate, '
+                        'delete_special_candidate_run, '
                         'update_special_candidate_approval, get_all_specials, update_special, delete_special, insert_special, '
                         'update_special_candidate, get_all_bars, get_bar_details, update_bar, update_open_hours'
                     )
@@ -1385,6 +1413,11 @@ def lambda_handler(event, context):
                 if not special_candidate_id:
                     raise ValueError('special_candidate_id is required for remove_rejected_special_candidate')
                 result = remove_rejected_special_candidate(cursor, special_candidate_id)
+            elif mode == 'delete_special_candidate_run':
+                run_id = event.get('run_id')
+                if not run_id:
+                    raise ValueError('run_id is required for delete_special_candidate_run')
+                result = delete_special_candidate_run(cursor, int(run_id))
             elif mode == 'get_all_specials':
                 result = get_all_specials(cursor)
             elif mode == 'get_all_bars':
