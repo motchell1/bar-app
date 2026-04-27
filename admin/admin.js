@@ -696,7 +696,7 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
   async function generateCandidateSpecialsForBar(barId) {
     const bar = state.allBars.find((row) => Number(row.bar_id) === Number(barId));
     if (!bar) throw new Error('Bar details are unavailable. Please refresh and try again.');
-    const homepageUrl = String(bar.homepage_url || bar.website_url || '').trim();
+    const homepageUrl = String(bar.homepage_url || bar.website_url || bar.website || '').trim();
     if (!homepageUrl) throw new Error('This bar does not have a website URL, so a candidate run cannot be generated.');
 
     state.generatingBarId = Number(barId);
