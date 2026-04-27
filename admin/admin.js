@@ -53,6 +53,7 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
     loadingSpecials: false,
     loadingRejectedSpecials: false,
     loadingBars: false,
+    barSearchTerm: '',
     specialSearchTerm: '',
     specialFilterActive: 'all',
     specialFilterNeighborhood: 'all',
@@ -73,6 +74,8 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
     detailBarEditing: false,
     savingBar: false,
     generatingBarId: null,
+    generatingBarSecondsElapsed: 0,
+    generateResultMessage: '',
     runs: [],
     confirmingDeleteRunId: null,
     deletingRunId: null,
@@ -96,6 +99,7 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
     },
     errorMessage: ''
   };
+  let generateBarTimer = null;
 
   const SORTABLE_TABLES = {
     'special-management': 'specialManagementSort',
@@ -121,9 +125,12 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
     state.detailOpenHours = [];
     state.detailBarEditing = false;
     state.generatingBarId = null;
+    state.generatingBarSecondsElapsed = 0;
+    state.generateResultMessage = '';
     state.confirmingDeleteRunId = null;
     state.deletingRunId = null;
     state.creatingSpecial = false;
+    stopGenerateBarTimer();
     render();
   });
 
@@ -151,6 +158,22 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
     }
 
     return parsed;
+  }
+
+  function stopGenerateBarTimer() {
+    if (generateBarTimer) {
+      clearInterval(generateBarTimer);
+      generateBarTimer = null;
+    }
+  }
+
+  function startGenerateBarTimer() {
+    stopGenerateBarTimer();
+    state.generatingBarSecondsElapsed = 0;
+    generateBarTimer = setInterval(() => {
+      state.generatingBarSecondsElapsed += 1;
+      render();
+    }, 1000);
   }
 
   function formatDateTime(value) {
@@ -673,11 +696,13 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
   async function generateCandidateSpecialsForBar(barId) {
     const bar = state.allBars.find((row) => Number(row.bar_id) === Number(barId));
     if (!bar) throw new Error('Bar details are unavailable. Please refresh and try again.');
-    const homepageUrl = String(bar.website_url || '').trim();
+    const homepageUrl = String(bar.homepage_url || bar.website_url || '').trim();
     if (!homepageUrl) throw new Error('This bar does not have a website URL, so a candidate run cannot be generated.');
 
     state.generatingBarId = Number(barId);
+    state.generateResultMessage = '';
     state.errorMessage = '';
+    startGenerateBarTimer();
     render();
 
     try {
@@ -701,12 +726,16 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
       if (parsed?.error) {
         throw new Error(parsed.error);
       }
+      state.generateResultMessage = `Generate Candidate Specials response: ${JSON.stringify(parsed)}`;
       await loadAllBars();
     } catch (err) {
       console.error('Failed to generate candidate specials:', err);
       state.errorMessage = err?.message || 'Failed to generate candidate specials for this bar.';
+      state.generateResultMessage = '';
     } finally {
+      stopGenerateBarTimer();
       state.generatingBarId = null;
+      state.generatingBarSecondsElapsed = 0;
       render();
     }
   }
@@ -1325,11 +1354,20 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
   }
 
   function buildBarManagementTable() {
-    if (!state.allBars.length) {
+    const searchTerm = String(state.barSearchTerm || '').trim().toLowerCase();
+    const filteredBars = state.allBars.filter((bar) => {
+      if (!searchTerm) return true;
+      const name = String(bar.name || '').toLowerCase();
+      const neighborhood = String(bar.neighborhood || '').toLowerCase();
+      return name.includes(searchTerm) || neighborhood.includes(searchTerm);
+    });
+
+    if (!filteredBars.length) {
+      if (searchTerm) return '<p class="admin-empty">No bars match that search.</p>';
       return '<p class="admin-empty">No bars found.</p>';
     }
 
-    const sortedBars = sortRows(state.allBars, 'bar-management', barSortValue);
+    const sortedBars = sortRows(filteredBars, 'bar-management', barSortValue);
     const rows = sortedBars.map((bar) => `
       <tr class="admin-bar-row" data-bar-id="${bar.bar_id}">
         <td>${bar.name || '—'}</td>
@@ -1667,6 +1705,26 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
   function bindBarManagementEvents() {
     bindSortableColumnHeaders();
 
+    const searchInput = screenElement.querySelector('[data-bar-search-input]');
+    if (searchInput) {
+      searchInput.addEventListener('input', (event) => {
+        const { selectionStart, selectionEnd } = event.target;
+        state.barSearchTerm = event.target.value;
+        render();
+        const nextInput = screenElement.querySelector('[data-bar-search-input]');
+        if (nextInput) {
+          nextInput.focus();
+          if (
+            typeof selectionStart === 'number'
+            && typeof selectionEnd === 'number'
+            && typeof nextInput.setSelectionRange === 'function'
+          ) {
+            nextInput.setSelectionRange(selectionStart, selectionEnd);
+          }
+        }
+      });
+    }
+
     screenElement.querySelectorAll('.admin-bar-row[data-bar-id]').forEach((row) => {
       row.addEventListener('click', () => {
         state.actionBarId = Number(row.getAttribute('data-bar-id'));
@@ -1907,6 +1965,16 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
     screenElement.innerHTML = `
       <section class="admin-specials-view" aria-label="Bar management">
         <h2>Bar Management</h2>
+        <input
+          type="search"
+          class="admin-input admin-special-search-input"
+          data-bar-search-input
+          placeholder="Search by bar or neighborhood"
+          value="${escapeAttribute(state.barSearchTerm)}"
+          aria-label="Search bars by bar or neighborhood"
+        />
+        ${state.generatingBarId ? `<p class="admin-loading">Generating candidate specials... ${state.generatingBarSecondsElapsed}s elapsed.</p>` : ''}
+        ${state.generateResultMessage ? `<p class="admin-loading">${state.generateResultMessage}</p>` : ''}
         ${state.errorMessage ? `<p class="admin-error">${state.errorMessage}</p>` : ''}
         ${buildBarManagementTable()}
       </section>
