@@ -3,6 +3,7 @@ import logging
 import os
 import re
 import time
+import zlib
 from datetime import date, datetime, timedelta
 from html import unescape
 from html.parser import HTMLParser
@@ -21,7 +22,8 @@ MAX_LINKS_TO_VISIT = 3
 MAX_TEXT_CHARS_PER_PAGE = 20000
 KEYWORD_MATCH_CHAR_WINDOW_SIZE = int(os.environ.get('KEYWORD_MATCH_CHAR_WINDOW_SIZE', '220'))
 HTML_CONTENT_HINTS = ('text/html', 'application/xhtml+xml')
-NON_HTML_EXTENSIONS = ('.pdf', '.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.zip', '.mp4', '.mp3')
+PDF_CONTENT_HINTS = ('application/pdf',)
+NON_TEXT_EXTENSIONS = ('.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.zip', '.mp4', '.mp3')
 
 KEYWORDS = ('special', 'happy', 'menu', 'event')
 SPECIALS_VOCAB = (
@@ -234,7 +236,52 @@ def invoke_data_audit(payload):
     return _invoke_lambda(DATA_AUDIT_LAMBDA_NAME, payload, 'DATA_AUDIT_LAMBDA_NAME')
 
 
-def fetch_html(url):
+def _extract_pdf_text(pdf_bytes):
+    if not pdf_bytes:
+        return ''
+
+    extracted_chunks = []
+    for match in re.finditer(rb'stream\r?\n(.*?)\r?\nendstream', pdf_bytes, flags=re.DOTALL):
+        stream_payload = match.group(1)
+        decoded_payload = None
+        try:
+            decoded_payload = zlib.decompress(stream_payload)
+        except zlib.error:
+            decoded_payload = stream_payload
+
+        if not decoded_payload:
+            continue
+
+        decoded_text = decoded_payload.decode('latin-1', errors='ignore')
+        if 'BT' not in decoded_text and 'Tj' not in decoded_text and 'TJ' not in decoded_text:
+            continue
+
+        chunks = re.findall(r'\((.*?)\)\s*Tj', decoded_text, flags=re.DOTALL)
+        for array_match in re.findall(r'\[(.*?)\]\s*TJ', decoded_text, flags=re.DOTALL):
+            chunks.extend(re.findall(r'\((.*?)\)', array_match, flags=re.DOTALL))
+
+        for chunk in chunks:
+            normalized = (
+                chunk
+                .replace(r'\n', '\n')
+                .replace(r'\r', ' ')
+                .replace(r'\t', ' ')
+                .replace(r'\(', '(')
+                .replace(r'\)', ')')
+                .replace(r'\\', '\\')
+            )
+            normalized = re.sub(r'\s+', ' ', normalized).strip()
+            if normalized:
+                extracted_chunks.append(normalized)
+
+    if not extracted_chunks:
+        return ''
+
+    text = '\n'.join(extracted_chunks)
+    return text[:MAX_TEXT_CHARS_PER_PAGE]
+
+
+def fetch_page_content(url):
     started_at = time.perf_counter()
     LOGGER.info('Fetching URL: %s', url)
     response = requests.get(
@@ -247,17 +294,35 @@ def fetch_html(url):
 
     final_url = response.url or url
     parsed_final = urlparse(final_url)
-    if parsed_final.path.lower().endswith(NON_HTML_EXTENSIONS):
+    content_type = (response.headers.get('Content-Type') or '').lower()
+    if parsed_final.path.lower().endswith(NON_TEXT_EXTENSIONS):
         elapsed = time.perf_counter() - started_at
-        LOGGER.info('Skipping non-HTML URL in %.2fs: %s', elapsed, final_url)
+        LOGGER.info('Skipping non-text URL in %.2fs: %s', elapsed, final_url)
         response.close()
         return None
 
-    content_type = (response.headers.get('Content-Type') or '').lower()
-    if content_type and all(hint not in content_type for hint in HTML_CONTENT_HINTS):
+    is_pdf = (
+        parsed_final.path.lower().endswith('.pdf')
+        or any(hint in content_type for hint in PDF_CONTENT_HINTS)
+    )
+    is_html = any(hint in content_type for hint in HTML_CONTENT_HINTS) or not content_type
+
+    if is_pdf:
+        payload = response.content
+        response.close()
+        text = _extract_pdf_text(payload)
+        elapsed = time.perf_counter() - started_at
+        if text:
+            LOGGER.info('Fetched PDF URL in %.2fs: %s', elapsed, url)
+            return {'content_type': 'pdf', 'text': text}
+
+        LOGGER.info('Fetched PDF URL in %.2fs but extracted no text: %s', elapsed, url)
+        return None
+
+    if not is_html:
         elapsed = time.perf_counter() - started_at
         LOGGER.info(
-            'Skipping response with non-HTML content-type in %.2fs: %s (%s)',
+            'Skipping response with unsupported content-type in %.2fs: %s (%s)',
             elapsed,
             final_url,
             content_type
@@ -266,11 +331,11 @@ def fetch_html(url):
         return None
 
     response.encoding = response.encoding or response.apparent_encoding
-    html = response.text
+    html = response.text[:MAX_TEXT_CHARS_PER_PAGE * 4]
     response.close()
     elapsed = time.perf_counter() - started_at
     LOGGER.info('Fetched URL in %.2fs: %s', elapsed, url)
-    return html
+    return {'content_type': 'html', 'text': html}
 
 
 def _normalize_host(host):
@@ -755,17 +820,20 @@ def generate_from_crawl(homepage_url, bar_name, neighborhood):
         homepage_url
     )
     try:
-        homepage_html = fetch_html(homepage_url)
+        homepage_page = fetch_page_content(homepage_url)
     except requests.RequestException:
         LOGGER.exception('Failed fetching homepage for crawl; falling back to web_search: %s', homepage_url)
         return [], stats
     except Exception:
         LOGGER.exception('Unexpected homepage crawl error; falling back to web_search: %s', homepage_url)
         return [], stats
-    if not homepage_html:
-        LOGGER.info('Homepage was non-HTML or empty; returning empty crawl result')
+    if not homepage_page:
+        LOGGER.info('Homepage was unsupported or empty; returning empty crawl result')
         return [], stats
-    links = extract_links(homepage_url, homepage_html)
+    if homepage_page.get('content_type') != 'html':
+        LOGGER.info('Homepage content was not HTML; returning empty crawl result')
+        return [], stats
+    links = extract_links(homepage_url, homepage_page.get('text', ''))
     LOGGER.info('Extracted %d same-domain links from homepage', len(links))
     top_links = choose_candidate_links(links)
     stats['web_crawl_candidate_links'] = len(top_links)
@@ -781,16 +849,19 @@ def generate_from_crawl(homepage_url, bar_name, neighborhood):
             LOGGER.info('Skipping malformed candidate link entry: %s', link)
             continue
         try:
-            html = fetch_html(candidate_url)
-            if not html:
-                LOGGER.info('Skipping non-HTML candidate link: %s', candidate_url)
+            page = fetch_page_content(candidate_url)
+            if not page:
+                LOGGER.info('Skipping unsupported candidate link: %s', candidate_url)
                 continue
-            text = extract_text(html)
+            if page.get('content_type') == 'pdf':
+                text = page.get('text', '')
+            else:
+                text = extract_text(page.get('text', ''))
             if text:
                 page_payloads.append({'url': candidate_url, 'text': text})
                 LOGGER.info('Captured %d characters from %s', len(text), candidate_url)
             else:
-                LOGGER.info('No HTML text captured from %s (likely non-HTML content)', candidate_url)
+                LOGGER.info('No text captured from %s (likely image-only or unsupported)', candidate_url)
         except requests.RequestException:
             LOGGER.exception('Failed fetching candidate link: %s', candidate_url)
             continue
