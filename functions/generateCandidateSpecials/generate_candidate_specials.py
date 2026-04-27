@@ -302,8 +302,8 @@ def _extract_pdf_text(pdf_bytes):
         return ''
 
     extracted_chunks = []
-    for match in re.finditer(rb'stream\r?\n(.*?)\r?\nendstream', pdf_bytes, flags=re.DOTALL):
-        stream_payload = match.group(1)
+    for match in re.finditer(rb'stream[\r\n]+(.*?)endstream', pdf_bytes, flags=re.DOTALL):
+        stream_payload = (match.group(1) or b'').rstrip(b'\r\n')
         decoded_payload = _decode_pdf_stream(stream_payload)
 
         if not decoded_payload:
@@ -336,7 +336,14 @@ def _extract_pdf_text(pdf_bytes):
                     extracted_chunks.append(normalized)
 
     if not extracted_chunks:
-        return ''
+        fallback_text = pdf_bytes.decode('latin-1', errors='ignore')
+        fallback_chunks = re.findall(r'\((?:\\.|[^\\()]){4,}\)', fallback_text, flags=re.DOTALL)
+        for token in fallback_chunks:
+            normalized = re.sub(r'\s+', ' ', _decode_pdf_literal(token[1:-1])).strip()
+            if normalized:
+                extracted_chunks.append(normalized)
+        if not extracted_chunks:
+            return ''
 
     text = '\n'.join(extracted_chunks)
     return text[:MAX_TEXT_CHARS_PER_PAGE]
