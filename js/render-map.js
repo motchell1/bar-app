@@ -11,6 +11,20 @@ let mapSelectedBarSheetState = {
 };
 let mapDismissListenersBound = false;
 let mapSheetDismissTimer = null;
+const MAP_MARKER_BLUE = '#007bff';
+
+function createBlueMapPinElement() {
+  const PinElement = google.maps.marker?.PinElement;
+  if (!PinElement) return null;
+
+  const pin = new PinElement({
+    background: MAP_MARKER_BLUE,
+    borderColor: MAP_MARKER_BLUE,
+    glyphColor: '#ffffff'
+  });
+
+  return pin.element;
+}
 
 function getMapSelectedDayKey() {
   if (mapSelectedDayKey && MAP_DAY_KEYS.includes(mapSelectedDayKey)) {
@@ -303,7 +317,8 @@ function renderMapTab() {
           position: { lat: bar.latitude, lng: bar.longitude },
           map: barsMap,
           title: bar.name,
-          gmpClickable: true
+          gmpClickable: true,
+          content: createBlueMapPinElement()
         });
 
         marker.addEventListener('gmp-click', () => {
