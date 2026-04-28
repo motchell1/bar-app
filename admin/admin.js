@@ -1,4 +1,5 @@
 const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaws.com/default/dbAdminSync';
+const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaws.com/default/generateCandidateSpecials';
 
 (function initAdminPage() {
   const backButton = document.getElementById('admin-back-button');
@@ -52,6 +53,7 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
     loadingSpecials: false,
     loadingRejectedSpecials: false,
     loadingBars: false,
+    barSearchTerm: '',
     specialSearchTerm: '',
     specialFilterActive: 'all',
     specialFilterNeighborhood: 'all',
@@ -71,7 +73,12 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
     detailOpenHours: [],
     detailBarEditing: false,
     savingBar: false,
+    generatingBarId: null,
+    generatingBarSecondsElapsed: 0,
+    generateResultPayload: null,
     runs: [],
+    confirmingDeleteRunId: null,
+    deletingRunId: null,
     rejectedSpecials: [],
     allSpecials: [],
     groupedSpecials: [],
@@ -92,6 +99,7 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
     },
     errorMessage: ''
   };
+  let generateBarTimer = null;
 
   const SORTABLE_TABLES = {
     'special-management': 'specialManagementSort',
@@ -116,7 +124,13 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
     state.detailBar = null;
     state.detailOpenHours = [];
     state.detailBarEditing = false;
+    state.generatingBarId = null;
+    state.generatingBarSecondsElapsed = 0;
+    state.generateResultPayload = null;
+    state.confirmingDeleteRunId = null;
+    state.deletingRunId = null;
     state.creatingSpecial = false;
+    stopGenerateBarTimer();
     render();
   });
 
@@ -144,6 +158,22 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
     }
 
     return parsed;
+  }
+
+  function stopGenerateBarTimer() {
+    if (generateBarTimer) {
+      clearInterval(generateBarTimer);
+      generateBarTimer = null;
+    }
+  }
+
+  function startGenerateBarTimer() {
+    stopGenerateBarTimer();
+    state.generatingBarSecondsElapsed = 0;
+    generateBarTimer = setInterval(() => {
+      state.generatingBarSecondsElapsed += 1;
+      render();
+    }, 1000);
   }
 
   function formatDateTime(value) {
@@ -663,6 +693,77 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
     }
   }
 
+  async function generateCandidateSpecialsForBar(barId) {
+    const bar = state.allBars.find((row) => Number(row.bar_id) === Number(barId));
+    if (!bar) throw new Error('Bar details are unavailable. Please refresh and try again.');
+    const homepageUrl = String(bar.homepage_url || bar.website_url || bar.website || '').trim();
+    if (!homepageUrl) throw new Error('This bar does not have a website URL, so a candidate run cannot be generated.');
+
+    state.generatingBarId = Number(barId);
+    state.generateResultPayload = null;
+    state.errorMessage = '';
+    startGenerateBarTimer();
+    render();
+
+    try {
+      const response = await fetch(GENERATE_CANDIDATE_SPECIALS_API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'text/plain'
+        },
+        body: JSON.stringify({
+          bar_id: Number(bar.bar_id),
+          bar_name: String(bar.name || '').trim(),
+          neighborhood: String(bar.neighborhood || '').trim(),
+          homepage_url: homepageUrl
+        })
+      });
+      const data = await response.json();
+      const parsed = typeof data.body === 'string' ? JSON.parse(data.body) : data;
+      if (!response.ok) {
+        throw new Error(parsed?.error || `Request failed with status ${response.status}`);
+      }
+      if (parsed?.error) {
+        throw new Error(parsed.error);
+      }
+      state.generateResultPayload = parsed;
+      await loadAllBars();
+    } catch (err) {
+      console.error('Failed to generate candidate specials:', err);
+      state.errorMessage = err?.message || 'Failed to generate candidate specials for this bar.';
+      state.generateResultPayload = null;
+    } finally {
+      stopGenerateBarTimer();
+      state.generatingBarId = null;
+      state.generatingBarSecondsElapsed = 0;
+      render();
+    }
+  }
+
+  async function deleteSpecialCandidatesForRun(runId) {
+    const parsedRunId = Number(runId);
+    if (!parsedRunId) return;
+
+    state.deletingRunId = parsedRunId;
+    state.errorMessage = '';
+    render();
+
+    try {
+      await callAdminSync({
+        mode: 'delete_special_candidate_run',
+        run_id: parsedRunId
+      });
+      state.confirmingDeleteRunId = null;
+      await loadUnapprovedSpecials();
+    } catch (err) {
+      console.error('Failed to delete candidate run:', err);
+      state.errorMessage = err?.message || 'Failed to delete candidate run.';
+    } finally {
+      state.deletingRunId = null;
+      render();
+    }
+  }
+
   function getSpecialById(specialId) {
     return state.allSpecials.find((row) => row.special_id === specialId) || null;
   }
@@ -689,6 +790,7 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
 
   function getBarActionMenuMarkup() {
     if (!state.actionBarId) return '';
+    const isGenerating = state.generatingBarId === Number(state.actionBarId);
     return `
       <div class="admin-modal-backdrop" data-close-bar-action-menu="true">
         <div class="admin-modal" role="dialog" aria-label="Bar actions">
@@ -696,6 +798,9 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
           <button type="button" class="admin-tool-button" data-bar-action="view-details" data-bar-id="${state.actionBarId}">View Details</button>
           <button type="button" class="admin-tool-button" data-bar-action="activate" data-bar-id="${state.actionBarId}">Activate Bar</button>
           <button type="button" class="admin-tool-button" data-bar-action="deactivate" data-bar-id="${state.actionBarId}">Deactivate Bar</button>
+          <button type="button" class="admin-tool-button" data-bar-action="generate-candidates" data-bar-id="${state.actionBarId}" ${isGenerating ? 'disabled' : ''}>
+            ${isGenerating ? 'Generating Candidate Specials...' : 'Generate Candidate Specials'}
+          </button>
           <button type="button" class="admin-secondary-btn" data-close-bar-action-menu="true">Close</button>
         </div>
       </div>
@@ -1025,8 +1130,10 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
     return state.runs.map((run) => {
       const specialsMarkup = (run.specials || []).map((special) => {
         const candidateId = Number(special.special_candidate_id);
+        const approvalStatus = String(special.approval_status || '').trim().toUpperCase();
+        const isAutoApproved = approvalStatus === 'AUTO_APPROVED';
         const isUpdating = state.updatingCandidateId === candidateId;
-        const isEditing = state.editingCandidateId === candidateId;
+        const isEditing = !isAutoApproved && state.editingCandidateId === candidateId;
         const confidence = special.confidence === null || special.confidence === undefined ? '—' : String(special.confidence);
         const editableValue = (field, fallback = '—') => {
           const value = special[field] ?? '';
@@ -1081,13 +1188,14 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
 
         return `
           <article class="admin-candidate-card" data-candidate-id="${candidateId}">
-            ${isEditing ? '' : `
+            ${(isEditing || isAutoApproved) ? '' : `
               <button class="admin-icon-btn" type="button" aria-label="Edit special candidate" title="Edit" data-candidate-action="edit" data-candidate-id="${candidateId}" ${isUpdating ? 'disabled' : ''}>
                 &#8943;
               </button>
             `}
             <h4>${isEditing ? 'Editing Special Candidate' : (special.description || 'No description')}</h4>
             <p><strong>Special Candidate ID:</strong> ${special.special_candidate_id ?? '—'}</p>
+            <p><strong>Status:</strong> ${special.approval_status || 'NOT_APPROVED'}</p>
             <p><strong>Description:</strong> ${editableValue('description')}</p>
             <p><strong>Type:</strong> ${editableValue('type')}</p>
             <p><strong>Days:</strong> ${editableValue('days_of_week', '—')}</p>
@@ -1098,20 +1206,36 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
             <p><strong>Method:</strong> ${special.fetch_method || '—'}</p>
             <p><strong>Source:</strong> ${getSourceMarkup(special.source)}</p>
             <p><strong>Notes:</strong> ${special.notes || '—'}</p>
-            <div class="admin-actions-row">
-              ${isEditing
-                ? `<button class="admin-action-btn approve" type="button" data-candidate-action="save-edit" data-candidate-id="${candidateId}" ${state.savingCandidate ? 'disabled' : ''}>Save</button>
-                   <button class="admin-secondary-btn" type="button" data-candidate-action="cancel-edit" data-candidate-id="${candidateId}" ${state.savingCandidate ? 'disabled' : ''}>Cancel</button>`
-                : `<button class="admin-action-btn approve" type="button" data-action="APPROVED" data-candidate-id="${candidateId}" ${isUpdating ? 'disabled' : ''}>Approve</button>
-                   <button class="admin-action-btn reject" type="button" data-action="REJECTED" data-candidate-id="${candidateId}" ${isUpdating ? 'disabled' : ''}>Reject</button>`}
-            </div>
+            ${isAutoApproved
+              ? ''
+              : `<div class="admin-actions-row">
+                  ${isEditing
+                    ? `<button class="admin-action-btn approve" type="button" data-candidate-action="save-edit" data-candidate-id="${candidateId}" ${state.savingCandidate ? 'disabled' : ''}>Save</button>
+                       <button class="admin-secondary-btn" type="button" data-candidate-action="cancel-edit" data-candidate-id="${candidateId}" ${state.savingCandidate ? 'disabled' : ''}>Cancel</button>`
+                    : `<button class="admin-action-btn approve" type="button" data-action="APPROVED" data-candidate-id="${candidateId}" ${isUpdating ? 'disabled' : ''}>Approve</button>
+                       <button class="admin-action-btn reject" type="button" data-action="REJECTED" data-candidate-id="${candidateId}" ${isUpdating ? 'disabled' : ''}>Reject</button>`}
+                </div>`}
           </article>
         `;
       }).join('');
 
+      const isDeletingRun = Number(state.deletingRunId) === Number(run.run_id);
       return `
         <section class="admin-run-card">
-          <h3>Run ${run.run_id} — ${run.bar_name || 'Unknown bar'}</h3>
+          <div class="admin-run-card-header">
+            <h3>Run ${run.run_id} — ${run.bar_name || 'Unknown bar'}</h3>
+            <button
+              type="button"
+              class="admin-icon-btn admin-run-delete-btn"
+              aria-label="Delete run ${run.run_id}"
+              title="Delete run"
+              data-run-action="prompt-delete"
+              data-run-id="${run.run_id}"
+              ${isDeletingRun ? 'disabled' : ''}
+            >
+              &times;
+            </button>
+          </div>
           <p><strong>Neighborhood:</strong> ${run.neighborhood || '—'}</p>
           <p><strong>Bar ID:</strong> ${run.bar_id ?? '—'}</p>
           <p><strong>Total candidates:</strong> ${run.total_candidates ?? '—'}</p>
@@ -1122,6 +1246,31 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
         </section>
       `;
     }).join('');
+  }
+
+  function getRunDeleteConfirmationModalMarkup() {
+    if (!state.confirmingDeleteRunId) return '';
+    const isDeleting = Number(state.deletingRunId) === Number(state.confirmingDeleteRunId);
+    return `
+      <div class="admin-modal-backdrop" data-close-run-delete-modal="true">
+        <div class="admin-modal" role="dialog" aria-label="Delete run confirmation">
+          <h3>Delete Candidate Run ${state.confirmingDeleteRunId}</h3>
+          <p>This will remove all <code>special_candidate</code> rows for this run. This cannot be undone.</p>
+          <div class="admin-actions-row">
+            <button
+              type="button"
+              class="admin-tool-button danger"
+              data-run-action="confirm-delete"
+              data-run-id="${state.confirmingDeleteRunId}"
+              ${isDeleting ? 'disabled' : ''}
+            >
+              ${isDeleting ? 'Deleting...' : 'Delete Run'}
+            </button>
+            <button type="button" class="admin-secondary-btn" data-close-run-delete-modal="true" ${isDeleting ? 'disabled' : ''}>Cancel</button>
+          </div>
+        </div>
+      </div>
+    `;
   }
 
   function buildSpecialManagementTable() {
@@ -1210,11 +1359,20 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
   }
 
   function buildBarManagementTable() {
-    if (!state.allBars.length) {
+    const searchTerm = String(state.barSearchTerm || '').trim().toLowerCase();
+    const filteredBars = state.allBars.filter((bar) => {
+      if (!searchTerm) return true;
+      const name = String(bar.name || '').toLowerCase();
+      const neighborhood = String(bar.neighborhood || '').toLowerCase();
+      return name.includes(searchTerm) || neighborhood.includes(searchTerm);
+    });
+
+    if (!filteredBars.length) {
+      if (searchTerm) return '<p class="admin-empty">No bars match that search.</p>';
       return '<p class="admin-empty">No bars found.</p>';
     }
 
-    const sortedBars = sortRows(state.allBars, 'bar-management', barSortValue);
+    const sortedBars = sortRows(filteredBars, 'bar-management', barSortValue);
     const rows = sortedBars.map((bar) => `
       <tr class="admin-bar-row" data-bar-id="${bar.bar_id}">
         <td>${bar.name || '—'}</td>
@@ -1286,6 +1444,33 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
           ).map((checkbox) => checkbox.getAttribute('data-candidate-day'));
           await saveCandidateUpdates(payload);
         }
+      });
+    });
+
+    screenElement.querySelectorAll('[data-run-action][data-run-id]').forEach((button) => {
+      button.addEventListener('click', async () => {
+        const action = button.getAttribute('data-run-action');
+        const runId = Number(button.getAttribute('data-run-id'));
+        if (!action || !runId) return;
+
+        if (action === 'prompt-delete') {
+          state.confirmingDeleteRunId = runId;
+          render();
+          return;
+        }
+
+        if (action === 'confirm-delete') {
+          await deleteSpecialCandidatesForRun(runId);
+        }
+      });
+    });
+
+    screenElement.querySelectorAll('[data-close-run-delete-modal="true"]').forEach((element) => {
+      element.addEventListener('click', (event) => {
+        if (event.currentTarget !== event.target) return;
+        if (state.deletingRunId) return;
+        state.confirmingDeleteRunId = null;
+        render();
       });
     });
   }
@@ -1525,6 +1710,26 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
   function bindBarManagementEvents() {
     bindSortableColumnHeaders();
 
+    const searchInput = screenElement.querySelector('[data-bar-search-input]');
+    if (searchInput) {
+      searchInput.addEventListener('input', (event) => {
+        const { selectionStart, selectionEnd } = event.target;
+        state.barSearchTerm = event.target.value;
+        render();
+        const nextInput = screenElement.querySelector('[data-bar-search-input]');
+        if (nextInput) {
+          nextInput.focus();
+          if (
+            typeof selectionStart === 'number'
+            && typeof selectionEnd === 'number'
+            && typeof nextInput.setSelectionRange === 'function'
+          ) {
+            nextInput.setSelectionRange(selectionStart, selectionEnd);
+          }
+        }
+      });
+    }
+
     screenElement.querySelectorAll('.admin-bar-row[data-bar-id]').forEach((row) => {
       row.addEventListener('click', () => {
         state.actionBarId = Number(row.getAttribute('data-bar-id'));
@@ -1564,6 +1769,11 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
             });
             await loadAllBars();
             render();
+            return;
+          }
+
+          if (action === 'generate-candidates') {
+            await generateCandidateSpecialsForBar(barId);
           }
         } catch (err) {
           console.error('Failed to update bar status:', err);
@@ -1685,6 +1895,7 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
         ${state.errorMessage ? `<p class="admin-error">${state.errorMessage}</p>` : ''}
         ${buildRunsMarkup()}
       </section>
+      ${getRunDeleteConfirmationModalMarkup()}
     `;
 
     bindApprovalButtons();
@@ -1759,12 +1970,50 @@ const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaw
     screenElement.innerHTML = `
       <section class="admin-specials-view" aria-label="Bar management">
         <h2>Bar Management</h2>
+        <input
+          type="search"
+          class="admin-input admin-special-search-input"
+          data-bar-search-input
+          placeholder="Search by bar or neighborhood"
+          value="${escapeAttribute(state.barSearchTerm)}"
+          aria-label="Search bars by bar or neighborhood"
+        />
+        ${state.generatingBarId ? `<p class="admin-loading">Generating candidate specials... ${state.generatingBarSecondsElapsed}s elapsed.</p>` : ''}
+        ${getGenerateResultMarkup()}
         ${state.errorMessage ? `<p class="admin-error">${state.errorMessage}</p>` : ''}
         ${buildBarManagementTable()}
       </section>
     `;
 
     bindBarManagementEvents();
+  }
+
+  function getGenerateResultMarkup() {
+    if (!state.generateResultPayload || typeof state.generateResultPayload !== 'object') return '';
+
+    const payload = state.generateResultPayload;
+    const rows = [
+      ['Neighborhood', payload.neighborhood || '—'],
+      ['Processed Bars', payload.processed_bars ?? '—'],
+      ['Candidates Found', payload.candidate_specials_found ?? '—'],
+      ['Candidates Inserted', payload.candidate_specials_inserted ?? '—'],
+      ['Auto Approved', payload.auto_approved_specials ?? '—'],
+      ['Crawl Specials', payload.website_crawl_specials ?? '—'],
+      ['Web AI Search Specials', payload.web_ai_search_specials ?? '—'],
+      ['Runs Created', payload.candidate_runs_created ?? '—'],
+      ['Runs Auto Published', payload.candidate_runs_auto_published ?? '—'],
+      ['Data Audit Invoked', payload.data_audit_invoked ?? '—'],
+      ['Data Audit Error', payload.data_audit_error || '—']
+    ];
+
+    return `
+      <div class="admin-generate-result">
+        <h3>Generate Candidate Specials Complete</h3>
+        <div class="admin-generate-result-grid">
+          ${rows.map(([label, value]) => `<p><strong>${label}:</strong> ${value}</p>`).join('')}
+        </div>
+      </div>
+    `;
   }
 
   function renderRejectedSpecialManagementView() {
