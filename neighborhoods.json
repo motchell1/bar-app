@@ -113,10 +113,10 @@
       ]
     },
     "strip district": {
-      "neighborhood_name": "South Side",
+      "neighborhood_name": "strip district",
       "search_rectangles": [
         {
-          "low": { "lat": 40.443642, , "lng": -79.994947 },
+          "low": { "lat": 40.443642, "lng": -79.994947 },
           "high": { "lat": 40.467606, "lng": -79.967291 }
         }
       ],
