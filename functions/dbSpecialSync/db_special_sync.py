@@ -153,6 +153,12 @@ def _should_convert_to_all_day(day_of_week, all_day, start_time, end_time, open_
     )
 
 
+def _append_missing_hours_note(note_suffixes: Dict[int, List[str]], candidate_id: int, day_of_week: str, missing_field: str) -> None:
+    note_suffixes.setdefault(candidate_id, []).append(
+        f" - missing {missing_field} for {day_of_week}, special not published for {day_of_week}"
+    )
+
+
 def _is_candidate_same_as_special(candidate_row: Dict, special_row: Dict) -> bool:
     return (
         _normalize_day_of_week(candidate_row.get('day_of_week')) == _normalize_day_of_week(special_row.get('day_of_week'))
@@ -371,6 +377,7 @@ def publish_special_candidate_run(cursor, bar_id: int, run_id: int, auto_publish
     approved_candidates = cursor.fetchall()
 
     candidate_rows = []
+    candidate_note_suffixes = {}
     for candidate in approved_candidates:
         for day in _parse_days_of_week(candidate.get('days_of_week')):
             start_time = candidate.get('start_time')
@@ -380,6 +387,27 @@ def publish_special_candidate_run(cursor, bar_id: int, run_id: int, auto_publish
                 all_day = 'Y'
                 start_time = None
                 end_time = None
+
+            if _normalize_yn_flag(all_day) == 'N':
+                day_hours = open_hours_lookup.get(_normalize_day_of_week(day), {})
+                should_skip = False
+                if not _normalize_time_value(start_time):
+                    resolved_open_time = _normalize_time_value(day_hours.get('open_time'))
+                    if resolved_open_time:
+                        start_time = resolved_open_time
+                    else:
+                        _append_missing_hours_note(candidate_note_suffixes, candidate['special_candidate_id'], day, 'open_time')
+                        should_skip = True
+                if not _normalize_time_value(end_time):
+                    resolved_close_time = _normalize_time_value(day_hours.get('close_time'))
+                    if resolved_close_time:
+                        end_time = resolved_close_time
+                    else:
+                        _append_missing_hours_note(candidate_note_suffixes, candidate['special_candidate_id'], day, 'close_time')
+                        should_skip = True
+                if should_skip:
+                    continue
+
             candidate_rows.append(
                 {
                     'candidate_id': candidate['special_candidate_id'],
@@ -391,6 +419,16 @@ def publish_special_candidate_run(cursor, bar_id: int, run_id: int, auto_publish
                     'all_day': all_day,
                 }
             )
+
+    for candidate_id, note_suffixes in candidate_note_suffixes.items():
+        cursor.execute(
+            """
+            UPDATE special_candidate
+            SET notes = CONCAT(COALESCE(notes, ''), %s)
+            WHERE special_candidate_id = %s
+            """,
+            (''.join(note_suffixes), candidate_id),
+        )
 
     manual_filter_clause = "AND insert_method <> 'MANUAL'" if IGNORE_MANUAL_SPECIALS_ON_PUBLISH == 'Y' else ''
     cursor.execute(

@@ -116,6 +116,26 @@ def _normalize_time_value(value) -> str:
     return normalized
 
 
+def _build_open_hours_lookup(open_hours_rows: List[Dict]) -> Dict[str, Dict]:
+    lookup = {}
+    for row in open_hours_rows:
+        day_key = _normalize_day_of_week(row.get('day_of_week'))
+        if not day_key:
+            continue
+        lookup[day_key] = {
+            'open_time': _normalize_time_value(row.get('open_time')),
+            'close_time': _normalize_time_value(row.get('close_time')),
+            'is_closed': _normalize_yn_flag(row.get('is_closed')),
+        }
+    return lookup
+
+
+def _append_missing_hours_note(note_suffixes: Dict[int, List[str]], candidate_id: int, day_of_week: str, missing_field: str) -> None:
+    note_suffixes.setdefault(candidate_id, []).append(
+        f" - missing {missing_field} for {day_of_week}, special not published for {day_of_week}"
+    )
+
+
 def _to_json_safe_number(value):
     if isinstance(value, Decimal):
         return float(value)
@@ -143,6 +163,16 @@ def _is_candidate_same_as_special(candidate_row: Dict, special_row: Dict) -> boo
 def publish_special_candidate_run(cursor, bar_id: int, run_id: int, auto_publish: str = 'N') -> Dict[str, int]:
     cursor.execute(
         """
+        SELECT day_of_week, open_time, close_time, is_closed
+        FROM open_hours
+        WHERE bar_id = %s
+        """,
+        (bar_id,),
+    )
+    open_hours_lookup = _build_open_hours_lookup(cursor.fetchall())
+
+    cursor.execute(
+        """
         SELECT special_candidate_id, description, type, days_of_week, start_time, end_time, all_day
         FROM special_candidate
         WHERE bar_id = %s
@@ -154,19 +184,52 @@ def publish_special_candidate_run(cursor, bar_id: int, run_id: int, auto_publish
     approved_candidates = cursor.fetchall()
 
     candidate_rows = []
+    candidate_note_suffixes = {}
     for candidate in approved_candidates:
         for day in _parse_days_of_week(candidate.get('days_of_week')):
+            start_time = candidate.get('start_time')
+            end_time = candidate.get('end_time')
+            all_day = candidate.get('all_day')
+            if _normalize_yn_flag(all_day) == 'N':
+                day_hours = open_hours_lookup.get(_normalize_day_of_week(day), {})
+                should_skip = False
+                if not _normalize_time_value(start_time):
+                    resolved_open_time = _normalize_time_value(day_hours.get('open_time'))
+                    if resolved_open_time:
+                        start_time = resolved_open_time
+                    else:
+                        _append_missing_hours_note(candidate_note_suffixes, candidate['special_candidate_id'], day, 'open_time')
+                        should_skip = True
+                if not _normalize_time_value(end_time):
+                    resolved_close_time = _normalize_time_value(day_hours.get('close_time'))
+                    if resolved_close_time:
+                        end_time = resolved_close_time
+                    else:
+                        _append_missing_hours_note(candidate_note_suffixes, candidate['special_candidate_id'], day, 'close_time')
+                        should_skip = True
+                if should_skip:
+                    continue
             candidate_rows.append(
                 {
                     'candidate_id': candidate['special_candidate_id'],
                     'description': candidate.get('description'),
                     'type': candidate.get('type'),
                     'day_of_week': day,
-                    'start_time': candidate.get('start_time'),
-                    'end_time': candidate.get('end_time'),
-                    'all_day': candidate.get('all_day'),
+                    'start_time': start_time,
+                    'end_time': end_time,
+                    'all_day': all_day,
                 }
             )
+
+    for candidate_id, note_suffixes in candidate_note_suffixes.items():
+        cursor.execute(
+            """
+            UPDATE special_candidate
+            SET notes = CONCAT(COALESCE(notes, ''), %s)
+            WHERE special_candidate_id = %s
+            """,
+            (''.join(note_suffixes), candidate_id),
+        )
 
     manual_filter_clause = "AND insert_method <> 'MANUAL'" if IGNORE_MANUAL_SPECIALS_ON_PUBLISH == 'Y' else ''
     cursor.execute(
