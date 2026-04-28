@@ -203,13 +203,13 @@ function showMapSelectedBarSheet(bar, specialIds, dayKey, dayLabel) {
     card.appendChild(image);
   }
 
-  const cardContent = buildHomeBarSpecials(bar, specialIds, dayKey, dayLabel);
-  if (!cardContent) {
+  const homeSpecials = buildHomeBarSpecials(bar, specialIds, dayKey, dayLabel);
+  if (!homeSpecials || !homeSpecials.content) {
     dismissMapSelectedBarSheet();
     return;
   }
 
-  card.appendChild(cardContent);
+  card.appendChild(homeSpecials.content);
   content.appendChild(card);
   if (window.lucide && typeof window.lucide.createIcons === 'function') {
     window.lucide.createIcons();

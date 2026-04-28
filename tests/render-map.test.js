@@ -37,6 +37,41 @@ function loadRenderMapContext() {
   return { context, listeners, mockMap };
 }
 
+function createStrictDocument() {
+  const byId = new Map();
+  const makeElement = () => ({
+    __isElement: true,
+    children: [],
+    className: '',
+    style: {},
+    dataset: {},
+    classList: { add() {}, remove() {} },
+    appendChild(child) {
+      if (!child || child.__isElement !== true) {
+        throw new TypeError('appendChild expects an element');
+      }
+      this.children.push(child);
+    },
+    addEventListener() {},
+    setPointerCapture() {}
+  });
+
+  const document = {
+    createElement: makeElement,
+    getElementById(id) {
+      return byId.get(id) || null;
+    }
+  };
+
+  const sheet = makeElement();
+  sheet.style.display = 'none';
+  const content = makeElement();
+  byId.set('map-selected-card-sheet', sheet);
+  byId.set('map-selected-card-content', content);
+
+  return { document, sheet, content, makeElement };
+}
+
 test('bindAdvancedMarkerClick binds click and gmp-click handlers', () => {
   const { context } = loadRenderMapContext();
   const calls = [];
@@ -64,4 +99,17 @@ test('map click dismissal ignores immediate click after marker tap', () => {
   context.bindMapInteractionDismiss();
   listeners.click();
   assert.equal(dismissCalls, 0);
+});
+
+test('showMapSelectedBarSheet appends homeSpecials.content element', () => {
+  const { context } = loadRenderMapContext();
+  const { document, sheet, content, makeElement } = createStrictDocument();
+  context.document = document;
+  context.window = {};
+  context.buildHomeBarSpecials = () => ({ content: makeElement(), hasActiveOrUpcoming: true });
+
+  context.showMapSelectedBarSheet({ bar_id: 1, name: 'Test Bar' }, ['100'], 'MON', 'Monday');
+
+  assert.equal(sheet.style.display, '');
+  assert.equal(content.children.length, 1);
 });
