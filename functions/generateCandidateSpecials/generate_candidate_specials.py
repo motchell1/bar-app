@@ -691,11 +691,7 @@ def normalize_item(item, default_source):
     normalized_days = [day for day in days if day in DAY_KEYS]
     raw_item_type = str(item.get('type') or '').strip().lower()
     item_type = raw_item_type if raw_item_type in ('food', 'drink', 'combo', 'unknown') else 'unknown'
-    text_blob = f"{item.get('description') or ''} {item.get('notes') or ''}"
-    parsed_date = _parse_date_from_text(text_blob)
-    if parsed_date and parsed_date < date.today():
-        return None
-    is_recurring = 'N' if parsed_date else 'Y'
+    is_recurring = 'Y'
 
     return {
         'description': str(item.get('description') or '').strip(),
@@ -709,7 +705,7 @@ def normalize_item(item, default_source):
         'source_url': str(item.get('source_url') or item.get('source') or default_source).strip(),
         'fetch_method': '',
         'is_recurring': is_recurring,
-        'date': parsed_date.isoformat() if parsed_date else None
+        'date': None
     }
 
 
