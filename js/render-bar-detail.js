@@ -15,6 +15,7 @@ const detailLocationMapState = {
   marker: null,
   mapContainer: null
 };
+const DETAIL_MAP_MARKER_BLUE = '#007bff';
 
 function getBarFromPayload(barOrId) {
   const barId = String(typeof barOrId === 'object' ? barOrId?.bar_id : barOrId);
@@ -209,9 +210,18 @@ function updateBarLocationSection(selectedBar) {
 
         if (google.maps.marker?.AdvancedMarkerElement) {
           if (detailLocationMapState.marker) detailLocationMapState.marker.map = null;
+          const PinElement = google.maps.marker?.PinElement;
+          const pinContent = PinElement
+            ? new PinElement({
+              background: DETAIL_MAP_MARKER_BLUE,
+              borderColor: DETAIL_MAP_MARKER_BLUE,
+              glyphColor: '#ffffff'
+            }).element
+            : null;
           detailLocationMapState.marker = new google.maps.marker.AdvancedMarkerElement({
             map: detailLocationMapState.map,
-            position: location
+            position: location,
+            content: pinContent
           });
           return;
         }
@@ -219,11 +229,13 @@ function updateBarLocationSection(selectedBar) {
         if (!detailLocationMapState.marker) {
           detailLocationMapState.marker = new google.maps.Marker({
             map: detailLocationMapState.map,
-            position: location
+            position: location,
+            icon: 'https://maps.google.com/mapfiles/ms/icons/blue-dot.png'
           });
         } else {
           detailLocationMapState.marker.setPosition(location);
           detailLocationMapState.marker.setMap(detailLocationMapState.map);
+          detailLocationMapState.marker.setIcon('https://maps.google.com/mapfiles/ms/icons/blue-dot.png');
         }
       };
 
