@@ -1124,14 +1124,16 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
 
   function buildRunsMarkup() {
     if (state.runs.length === 0) {
-      return '<p class="admin-empty">No unapproved specials.</p>';
+      return '<p class="admin-empty">No pending or auto-approved specials.</p>';
     }
 
     return state.runs.map((run) => {
       const specialsMarkup = (run.specials || []).map((special) => {
         const candidateId = Number(special.special_candidate_id);
+        const approvalStatus = String(special.approval_status || '').trim().toUpperCase();
+        const isAutoApproved = approvalStatus === 'AUTO_APPROVED';
         const isUpdating = state.updatingCandidateId === candidateId;
-        const isEditing = state.editingCandidateId === candidateId;
+        const isEditing = !isAutoApproved && state.editingCandidateId === candidateId;
         const confidence = special.confidence === null || special.confidence === undefined ? '—' : String(special.confidence);
         const editableValue = (field, fallback = '—') => {
           const value = special[field] ?? '';
@@ -1186,13 +1188,14 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
 
         return `
           <article class="admin-candidate-card" data-candidate-id="${candidateId}">
-            ${isEditing ? '' : `
+            ${(isEditing || isAutoApproved) ? '' : `
               <button class="admin-icon-btn" type="button" aria-label="Edit special candidate" title="Edit" data-candidate-action="edit" data-candidate-id="${candidateId}" ${isUpdating ? 'disabled' : ''}>
                 &#8943;
               </button>
             `}
             <h4>${isEditing ? 'Editing Special Candidate' : (special.description || 'No description')}</h4>
             <p><strong>Special Candidate ID:</strong> ${special.special_candidate_id ?? '—'}</p>
+            <p><strong>Status:</strong> ${special.approval_status || 'NOT_APPROVED'}</p>
             <p><strong>Description:</strong> ${editableValue('description')}</p>
             <p><strong>Type:</strong> ${editableValue('type')}</p>
             <p><strong>Days:</strong> ${editableValue('days_of_week', '—')}</p>
@@ -1203,13 +1206,15 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
             <p><strong>Method:</strong> ${special.fetch_method || '—'}</p>
             <p><strong>Source:</strong> ${getSourceMarkup(special.source)}</p>
             <p><strong>Notes:</strong> ${special.notes || '—'}</p>
-            <div class="admin-actions-row">
-              ${isEditing
-                ? `<button class="admin-action-btn approve" type="button" data-candidate-action="save-edit" data-candidate-id="${candidateId}" ${state.savingCandidate ? 'disabled' : ''}>Save</button>
-                   <button class="admin-secondary-btn" type="button" data-candidate-action="cancel-edit" data-candidate-id="${candidateId}" ${state.savingCandidate ? 'disabled' : ''}>Cancel</button>`
-                : `<button class="admin-action-btn approve" type="button" data-action="APPROVED" data-candidate-id="${candidateId}" ${isUpdating ? 'disabled' : ''}>Approve</button>
-                   <button class="admin-action-btn reject" type="button" data-action="REJECTED" data-candidate-id="${candidateId}" ${isUpdating ? 'disabled' : ''}>Reject</button>`}
-            </div>
+            ${isAutoApproved
+              ? '<p><em>Auto-approved candidate (read-only in this view).</em></p>'
+              : `<div class="admin-actions-row">
+                  ${isEditing
+                    ? `<button class="admin-action-btn approve" type="button" data-candidate-action="save-edit" data-candidate-id="${candidateId}" ${state.savingCandidate ? 'disabled' : ''}>Save</button>
+                       <button class="admin-secondary-btn" type="button" data-candidate-action="cancel-edit" data-candidate-id="${candidateId}" ${state.savingCandidate ? 'disabled' : ''}>Cancel</button>`
+                    : `<button class="admin-action-btn approve" type="button" data-action="APPROVED" data-candidate-id="${candidateId}" ${isUpdating ? 'disabled' : ''}>Approve</button>
+                       <button class="admin-action-btn reject" type="button" data-action="REJECTED" data-candidate-id="${candidateId}" ${isUpdating ? 'disabled' : ''}>Reject</button>`}
+                </div>`}
           </article>
         `;
       }).join('');

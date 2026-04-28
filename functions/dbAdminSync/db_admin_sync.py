@@ -304,11 +304,12 @@ def get_unapproved_special_candidates(cursor):
             sc.notes,
             sc.fetch_method,
             sc.source,
+            sc.approval_status,
             sc.insert_date
         FROM special_candidate sc
         JOIN special_candidate_run scr ON scr.run_id = sc.run_id
         JOIN bar b ON b.bar_id = scr.bar_id
-        WHERE sc.approval_status = 'NOT_APPROVED'
+        WHERE sc.approval_status IN ('NOT_APPROVED', 'AUTO_APPROVED')
             AND COALESCE(sc.is_recurring, 'Y') = 'Y'
         ORDER BY scr.run_id DESC, sc.special_candidate_id ASC
         """
@@ -351,6 +352,7 @@ def get_unapproved_special_candidates(cursor):
                 'notes': row.get('notes'),
                 'fetch_method': row.get('fetch_method'),
                 'source': row.get('source'),
+                'approval_status': row.get('approval_status'),
                 'insert_date': row.get('insert_date').isoformat() if row.get('insert_date') else None,
             }
         )
