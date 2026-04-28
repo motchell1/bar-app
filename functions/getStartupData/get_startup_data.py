@@ -33,7 +33,7 @@ def query_bars(cursor):
               WHERE s.bar_id = b.bar_id
                 AND s.is_active = 'Y'
           )
-        ORDER BY neighborhood, name
+        ORDER BY name
     """)
     return cursor.fetchall()
 

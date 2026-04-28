@@ -252,11 +252,6 @@ function getSortedFilteredBars(bars) {
       if (!query) return true;
       const name = (bar.name || '').toLowerCase();
       return name.includes(query);
-    })
-    .sort((a, b) => {
-      const neighborhoodCompare = (a.neighborhood || '').localeCompare(b.neighborhood || '', undefined, { sensitivity: 'base' });
-      if (neighborhoodCompare !== 0) return neighborhoodCompare;
-      return (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' });
     });
 }
 
