@@ -75,7 +75,7 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
     savingBar: false,
     generatingBarId: null,
     generatingBarSecondsElapsed: 0,
-    generateResultMessage: '',
+    generateResultPayload: null,
     runs: [],
     confirmingDeleteRunId: null,
     deletingRunId: null,
@@ -126,7 +126,7 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
     state.detailBarEditing = false;
     state.generatingBarId = null;
     state.generatingBarSecondsElapsed = 0;
-    state.generateResultMessage = '';
+    state.generateResultPayload = null;
     state.confirmingDeleteRunId = null;
     state.deletingRunId = null;
     state.creatingSpecial = false;
@@ -700,7 +700,7 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
     if (!homepageUrl) throw new Error('This bar does not have a website URL, so a candidate run cannot be generated.');
 
     state.generatingBarId = Number(barId);
-    state.generateResultMessage = '';
+    state.generateResultPayload = null;
     state.errorMessage = '';
     startGenerateBarTimer();
     render();
@@ -726,12 +726,12 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
       if (parsed?.error) {
         throw new Error(parsed.error);
       }
-      state.generateResultMessage = `Generate Candidate Specials response: ${JSON.stringify(parsed)}`;
+      state.generateResultPayload = parsed;
       await loadAllBars();
     } catch (err) {
       console.error('Failed to generate candidate specials:', err);
       state.errorMessage = err?.message || 'Failed to generate candidate specials for this bar.';
-      state.generateResultMessage = '';
+      state.generateResultPayload = null;
     } finally {
       stopGenerateBarTimer();
       state.generatingBarId = null;
@@ -1974,13 +1974,41 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
           aria-label="Search bars by bar or neighborhood"
         />
         ${state.generatingBarId ? `<p class="admin-loading">Generating candidate specials... ${state.generatingBarSecondsElapsed}s elapsed.</p>` : ''}
-        ${state.generateResultMessage ? `<p class="admin-loading">${state.generateResultMessage}</p>` : ''}
+        ${getGenerateResultMarkup()}
         ${state.errorMessage ? `<p class="admin-error">${state.errorMessage}</p>` : ''}
         ${buildBarManagementTable()}
       </section>
     `;
 
     bindBarManagementEvents();
+  }
+
+  function getGenerateResultMarkup() {
+    if (!state.generateResultPayload || typeof state.generateResultPayload !== 'object') return '';
+
+    const payload = state.generateResultPayload;
+    const rows = [
+      ['Neighborhood', payload.neighborhood || '—'],
+      ['Processed Bars', payload.processed_bars ?? '—'],
+      ['Candidates Found', payload.candidate_specials_found ?? '—'],
+      ['Candidates Inserted', payload.candidate_specials_inserted ?? '—'],
+      ['Auto Approved', payload.auto_approved_specials ?? '—'],
+      ['Crawl Specials', payload.website_crawl_specials ?? '—'],
+      ['Web AI Search Specials', payload.web_ai_search_specials ?? '—'],
+      ['Runs Created', payload.candidate_runs_created ?? '—'],
+      ['Runs Auto Published', payload.candidate_runs_auto_published ?? '—'],
+      ['Data Audit Invoked', payload.data_audit_invoked ?? '—'],
+      ['Data Audit Error', payload.data_audit_error || '—']
+    ];
+
+    return `
+      <div class="admin-generate-result">
+        <h3>Generate Candidate Specials Complete</h3>
+        <div class="admin-generate-result-grid">
+          ${rows.map(([label, value]) => `<p><strong>${label}:</strong> ${value}</p>`).join('')}
+        </div>
+      </div>
+    `;
   }
 
   function renderRejectedSpecialManagementView() {

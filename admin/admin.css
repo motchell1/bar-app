@@ -124,6 +124,31 @@ body {
   border: 1px solid #ffb3b3;
 }
 
+.admin-generate-result {
+  margin: 0;
+  padding: 12px;
+  border-radius: 8px;
+  background: #fff;
+  border: 1px solid #d4e3ff;
+}
+
+.admin-generate-result h3 {
+  margin: 0 0 8px;
+  color: #1f4d99;
+  font-size: 16px;
+}
+
+.admin-generate-result-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 8px;
+}
+
+.admin-generate-result-grid p {
+  margin: 0;
+  font-size: 13px;
+}
+
 .admin-run-card,
 .admin-candidate-card {
   background: #fff;
