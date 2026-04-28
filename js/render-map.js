@@ -11,6 +11,33 @@ let mapSelectedBarSheetState = {
 };
 let mapDismissListenersBound = false;
 let mapSheetDismissTimer = null;
+let mapLastMarkerTapAt = 0;
+const MAP_MARKER_BLUE = '#007bff';
+
+function createBlueMapPinElement() {
+  const PinElement = google.maps.marker?.PinElement;
+  if (!PinElement) return null;
+
+  const pin = new PinElement({
+    background: MAP_MARKER_BLUE,
+    borderColor: MAP_MARKER_BLUE,
+    glyphColor: '#ffffff'
+  });
+
+  return pin.element;
+}
+
+function bindAdvancedMarkerClick(marker, onClick) {
+  if (!marker || typeof onClick !== 'function') return;
+
+  if (typeof marker.addListener === 'function') {
+    marker.addListener('click', onClick);
+  }
+
+  if (typeof marker.addEventListener === 'function') {
+    marker.addEventListener('gmp-click', onClick);
+  }
+}
 
 function getMapSelectedDayKey() {
   if (mapSelectedDayKey && MAP_DAY_KEYS.includes(mapSelectedDayKey)) {
@@ -203,6 +230,7 @@ function bindMapInteractionDismiss() {
   if (!barsMap || mapDismissListenersBound) return;
 
   const dismissIfOpen = () => {
+    if (Date.now() - mapLastMarkerTapAt < 300) return;
     if (!mapSelectedBarSheetState.barId) return;
     dismissMapSelectedBarSheetAnimated();
   };
@@ -303,10 +331,12 @@ function renderMapTab() {
           position: { lat: bar.latitude, lng: bar.longitude },
           map: barsMap,
           title: bar.name,
-          gmpClickable: true
+          gmpClickable: true,
+          content: createBlueMapPinElement()
         });
 
-        marker.addEventListener('gmp-click', () => {
+        bindAdvancedMarkerClick(marker, () => {
+          mapLastMarkerTapAt = Date.now();
           const dayLabel = getMapDayLabel(selectedDayKey);
           showMapSelectedBarSheet(bar, bar.specialIds, selectedDayKey, dayLabel);
         });
