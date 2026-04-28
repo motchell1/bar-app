@@ -26,6 +26,18 @@ function createBlueMapPinElement() {
   return pin.element;
 }
 
+function bindAdvancedMarkerClick(marker, onClick) {
+  if (!marker || typeof onClick !== 'function') return;
+
+  if (typeof marker.addListener === 'function') {
+    marker.addListener('click', onClick);
+  }
+
+  if (typeof marker.addEventListener === 'function') {
+    marker.addEventListener('gmp-click', onClick);
+  }
+}
+
 function getMapSelectedDayKey() {
   if (mapSelectedDayKey && MAP_DAY_KEYS.includes(mapSelectedDayKey)) {
     return mapSelectedDayKey;
@@ -321,7 +333,7 @@ function renderMapTab() {
           content: createBlueMapPinElement()
         });
 
-        marker.addEventListener('gmp-click', () => {
+        bindAdvancedMarkerClick(marker, () => {
           const dayLabel = getMapDayLabel(selectedDayKey);
           showMapSelectedBarSheet(bar, bar.specialIds, selectedDayKey, dayLabel);
         });
