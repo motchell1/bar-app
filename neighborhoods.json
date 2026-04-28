@@ -18,6 +18,23 @@
       { "lat": 40.501808, "lng": -80.078474 }
     ]
   },
+  "bloomfield": {
+    "neighborhood_name": "Bloomfield",
+    "search_rectangles": [
+      {
+        "low": { "lat": 40.450800, "lng": -79.9588622 },
+        "high": { "lat": 40.466682, "lng": -79.933446 }
+      }
+    ],
+    "polygon": [
+      { "lat": 40.465381, "lng": -79.958190 },
+      { "lat": 40.452653, "lng": -79.949633 },
+      { "lat": 40.456556, "lng": -79.936496 },
+      { "lat": 40.464807, "lng": -79.935179 },
+      { "lat": 40.466688, "lng": -79.952023 },
+      { "lat": 40.465381, "lng": -79.958190 }
+    ]
+  },
   "downtown": {
     "neighborhood_name": "Downtown",
     "search_label": "Downtown Pittsburgh",
