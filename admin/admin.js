@@ -1124,7 +1124,7 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
 
   function buildRunsMarkup() {
     if (state.runs.length === 0) {
-      return '<p class="admin-empty">No pending or auto-approved specials.</p>';
+      return '<p class="admin-empty">No unapproved specials.</p>';
     }
 
     return state.runs.map((run) => {
@@ -1207,7 +1207,7 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
             <p><strong>Source:</strong> ${getSourceMarkup(special.source)}</p>
             <p><strong>Notes:</strong> ${special.notes || '—'}</p>
             ${isAutoApproved
-              ? '<p><em>Auto-approved candidate (read-only in this view).</em></p>'
+              ? ''
               : `<div class="admin-actions-row">
                   ${isEditing
                     ? `<button class="admin-action-btn approve" type="button" data-candidate-action="save-edit" data-candidate-id="${candidateId}" ${state.savingCandidate ? 'disabled' : ''}>Save</button>

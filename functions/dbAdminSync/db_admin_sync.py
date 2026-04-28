@@ -311,6 +311,12 @@ def get_unapproved_special_candidates(cursor):
         JOIN bar b ON b.bar_id = scr.bar_id
         WHERE sc.approval_status IN ('NOT_APPROVED', 'AUTO_APPROVED')
             AND COALESCE(sc.is_recurring, 'Y') = 'Y'
+            AND sc.run_id IN (
+                SELECT DISTINCT sc2.run_id
+                FROM special_candidate sc2
+                WHERE sc2.approval_status = 'NOT_APPROVED'
+                    AND COALESCE(sc2.is_recurring, 'Y') = 'Y'
+            )
         ORDER BY scr.run_id DESC, sc.special_candidate_id ASC
         """
     )
