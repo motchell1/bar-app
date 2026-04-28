@@ -113,7 +113,7 @@
       ]
     },
     "strip district": {
-      "neighborhood_name": "strip district",
+      "neighborhood_name": "Strip District",
       "search_rectangles": [
         {
           "low": { "lat": 40.443642, "lng": -79.994947 },
