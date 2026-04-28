@@ -22,6 +22,7 @@ function createBlueMapPinElement() {
     borderColor: MAP_MARKER_BLUE,
     glyphColor: '#ffffff'
   });
+  pin.element.style.pointerEvents = 'none';
 
   return pin.element;
 }
@@ -29,12 +30,13 @@ function createBlueMapPinElement() {
 function bindAdvancedMarkerClick(marker, onClick) {
   if (!marker || typeof onClick !== 'function') return;
 
-  if (typeof marker.addListener === 'function') {
-    marker.addListener('click', onClick);
-  }
-
   if (typeof marker.addEventListener === 'function') {
     marker.addEventListener('gmp-click', onClick);
+    return;
+  }
+
+  if (typeof marker.addListener === 'function') {
+    marker.addListener('click', onClick);
   }
 }
 
