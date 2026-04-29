@@ -423,7 +423,18 @@ def get_unapproved_special_candidates(cursor):
         placeholders = ','.join(['%s'] * len(candidate_ids))
         cursor.execute(
             f"""
-            SELECT scsm.special_candidate_id, s.special_id, s.day_of_week, s.description, s.start_time, s.end_time, s.all_day, s.is_active
+            SELECT
+                scsm.special_candidate_id,
+                s.special_id,
+                s.day_of_week,
+                s.description,
+                s.start_time,
+                s.end_time,
+                s.all_day,
+                s.type,
+                s.insert_date,
+                s.update_date,
+                s.is_active
             FROM special_candidate_special_match scsm
             JOIN special s ON s.special_id = scsm.special_id
             WHERE scsm.special_candidate_id IN ({placeholders})
@@ -441,6 +452,9 @@ def get_unapproved_special_candidates(cursor):
                     'start_time': _normalize_time_value(row.get('start_time')) or None,
                     'end_time': _normalize_time_value(row.get('end_time')) or None,
                     'all_day': row.get('all_day'),
+                    'type': row.get('type'),
+                    'insert_date': row.get('insert_date').isoformat() if row.get('insert_date') else None,
+                    'update_date': row.get('update_date').isoformat() if row.get('update_date') else None,
                     'is_active': row.get('is_active'),
                 }
             )
