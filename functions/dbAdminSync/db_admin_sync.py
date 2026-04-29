@@ -1053,7 +1053,8 @@ def get_all_specials(cursor):
             s.is_active,
             s.insert_method,
             s.insert_date,
-            s.update_date
+            s.update_date,
+            s.special_candidate_id
         FROM special s
         JOIN bar b
             ON b.bar_id = s.bar_id
