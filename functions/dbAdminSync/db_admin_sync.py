@@ -636,7 +636,7 @@ def get_rejected_special_candidates(cursor):
             scr.reject_id,
             scr.bar_id,
             b.name AS bar_name,
-            nb.name AS neighborhood,
+            b.neighborhood AS neighborhood,
             scr.description,
             scr.days_of_week,
             COALESCE(MAX(sc.type), '') AS type,
@@ -654,14 +654,13 @@ def get_rejected_special_candidates(cursor):
             COUNT(DISTINCT scrj.special_candidate_id) AS linked_candidate_count
         FROM special_candidate_reject scr
         JOIN bar b ON b.bar_id = scr.bar_id
-        LEFT JOIN neighborhood nb ON nb.neighborhood_id = b.neighborhood_id
         LEFT JOIN special_candidate_reject_join scrj ON scrj.reject_id = scr.reject_id
         LEFT JOIN special_candidate linked_sc ON linked_sc.special_candidate_id = scrj.special_candidate_id
         GROUP BY
             scr.reject_id,
             scr.bar_id,
             b.name,
-            nb.name,
+            b.neighborhood,
             scr.description,
             scr.days_of_week,
             scr.start_time,
