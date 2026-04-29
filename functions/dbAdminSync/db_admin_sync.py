@@ -160,6 +160,23 @@ def _is_candidate_same_as_special(candidate_row: Dict, special_row: Dict) -> boo
     )
 
 
+def _resolve_candidate_day_rows(candidate: Dict) -> List[Dict]:
+    rows = []
+    for day in _parse_days_of_week(candidate.get('days_of_week')):
+        rows.append(
+            {
+                'day_of_week': _normalize_day_of_week(day),
+                'all_day': _normalize_yn_flag(candidate.get('all_day')),
+                'start_time': _normalize_time_value(candidate.get('start_time')) or None,
+                'end_time': _normalize_time_value(candidate.get('end_time')) or None,
+                'description': candidate.get('description'),
+                'type': candidate.get('type'),
+                'source': candidate.get('source'),
+            }
+        )
+    return rows
+
+
 def publish_special_candidate_run(cursor, bar_id: int, run_id: int, auto_publish: str = 'N') -> Dict[str, int]:
     cursor.execute(
         """
@@ -244,17 +261,6 @@ def publish_special_candidate_run(cursor, bar_id: int, run_id: int, auto_publish
     )
     existing_specials = cursor.fetchall()
 
-    approved_candidate_ids = [candidate['special_candidate_id'] for candidate in approved_candidates if candidate.get('special_candidate_id')]
-    for candidate_id in approved_candidate_ids:
-        cursor.execute(
-            """
-            UPDATE special_candidate
-            SET approved_special_id = NULL
-            WHERE special_candidate_id = %s
-            """,
-            (candidate_id,),
-        )
-
     matched_special_ids = set()
     candidate_to_special_ids = {}
     unmatched_candidates = []
@@ -307,15 +313,15 @@ def publish_special_candidate_run(cursor, bar_id: int, run_id: int, auto_publish
         candidate_to_special_ids.setdefault(candidate['candidate_id'], set()).add(cursor.lastrowid)
 
     for candidate_id, special_ids in candidate_to_special_ids.items():
-        approved_special_id = min(special_ids) if special_ids else None
-        cursor.execute(
-            """
-            UPDATE special_candidate
-            SET approved_special_id = %s
-            WHERE special_candidate_id = %s
-            """,
-            (approved_special_id, candidate_id),
-        )
+        for special_id in special_ids:
+            cursor.execute(
+                """
+                UPDATE special
+                SET special_candidate_id = %s
+                WHERE special_id = %s
+                """,
+                (candidate_id, special_id),
+            )
 
     deactivated_special_count = len(existing_specials) - len(matched_special_ids)
     cursor.execute(
@@ -343,6 +349,7 @@ def get_unapproved_special_candidates(cursor):
         """
         SELECT
             scr.run_id,
+            scr.bar_id,
             b.name AS bar_name,
             scr.total_candidates,
             scr.auto_approved_candidates,
@@ -367,6 +374,7 @@ def get_unapproved_special_candidates(cursor):
             sc.notes,
             sc.fetch_method,
             sc.source,
+            sc.match_status,
             sc.approval_status,
             sc.insert_date
         FROM special_candidate sc
@@ -384,6 +392,44 @@ def get_unapproved_special_candidates(cursor):
         """
     )
     rows = cursor.fetchall()
+    candidate_ids = [row.get('special_candidate_id') for row in rows if row.get('special_candidate_id')]
+    matches_by_candidate = {}
+    if candidate_ids:
+        placeholders = ','.join(['%s'] * len(candidate_ids))
+        cursor.execute(
+            f"""
+            SELECT
+                scsm.special_candidate_id,
+                s.special_id,
+                s.day_of_week,
+                s.all_day,
+                s.start_time,
+                s.end_time,
+                s.description,
+                s.type,
+                s.is_active
+            FROM special_candidate_special_match scsm
+            JOIN special s ON s.special_id = scsm.special_id
+            WHERE scsm.special_candidate_id IN ({placeholders})
+            ORDER BY scsm.special_candidate_id ASC, s.day_of_week ASC, s.special_id ASC
+            """,
+            candidate_ids,
+        )
+        for match_row in cursor.fetchall():
+            candidate_id = match_row.get('special_candidate_id')
+            matches_by_candidate.setdefault(candidate_id, []).append(
+                {
+                    'special_id': match_row.get('special_id'),
+                    'day_of_week': _normalize_day_of_week(match_row.get('day_of_week')),
+                    'all_day': _normalize_yn_flag(match_row.get('all_day')),
+                    'start_time': _normalize_time_value(match_row.get('start_time')) or None,
+                    'end_time': _normalize_time_value(match_row.get('end_time')) or None,
+                    'description': match_row.get('description'),
+                    'type': match_row.get('type'),
+                    'is_active': match_row.get('is_active'),
+                }
+            )
+
     grouped_runs = {}
     for row in rows:
         run_id = row['run_id']
@@ -392,6 +438,7 @@ def get_unapproved_special_candidates(cursor):
             {
                 'run_id': run_id,
                 'bar_name': row.get('bar_name'),
+                'bar_id': row.get('bar_id'),
                 'neighborhood': row.get('neighborhood'),
                 'total_candidates': row.get('total_candidates'),
                 'auto_approved_candidates': row.get('auto_approved_candidates'),
@@ -407,6 +454,7 @@ def get_unapproved_special_candidates(cursor):
                 'specials': [],
             },
         )
+        resolved_match_status = row.get('match_status') or ('MATCHED' if matches_by_candidate.get(row.get('special_candidate_id')) else 'NOT_MATCHED')
         run['specials'].append(
             {
                 'special_candidate_id': row.get('special_candidate_id'),
@@ -421,6 +469,8 @@ def get_unapproved_special_candidates(cursor):
                 'notes': row.get('notes'),
                 'fetch_method': row.get('fetch_method'),
                 'source': row.get('source'),
+                'match_status': resolved_match_status,
+                'matched_specials': matches_by_candidate.get(row.get('special_candidate_id'), []),
                 'approval_status': row.get('approval_status'),
                 'insert_date': row.get('insert_date').isoformat() if row.get('insert_date') else None,
             }
@@ -552,11 +602,7 @@ def detect_duplicate_specials(cursor, bar_id: int = None) -> Dict[str, object]:
         FROM special s
         JOIN bar b ON b.bar_id = s.bar_id
         LEFT JOIN special_candidate sc
-            ON sc.special_candidate_id = (
-                SELECT MAX(sc2.special_candidate_id)
-                FROM special_candidate sc2
-                WHERE sc2.approved_special_id = s.special_id
-            )
+            ON sc.special_candidate_id = s.special_candidate_id
         WHERE {where_clause}
         ORDER BY s.bar_id, s.day_of_week, s.type, s.special_id
         """,
@@ -776,10 +822,13 @@ def delete_special_candidate_run(cursor, run_id: int):
     }
 
 
-def update_special_candidate_approval(cursor, special_candidate_id: int, approval_status: str):
+def update_special_candidate_approval(cursor, special_candidate_id: int, approval_status: str, approval_action: str = ''):
     normalized_status = str(approval_status or '').strip().upper()
     if normalized_status not in {'APPROVED', 'REJECTED'}:
         raise ValueError('approval_status must be APPROVED or REJECTED')
+    normalized_action = str(approval_action or '').strip().upper()
+    if normalized_action not in {'', 'OVERRIDE_MATCH'}:
+        raise ValueError('approval_action must be OVERRIDE_MATCH when provided')
 
     cursor.execute(
         """
@@ -807,6 +856,16 @@ def update_special_candidate_approval(cursor, special_candidate_id: int, approva
 
     run_id = target['run_id']
     bar_id = target['bar_id']
+    target_rows = _resolve_candidate_day_rows(target)
+    cursor.execute(
+        """
+        SELECT special_id
+        FROM special_candidate_special_match
+        WHERE special_candidate_id = %s
+        """,
+        (special_candidate_id,),
+    )
+    matched_ids = [row.get('special_id') for row in cursor.fetchall() if row.get('special_id')]
 
     if normalized_status == 'REJECTED':
         cursor.execute(
@@ -847,6 +906,97 @@ def update_special_candidate_approval(cursor, special_candidate_id: int, approva
             """,
             (reject_id, special_candidate_id),
         )
+        cursor.execute(
+            """
+            DELETE FROM special_candidate_special_match
+            WHERE special_candidate_id = %s
+            """,
+            (special_candidate_id,),
+        )
+    elif matched_ids:
+        if normalized_action == 'OVERRIDE_MATCH':
+            cursor.execute(
+                """
+                SELECT special_id, day_of_week
+                FROM special
+                WHERE bar_id = %s
+                    AND special_candidate_id = %s
+                """,
+                (bar_id, special_candidate_id),
+            )
+            existing_linked_specials = cursor.fetchall()
+            matched_by_day = {}
+            for row in existing_linked_specials:
+                day_key = _normalize_day_of_week(row.get('day_of_week'))
+                if day_key and day_key not in matched_by_day:
+                    matched_by_day[day_key] = row
+            target_days = {row.get('day_of_week') for row in target_rows if row.get('day_of_week')}
+            for row in target_rows:
+                existing = matched_by_day.get(row.get('day_of_week'))
+                if existing:
+                    cursor.execute(
+                        """
+                        UPDATE special
+                        SET description = %s,
+                            type = %s,
+                            all_day = %s,
+                            start_time = %s,
+                            end_time = %s,
+                            special_candidate_id = %s,
+                            is_active = 'Y',
+                            update_date = NOW()
+                        WHERE special_id = %s
+                        """,
+                        (
+                            row.get('description'),
+                            row.get('type'),
+                            row.get('all_day'),
+                            row.get('start_time'),
+                            row.get('end_time'),
+                            special_candidate_id,
+                            existing.get('special_id'),
+                        ),
+                    )
+                else:
+                    cursor.execute(
+                        """
+                        INSERT INTO special
+                        (bar_id, day_of_week, all_day, start_time, end_time, description, type, insert_method, is_active, special_candidate_id)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, 'AUTO', 'Y', %s)
+                        """,
+                        (
+                            bar_id,
+                            row.get('day_of_week'),
+                            row.get('all_day'),
+                            row.get('start_time'),
+                            row.get('end_time'),
+                            row.get('description'),
+                            row.get('type'),
+                            special_candidate_id,
+                        ),
+                    )
+            for day_key, existing in matched_by_day.items():
+                if day_key not in target_days:
+                    cursor.execute(
+                        """
+                        UPDATE special
+                        SET is_active = 'N',
+                            update_date = NOW()
+                        WHERE special_id = %s
+                        """,
+                        (existing.get('special_id'),),
+                    )
+        else:
+            placeholders = ','.join(['%s'] * len(matched_ids))
+            cursor.execute(
+                f"""
+                UPDATE special
+                SET update_date = NOW(),
+                    special_candidate_id = %s
+                WHERE special_id IN ({placeholders})
+                """,
+                tuple([special_candidate_id] + matched_ids),
+            )
 
     cursor.execute(
         """
@@ -903,7 +1053,8 @@ def get_all_specials(cursor):
             s.is_active,
             s.insert_method,
             s.insert_date,
-            s.update_date
+            s.update_date,
+            s.special_candidate_id
         FROM special s
         JOIN bar b
             ON b.bar_id = s.bar_id
@@ -914,12 +1065,18 @@ def get_all_specials(cursor):
     special_ids = [row.get('special_id') for row in special_rows if row.get('special_id')]
 
     candidate_rows_by_special = {}
-    if special_ids:
-        placeholders = ','.join(['%s'] * len(special_ids))
+    linked_candidate_ids = sorted(
+        {
+            row.get('special_candidate_id')
+            for row in special_rows
+            if row.get('special_candidate_id')
+        }
+    )
+    if linked_candidate_ids:
+        placeholders = ','.join(['%s'] * len(linked_candidate_ids))
         cursor.execute(
             f"""
             SELECT
-                sc.approved_special_id,
                 sc.special_candidate_id,
                 sc.confidence,
                 sc.fetch_method,
@@ -933,16 +1090,16 @@ def get_all_specials(cursor):
             FROM special_candidate sc
             LEFT JOIN special_candidate_run scr
                 ON scr.run_id = sc.run_id
-            WHERE sc.approved_special_id IN ({placeholders})
+            WHERE sc.special_candidate_id IN ({placeholders})
             ORDER BY
-                sc.approved_special_id ASC,
+                sc.special_candidate_id ASC,
                 sc.approval_date DESC,
                 sc.special_candidate_id DESC
             """,
-            special_ids,
+            linked_candidate_ids,
         )
         for row in cursor.fetchall():
-            special_id = row.get('approved_special_id')
+            special_id = row.get('special_candidate_id')
             if not special_id:
                 continue
             candidate_rows_by_special.setdefault(special_id, []).append(
@@ -963,7 +1120,8 @@ def get_all_specials(cursor):
     specials = []
     for row in special_rows:
         special_id = row.get('special_id')
-        candidate_rows = candidate_rows_by_special.get(special_id, [])
+        linked_candidate_id = row.get('special_candidate_id')
+        candidate_rows = candidate_rows_by_special.get(linked_candidate_id, []) if linked_candidate_id else []
         primary_candidate = candidate_rows[0] if candidate_rows else {}
         specials.append(
             {
@@ -1307,15 +1465,6 @@ def delete_special(cursor, event):
 
     cursor.execute(
         """
-        UPDATE special_candidate
-        SET approved_special_id = NULL
-        WHERE approved_special_id = %s
-        """,
-        (special_id,),
-    )
-
-    cursor.execute(
-        """
         DELETE FROM device_special_favorite
         WHERE special_id = %s
         """,
@@ -1478,9 +1627,10 @@ def lambda_handler(event, context):
             elif mode == 'update_special_candidate_approval':
                 special_candidate_id = event.get('special_candidate_id')
                 approval_status = event.get('approval_status')
+                approval_action = event.get('approval_action')
                 if not special_candidate_id:
                     raise ValueError('special_candidate_id is required for update_special_candidate_approval')
-                result = update_special_candidate_approval(cursor, special_candidate_id, approval_status)
+                result = update_special_candidate_approval(cursor, special_candidate_id, approval_status, approval_action)
             elif mode == 'remove_rejected_special_candidate':
                 special_candidate_id = event.get('special_candidate_id')
                 if not special_candidate_id:
