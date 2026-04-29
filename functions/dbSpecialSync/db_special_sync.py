@@ -169,6 +169,40 @@ def _is_candidate_same_as_special(candidate_row: Dict, special_row: Dict) -> boo
     )
 
 
+def _find_special_matches(cursor, candidate: Dict) -> List[int]:
+    bar_id = candidate.get('bar_id')
+    if not bar_id:
+        return []
+    cursor.execute(
+        """
+        SELECT special_id, day_of_week, all_day, start_time, end_time, description, source
+        FROM special
+        WHERE bar_id = %s
+            AND is_active = 'Y'
+        """,
+        (bar_id,),
+    )
+    existing_specials = cursor.fetchall()
+    candidate_source = _normalize_text_value(candidate.get('source') or candidate.get('source_url'))
+    matched_ids = []
+    for day in _parse_days_of_week(candidate.get('days_of_week')):
+        day_candidate = {
+            'day_of_week': day,
+            'all_day': candidate.get('all_day'),
+            'start_time': candidate.get('start_time'),
+            'end_time': candidate.get('end_time'),
+            'description': candidate.get('description'),
+        }
+        for special in existing_specials:
+            special_source = _normalize_text_value(special.get('source'))
+            if candidate_source != special_source:
+                continue
+            if _is_candidate_same_as_special(day_candidate, special):
+                matched_ids.append(special.get('special_id'))
+                break
+    return [special_id for special_id in matched_ids if special_id]
+
+
 def _is_candidate_same_as_reject(candidate_row: Dict, reject_row: Dict) -> bool:
     return (
         str(candidate_row.get('bar_id')) == str(reject_row.get('bar_id'))
@@ -291,12 +325,14 @@ def insert_special_candidate(cursor, run: Dict, candidates: List[Dict]) -> Dict[
                 approval_status = 'AUTO_APPROVED'
                 approval_date = datetime.utcnow()
                 auto_approved_count += 1
+        matched_special_ids = _find_special_matches(cursor, candidate)
+        match_status = 'MATCHED' if matched_special_ids else 'NOT_MATCHED'
 
         cursor.execute(
             """
             INSERT INTO special_candidate
-            (run_id, bar_id, bar_name, neighborhood, description, type, days_of_week, start_time, end_time, all_day, is_recurring, date, fetch_method, source, confidence, notes, approval_status, approval_date)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            (run_id, bar_id, bar_name, neighborhood, description, type, days_of_week, start_time, end_time, all_day, is_recurring, date, fetch_method, source, confidence, notes, approval_status, approval_date, match_status)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """,
             (
                 run_id,
@@ -317,9 +353,19 @@ def insert_special_candidate(cursor, run: Dict, candidates: List[Dict]) -> Dict[
                 candidate.get('notes'),
                 approval_status,
                 approval_date,
+                match_status,
             ),
         )
         candidate_id = cursor.lastrowid
+        if matched_special_ids:
+            for special_id in matched_special_ids:
+                cursor.execute(
+                    """
+                    INSERT INTO special_candidate_special_match (special_id, special_candidate_id)
+                    VALUES (%s, %s)
+                    """,
+                    (special_id, candidate_id),
+                )
         if is_rejected_candidate:
             for reject_id in matched_reject_ids:
                 cursor.execute(

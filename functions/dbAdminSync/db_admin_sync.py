@@ -349,6 +349,7 @@ def get_unapproved_special_candidates(cursor):
         """
         SELECT
             scr.run_id,
+            scr.bar_id,
             b.name AS bar_name,
             scr.total_candidates,
             scr.auto_approved_candidates,
@@ -437,6 +438,7 @@ def get_unapproved_special_candidates(cursor):
             {
                 'run_id': run_id,
                 'bar_name': row.get('bar_name'),
+                'bar_id': row.get('bar_id'),
                 'neighborhood': row.get('neighborhood'),
                 'total_candidates': row.get('total_candidates'),
                 'auto_approved_candidates': row.get('auto_approved_candidates'),
@@ -452,6 +454,7 @@ def get_unapproved_special_candidates(cursor):
                 'specials': [],
             },
         )
+        resolved_match_status = row.get('match_status') or ('MATCHED' if matches_by_candidate.get(row.get('special_candidate_id')) else 'NOT_MATCHED')
         run['specials'].append(
             {
                 'special_candidate_id': row.get('special_candidate_id'),
@@ -466,7 +469,7 @@ def get_unapproved_special_candidates(cursor):
                 'notes': row.get('notes'),
                 'fetch_method': row.get('fetch_method'),
                 'source': row.get('source'),
-                'match_status': row.get('match_status'),
+                'match_status': resolved_match_status,
                 'matched_specials': matches_by_candidate.get(row.get('special_candidate_id'), []),
                 'approval_status': row.get('approval_status'),
                 'insert_date': row.get('insert_date').isoformat() if row.get('insert_date') else None,
