@@ -192,11 +192,19 @@ def _append_missing_hours_note(note_suffixes: Dict[int, List[str]], candidate_id
 
 
 def _is_candidate_same_as_special(candidate_row: Dict, special_row: Dict) -> bool:
+    candidate_all_day = _normalize_yn_flag(candidate_row.get('all_day'))
+    special_all_day = _normalize_yn_flag(special_row.get('all_day'))
+    times_match = (
+        _normalize_time_value(candidate_row.get('start_time')) == _normalize_time_value(special_row.get('start_time'))
+        and _normalize_time_value(candidate_row.get('end_time')) == _normalize_time_value(special_row.get('end_time'))
+    )
+    if candidate_all_day == 'Y' and special_all_day == 'Y':
+        times_match = True
+
     return (
         _normalize_day_of_week(candidate_row.get('day_of_week')) == _normalize_day_of_week(special_row.get('day_of_week'))
-        and _normalize_yn_flag(candidate_row.get('all_day')) == _normalize_yn_flag(special_row.get('all_day'))
-        and _normalize_time_value(candidate_row.get('start_time')) == _normalize_time_value(special_row.get('start_time'))
-        and _normalize_time_value(candidate_row.get('end_time')) == _normalize_time_value(special_row.get('end_time'))
+        and candidate_all_day == special_all_day
+        and times_match
         and _descriptions_match(candidate_row.get('description'), special_row.get('description'))
     )
 
