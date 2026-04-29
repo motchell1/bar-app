@@ -14,8 +14,8 @@ RDS_HOST = os.environ['RDS_HOST']
 DB_USER = os.environ['DB_USER']
 DB_PASSWORD = os.environ['DB_PASSWORD']
 DB_NAME = os.environ['DB_NAME']
-WEB_SCRAPE_AUTO_APPROVAL_THRESHOLD = 0.5
-WEB_AI_SEARCH_AUTO_APPROVAL_THRESHOLD = 0.8
+WEB_SCRAPE_AUTO_APPROVAL_THRESHOLD = float(os.environ.get('WEB_SCRAPE_AUTO_APPROVAL_THRESHOLD', '0.5'))
+WEB_AI_SEARCH_AUTO_APPROVAL_THRESHOLD = float(os.environ.get('WEB_AI_SEARCH_AUTO_APPROVAL_THRESHOLD', '0.8'))
 IGNORE_MANUAL_SPECIALS_ON_PUBLISH = 'Y'
 
 
@@ -325,7 +325,7 @@ def insert_special_candidate(cursor, run: Dict, candidates: List[Dict]) -> Dict[
         is_rejected_candidate = bool(matched_reject_ids)
 
         if is_rejected_candidate:
-            approval_status = 'AUTO_REJECTED'
+            approval_status = 'AUTO-REJECTED'
             approval_date = datetime.utcnow()
         else:
             fetch_method = (candidate.get('fetch_method') or '').strip()

@@ -491,7 +491,16 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
 
     try {
       const result = await callAdminSync({ mode: 'get_rejected_special_candidates' });
-      state.rejectedSpecials = Array.isArray(result?.specials) ? result.specials : [];
+      const rejectedRows = Array.isArray(result?.specials) ? result.specials : [];
+      const deduped = [];
+      const seenCandidateIds = new Set();
+      rejectedRows.forEach((row) => {
+        const candidateId = Number(row?.special_candidate_id);
+        if (candidateId && seenCandidateIds.has(candidateId)) return;
+        if (candidateId) seenCandidateIds.add(candidateId);
+        deduped.push(row);
+      });
+      state.rejectedSpecials = deduped;
     } catch (err) {
       console.error('Failed to load rejected specials:', err);
       state.errorMessage = err?.message || 'Failed to load rejected specials.';
