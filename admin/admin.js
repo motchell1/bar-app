@@ -1135,8 +1135,10 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
         const candidateId = Number(special.special_candidate_id);
         const approvalStatus = String(special.approval_status || '').trim().toUpperCase();
         const isAutoApproved = approvalStatus === 'AUTO_APPROVED';
+        const isAutoRejected = approvalStatus === 'AUTO_REJECTED';
         const isUpdating = state.updatingCandidateId === candidateId;
-        const isEditing = !isAutoApproved && state.editingCandidateId === candidateId;
+        const isReadOnlyCandidate = isAutoApproved || isAutoRejected;
+        const isEditing = !isReadOnlyCandidate && state.editingCandidateId === candidateId;
         const confidence = special.confidence === null || special.confidence === undefined ? '—' : String(special.confidence);
         const editableValue = (field, fallback = '—') => {
           const value = special[field] ?? '';
@@ -1191,7 +1193,7 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
 
         return `
           <article class="admin-candidate-card" data-candidate-id="${candidateId}">
-            ${(isEditing || isAutoApproved) ? '' : `
+            ${(isEditing || isReadOnlyCandidate) ? '' : `
               <button class="admin-icon-btn" type="button" aria-label="Edit special candidate" title="Edit" data-candidate-action="edit" data-candidate-id="${candidateId}" ${isUpdating ? 'disabled' : ''}>
                 &#8943;
               </button>
@@ -1209,7 +1211,7 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
             <p><strong>Method:</strong> ${special.fetch_method || '—'}</p>
             <p><strong>Source:</strong> ${getSourceMarkup(special.source)}</p>
             <p><strong>Notes:</strong> ${special.notes || '—'}</p>
-            ${isAutoApproved
+            ${isReadOnlyCandidate
               ? ''
               : `<div class="admin-actions-row">
                   ${isEditing
