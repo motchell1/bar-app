@@ -639,7 +639,7 @@ def get_rejected_special_candidates(cursor):
             b.neighborhood AS neighborhood,
             scr.description,
             scr.days_of_week,
-            COALESCE(MAX(sc.type), '') AS type,
+            COALESCE(MAX(linked_sc.type), '') AS type,
             scr.start_time,
             scr.end_time,
             scr.all_day,
