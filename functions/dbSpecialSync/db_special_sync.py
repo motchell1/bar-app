@@ -58,10 +58,21 @@ def _descriptions_match(candidate_description: str, special_description: str) ->
 
 def _parse_days_of_week(raw_days) -> List[str]:
     if isinstance(raw_days, str):
-        try:
-            raw_days = json.loads(raw_days)
-        except json.JSONDecodeError:
+        normalized_raw = raw_days.strip()
+        if not normalized_raw:
             raw_days = []
+        else:
+            try:
+                parsed_days = json.loads(normalized_raw)
+                if isinstance(parsed_days, str):
+                    raw_days = [parsed_days]
+                else:
+                    raw_days = parsed_days
+            except json.JSONDecodeError:
+                if ',' in normalized_raw:
+                    raw_days = [day.strip() for day in normalized_raw.split(',') if day.strip()]
+                else:
+                    raw_days = [normalized_raw]
     if not isinstance(raw_days, list):
         return []
     return [day for day in raw_days if isinstance(day, str) and day.strip()]
@@ -70,7 +81,17 @@ def _parse_days_of_week(raw_days) -> List[str]:
 def _normalize_day_of_week(value) -> str:
     if value is None:
         return ''
-    return str(value).strip().upper()
+    normalized = str(value).strip().upper()
+    day_aliases = {
+        'MONDAY': 'MON',
+        'TUESDAY': 'TUE',
+        'WEDNESDAY': 'WED',
+        'THURSDAY': 'THU',
+        'FRIDAY': 'FRI',
+        'SATURDAY': 'SAT',
+        'SUNDAY': 'SUN',
+    }
+    return day_aliases.get(normalized, normalized)
 
 
 def _normalize_days_of_week_value(value) -> tuple:
