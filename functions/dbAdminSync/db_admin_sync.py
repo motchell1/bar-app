@@ -244,19 +244,8 @@ def publish_special_candidate_run(cursor, bar_id: int, run_id: int, auto_publish
     )
     existing_specials = cursor.fetchall()
 
-    approved_candidate_ids = [candidate['special_candidate_id'] for candidate in approved_candidates if candidate.get('special_candidate_id')]
-    for candidate_id in approved_candidate_ids:
-        cursor.execute(
-            """
-            UPDATE special_candidate
-            SET approved_special_id = NULL
-            WHERE special_candidate_id = %s
-            """,
-            (candidate_id,),
-        )
-
     matched_special_ids = set()
-    candidate_to_special_ids = {}
+    special_to_candidate_id = {}
     unmatched_candidates = []
     for candidate in candidate_rows:
         matched_id = None
@@ -268,7 +257,7 @@ def publish_special_candidate_run(cursor, bar_id: int, run_id: int, auto_publish
                 break
         if matched_id is not None:
             matched_special_ids.add(matched_id)
-            candidate_to_special_ids.setdefault(candidate['candidate_id'], set()).add(matched_id)
+            special_to_candidate_id[matched_id] = candidate['candidate_id']
         else:
             unmatched_candidates.append(candidate)
 
@@ -289,8 +278,8 @@ def publish_special_candidate_run(cursor, bar_id: int, run_id: int, auto_publish
         cursor.execute(
             """
             INSERT INTO special
-            (bar_id, day_of_week, all_day, start_time, end_time, description, type, insert_method, is_active)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 'Y')
+            (bar_id, day_of_week, all_day, start_time, end_time, description, type, insert_method, is_active, special_candidate_id)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 'Y', %s)
             """,
             (
                 bar_id,
@@ -301,20 +290,20 @@ def publish_special_candidate_run(cursor, bar_id: int, run_id: int, auto_publish
                 candidate.get('description'),
                 candidate.get('type'),
                 'AUTO',
+                candidate['candidate_id'],
             ),
         )
         inserted_special_count += 1
-        candidate_to_special_ids.setdefault(candidate['candidate_id'], set()).add(cursor.lastrowid)
+        special_to_candidate_id[cursor.lastrowid] = candidate['candidate_id']
 
-    for candidate_id, special_ids in candidate_to_special_ids.items():
-        approved_special_id = min(special_ids) if special_ids else None
+    for special_id, candidate_id in special_to_candidate_id.items():
         cursor.execute(
             """
-            UPDATE special_candidate
-            SET approved_special_id = %s
-            WHERE special_candidate_id = %s
+            UPDATE special
+            SET special_candidate_id = %s
+            WHERE special_id = %s
             """,
-            (approved_special_id, candidate_id),
+            (candidate_id, special_id),
         )
 
     deactivated_special_count = len(existing_specials) - len(matched_special_ids)
@@ -552,11 +541,7 @@ def detect_duplicate_specials(cursor, bar_id: int = None) -> Dict[str, object]:
         FROM special s
         JOIN bar b ON b.bar_id = s.bar_id
         LEFT JOIN special_candidate sc
-            ON sc.special_candidate_id = (
-                SELECT MAX(sc2.special_candidate_id)
-                FROM special_candidate sc2
-                WHERE sc2.approved_special_id = s.special_id
-            )
+            ON sc.special_candidate_id = s.special_candidate_id
         WHERE {where_clause}
         ORDER BY s.bar_id, s.day_of_week, s.type, s.special_id
         """,
@@ -948,7 +933,7 @@ def get_all_specials(cursor):
         cursor.execute(
             f"""
             SELECT
-                sc.approved_special_id,
+                s.special_id,
                 sc.special_candidate_id,
                 sc.confidence,
                 sc.fetch_method,
@@ -959,19 +944,21 @@ def get_all_specials(cursor):
                 sc.insert_date,
                 scr.run_id,
                 scr.published_at
-            FROM special_candidate sc
+            FROM special s
+            LEFT JOIN special_candidate sc
+                ON sc.special_candidate_id = s.special_candidate_id
             LEFT JOIN special_candidate_run scr
                 ON scr.run_id = sc.run_id
-            WHERE sc.approved_special_id IN ({placeholders})
+            WHERE s.special_id IN ({placeholders})
             ORDER BY
-                sc.approved_special_id ASC,
+                s.special_id ASC,
                 sc.approval_date DESC,
                 sc.special_candidate_id DESC
             """,
             special_ids,
         )
         for row in cursor.fetchall():
-            special_id = row.get('approved_special_id')
+            special_id = row.get('special_id')
             if not special_id:
                 continue
             candidate_rows_by_special.setdefault(special_id, []).append(
@@ -1333,15 +1320,6 @@ def delete_special(cursor, event):
     special_id = event.get('special_id')
     if not special_id:
         raise ValueError('special_id is required for delete_special')
-
-    cursor.execute(
-        """
-        UPDATE special_candidate
-        SET approved_special_id = NULL
-        WHERE approved_special_id = %s
-        """,
-        (special_id,),
-    )
 
     cursor.execute(
         """
