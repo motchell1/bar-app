@@ -118,6 +118,10 @@ def _normalize_text_value(value) -> str:
     return str(value or '').strip()
 
 
+def _candidate_and_special_sources_match(candidate_source, special_source) -> bool:
+    return _normalize_text_value(candidate_source) == _normalize_text_value(special_source)
+
+
 def _build_open_hours_lookup(open_hours_rows: List[Dict]) -> Dict[str, Dict]:
     lookup = {}
     for row in open_hours_rows:
@@ -320,6 +324,73 @@ def insert_special_candidate(cursor, run: Dict, candidates: List[Dict]) -> Dict[
             ),
         )
         candidate_id = cursor.lastrowid
+        candidate_days = _parse_days_of_week(candidate.get('days_of_week'))
+        matched_special_ids = []
+        if candidate_days:
+            cursor.execute(
+                """
+                SELECT
+                    s.special_id,
+                    s.day_of_week,
+                    s.all_day,
+                    s.start_time,
+                    s.end_time,
+                    s.description,
+                    scx.source
+                FROM special s
+                LEFT JOIN special_candidate scx
+                    ON scx.special_candidate_id = s.special_candidate_id
+                WHERE s.bar_id = %s
+                    AND s.is_active = 'Y'
+                """,
+                (run['bar_id'],),
+            )
+            candidate_source = candidate.get('source') or candidate.get('source_url')
+            normalized_candidate_days = {_normalize_day_of_week(day) for day in candidate_days}
+            for special in cursor.fetchall():
+                if _normalize_day_of_week(special.get('day_of_week')) not in normalized_candidate_days:
+                    continue
+                if not _candidate_and_special_sources_match(candidate_source, special.get('source')):
+                    continue
+                if not _is_candidate_same_as_special(
+                    {
+                        'day_of_week': special.get('day_of_week'),
+                        'all_day': candidate.get('all_day'),
+                        'start_time': candidate.get('start_time'),
+                        'end_time': candidate.get('end_time'),
+                        'description': candidate.get('description'),
+                    },
+                    special,
+                ):
+                    continue
+                if _descriptions_match(candidate.get('description'), special.get('description')):
+                    matched_special_ids.append(special['special_id'])
+                    cursor.execute(
+                        """
+                        INSERT INTO special_candidate_special_match (special_id, special_candidate_id)
+                        VALUES (%s, %s)
+                        """,
+                        (special['special_id'], candidate_id),
+                    )
+        cursor.execute(
+            """
+            UPDATE special_candidate
+            SET match_status = %s
+            WHERE special_candidate_id = %s
+            """,
+            ('MATCHED' if matched_special_ids else 'NOT_MATCHED', candidate_id),
+        )
+        if matched_special_ids and approval_status == 'AUTO_APPROVED':
+            for special_id in matched_special_ids:
+                cursor.execute(
+                    """
+                    UPDATE special
+                    SET update_date = NOW(),
+                        special_candidate_id = %s
+                    WHERE special_id = %s
+                    """,
+                    (candidate_id, special_id),
+                )
         if is_rejected_candidate:
             for reject_id in matched_reject_ids:
                 cursor.execute(
