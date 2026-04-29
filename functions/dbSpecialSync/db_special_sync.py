@@ -118,6 +118,10 @@ def _normalize_text_value(value) -> str:
     return str(value or '').strip()
 
 
+def _candidate_and_special_sources_match(candidate_source, special_source) -> bool:
+    return _normalize_text_value(candidate_source) == _normalize_text_value(special_source)
+
+
 def _build_open_hours_lookup(open_hours_rows: List[Dict]) -> Dict[str, Dict]:
     lookup = {}
     for row in open_hours_rows:
@@ -323,34 +327,42 @@ def insert_special_candidate(cursor, run: Dict, candidates: List[Dict]) -> Dict[
         candidate_days = _parse_days_of_week(candidate.get('days_of_week'))
         matched_special_ids = []
         if candidate_days:
-            placeholders = ','.join(['%s'] * len(candidate_days))
             cursor.execute(
-                f"""
-                SELECT s.special_id, s.day_of_week, s.description
+                """
+                SELECT
+                    s.special_id,
+                    s.day_of_week,
+                    s.all_day,
+                    s.start_time,
+                    s.end_time,
+                    s.description,
+                    scx.source
                 FROM special s
+                LEFT JOIN special_candidate scx
+                    ON scx.special_candidate_id = s.special_candidate_id
                 WHERE s.bar_id = %s
                     AND s.is_active = 'Y'
-                    AND s.day_of_week IN ({placeholders})
-                    AND COALESCE(s.all_day, 'N') = %s
-                    AND COALESCE(s.start_time, '00:00:00') = COALESCE(%s, '00:00:00')
-                    AND COALESCE(s.end_time, '00:00:00') = COALESCE(%s, '00:00:00')
-                    AND EXISTS (
-                        SELECT 1
-                        FROM special_candidate scx
-                        WHERE scx.special_candidate_id = s.special_candidate_id
-                            AND COALESCE(scx.source, '') = COALESCE(%s, '')
-                    )
                 """,
-                (
-                    run['bar_id'],
-                    *candidate_days,
-                    _normalize_yn_flag(candidate.get('all_day')),
-                    candidate.get('start_time'),
-                    candidate.get('end_time'),
-                    candidate.get('source') or candidate.get('source_url'),
-                ),
+                (run['bar_id'],),
             )
+            candidate_source = candidate.get('source') or candidate.get('source_url')
+            normalized_candidate_days = {_normalize_day_of_week(day) for day in candidate_days}
             for special in cursor.fetchall():
+                if _normalize_day_of_week(special.get('day_of_week')) not in normalized_candidate_days:
+                    continue
+                if not _candidate_and_special_sources_match(candidate_source, special.get('source')):
+                    continue
+                if not _is_candidate_same_as_special(
+                    {
+                        'day_of_week': special.get('day_of_week'),
+                        'all_day': candidate.get('all_day'),
+                        'start_time': candidate.get('start_time'),
+                        'end_time': candidate.get('end_time'),
+                        'description': candidate.get('description'),
+                    },
+                    special,
+                ):
+                    continue
                 if _descriptions_match(candidate.get('description'), special.get('description')):
                     matched_special_ids.append(special['special_id'])
                     cursor.execute(
