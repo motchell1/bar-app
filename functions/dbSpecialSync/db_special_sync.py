@@ -75,7 +75,18 @@ def _parse_days_of_week(raw_days) -> List[str]:
                     raw_days = [normalized_raw]
     if not isinstance(raw_days, list):
         return []
-    return [day for day in raw_days if isinstance(day, str) and day.strip()]
+    normalized_days = []
+    for day in raw_days:
+        if not isinstance(day, str):
+            continue
+        normalized_day = day.strip()
+        if not normalized_day:
+            continue
+        normalized_day = normalized_day.strip('[]')
+        normalized_day = normalized_day.strip('\'"“”‘’')
+        if normalized_day:
+            normalized_days.append(normalized_day)
+    return normalized_days
 
 
 def _normalize_day_of_week(value) -> str:
