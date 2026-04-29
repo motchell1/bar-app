@@ -1193,6 +1193,30 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
           return value === '' ? fallback : String(value);
         };
 
+        const matchedSpecials = Array.isArray(special.matched_specials) ? special.matched_specials : [];
+        const matchedSpecialsMarkup = matchedSpecials.length
+          ? `
+            <div class="admin-matched-specials">
+              <p><strong>Matched Specials:</strong></p>
+              <div class="admin-matched-specials-list">
+                ${matchedSpecials.map((matched) => `
+                  <article class="admin-matched-special-card">
+                    <p><strong>Special ID:</strong> ${matched.special_id ?? '—'}</p>
+                    <p><strong>Day of Week:</strong> ${matched.day_of_week || '—'}</p>
+                    <p><strong>Description:</strong> ${matched.description || '—'}</p>
+                    <p><strong>All Day:</strong> ${matched.all_day || '—'}</p>
+                    <p><strong>Start Time:</strong> ${matched.start_time || '—'}</p>
+                    <p><strong>End Time:</strong> ${matched.end_time || '—'}</p>
+                    <p><strong>Type:</strong> ${matched.type || '—'}</p>
+                    <p><strong>Insert Date:</strong> ${formatDateTime(matched.insert_date)}</p>
+                    <p><strong>Update Date:</strong> ${formatDateTime(matched.update_date)}</p>
+                  </article>
+                `).join('')}
+              </div>
+            </div>
+          `
+          : '';
+
         return `
           <article class="admin-candidate-card" data-candidate-id="${candidateId}">
             ${(isEditing || isReadOnlyCandidate) ? '' : `
@@ -1214,7 +1238,7 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
             <p><strong>Source:</strong> ${getSourceMarkup(special.source)}</p>
             <p><strong>Notes:</strong> ${special.notes || '—'}</p>
             <p><strong>Match Status:</strong> ${special.match_status || 'NOT_MATCHED'}</p>
-            ${(special.matched_specials || []).length ? `<p><strong>Matched Specials:</strong> ${(special.matched_specials || []).map((matched) => `#${matched.special_id} ${matched.day_of_week} — ${matched.description || '—'}`).join('<br/>')}</p>` : ''}
+            ${matchedSpecialsMarkup}
             ${isReadOnlyCandidate
               ? ''
               : `<div class="admin-actions-row">

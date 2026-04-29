@@ -230,6 +230,24 @@ body {
   margin-top: 8px;
 }
 
+.admin-matched-specials {
+  margin-top: 8px;
+}
+
+.admin-matched-specials-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.admin-matched-special-card {
+  border: 1px solid #c7d8f7;
+  background: #f7faff;
+  border-radius: 8px;
+  padding: 8px;
+}
+
 .admin-icon-btn {
   position: absolute;
   top: 8px;
