@@ -847,6 +847,9 @@ def lambda_handler(event, context):
         crawl_specials_count = 0
         web_ai_search_specials_count = 0
         auto_approved_count = 0
+        auto_rejected_count = 0
+        needs_approval_count = 0
+        matched_count = 0
         inserted_count = 0
         runs_created = 0
         auto_published_runs = 0
@@ -942,6 +945,9 @@ def lambda_handler(event, context):
             runs_created += 1
             inserted_count += int(insert_result.get('inserted_count', 0))
             auto_approved_count += int(insert_result.get('auto_approved_count', 0))
+            auto_rejected_count += int(insert_result.get('auto_rejected_count', 0))
+            needs_approval_count += int(insert_result.get('needs_approval_count', 0))
+            matched_count += int(insert_result.get('matched_count', 0))
             run_id = insert_result.get('run_id')
 
             if insert_result.get('all_auto_approved') and run_id:
@@ -976,8 +982,10 @@ def lambda_handler(event, context):
                 'neighborhood': response_neighborhood,
                 'processed_bars': processed_bars,
                 'candidate_specials_found': len(total_candidates),
-                'candidate_specials_inserted': inserted_count,
                 'auto_approved_specials': auto_approved_count,
+                'auto_rejected_specials': auto_rejected_count,
+                'needs_approval_specials': needs_approval_count,
+                'matched_specials': matched_count,
                 'website_crawl_specials': crawl_specials_count,
                 'web_ai_search_specials': web_ai_search_specials_count,
                 'candidate_runs_created': runs_created,
