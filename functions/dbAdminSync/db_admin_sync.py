@@ -361,7 +361,7 @@ def get_unapproved_special_candidates(cursor):
         FROM special_candidate sc
         JOIN special_candidate_run scr ON scr.run_id = sc.run_id
         JOIN bar b ON b.bar_id = scr.bar_id
-        WHERE sc.approval_status IN ('NOT_APPROVED', 'AUTO_APPROVED')
+        WHERE sc.approval_status IN ('NOT_APPROVED', 'AUTO_APPROVED', 'AUTO_REJECTED')
             AND COALESCE(sc.is_recurring, 'Y') = 'Y'
             AND sc.run_id IN (
                 SELECT DISTINCT sc2.run_id
