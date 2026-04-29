@@ -647,8 +647,7 @@ def get_rejected_special_candidates(cursor):
             scr.date,
             scr.fetch_method,
             scr.source,
-            COALESCE(SUM(CASE WHEN linked_sc.fetch_method = 'web_ai_search' THEN 1 ELSE 0 END), 0) AS web_ai_search_matches,
-            COALESCE(SUM(CASE WHEN linked_sc.fetch_method = 'web_crawl' THEN 1 ELSE 0 END), 0) AS web_crawl_matches,
+            COUNT(scrj.special_candidate_id) AS candidate_matches,
             MAX(scrj.special_candidate_id) AS latest_special_candidate_id,
             MAX(linked_sc.insert_date) AS last_seen_candidate_insert_date,
             COUNT(DISTINCT scrj.special_candidate_id) AS linked_candidate_count
@@ -745,8 +744,7 @@ def get_rejected_special_candidates(cursor):
                 'fetch_method': row.get('fetch_method'),
                 'source': row.get('source'),
                 'insert_date': row.get('last_seen_candidate_insert_date').isoformat() if row.get('last_seen_candidate_insert_date') else None,
-                'web_ai_search_matches': int(row.get('web_ai_search_matches') or 0),
-                'web_crawl_matches': int(row.get('web_crawl_matches') or 0),
+                'candidate_matches': int(row.get('candidate_matches') or 0),
                 'linked_candidate_count': int(row.get('linked_candidate_count') or 0),
                 'linked_candidates': linked_by_reject_id.get(reject_id, []),
             }

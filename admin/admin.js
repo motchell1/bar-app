@@ -2077,8 +2077,7 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
               <th class="admin-sortable-header" data-sort-table="rejected-special-management" data-sort-key="type">Type${getSortIndicator('rejected-special-management', 'type')}</th>
               <th class="admin-sortable-header" data-sort-table="rejected-special-management" data-sort-key="fetch_method">Method${getSortIndicator('rejected-special-management', 'fetch_method')}</th>
               <th class="admin-sortable-header" data-sort-table="rejected-special-management" data-sort-key="source">Source${getSortIndicator('rejected-special-management', 'source')}</th>
-              <th class="admin-sortable-header" data-sort-table="rejected-special-management" data-sort-key="web_ai_search_matches">Web AI Search Matches${getSortIndicator('rejected-special-management', 'web_ai_search_matches')}</th>
-              <th class="admin-sortable-header" data-sort-table="rejected-special-management" data-sort-key="web_crawl_matches">Web Crawl Matches${getSortIndicator('rejected-special-management', 'web_crawl_matches')}</th>
+              <th class="admin-sortable-header" data-sort-table="rejected-special-management" data-sort-key="candidate_matches">Candidate Matches${getSortIndicator('rejected-special-management', 'candidate_matches')}</th>
               <th class="admin-sortable-header" data-sort-table="rejected-special-management" data-sort-key="linked_candidate_count">Linked Candidates${getSortIndicator('rejected-special-management', 'linked_candidate_count')}</th>
               <th class="admin-sortable-header" data-sort-table="rejected-special-management" data-sort-key="insert_date">Last Seen${getSortIndicator('rejected-special-management', 'insert_date')}</th>
             </tr>
@@ -2096,8 +2095,7 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
                 <td>${row.type || '—'}</td>
                 <td>${row.fetch_method || '—'}</td>
                 <td>${getSourceMarkup(row.source)}</td>
-                <td>${row.web_ai_search_matches ?? 0}</td>
-                <td>${row.web_crawl_matches ?? 0}</td>
+                <td>${row.candidate_matches ?? 0}</td>
                 <td>${row.linked_candidate_count ?? 0}</td>
                 <td>${formatDateTime(row.insert_date)}</td>
               </tr>
