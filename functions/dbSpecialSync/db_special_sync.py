@@ -301,6 +301,17 @@ def insert_special_candidate(cursor, run: Dict, candidates: List[Dict]) -> Dict[
         (run['bar_id'],),
     )
     rejected_candidates = cursor.fetchall()
+    cursor.execute(
+        """
+        SELECT 1 AS has_column
+        FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+            AND TABLE_NAME = 'special_candidate'
+            AND COLUMN_NAME = 'match_status'
+        LIMIT 1
+        """
+    )
+    has_match_status_column = bool(cursor.fetchone())
 
     for candidate in candidates:
         approval_status = 'NOT_APPROVED'
@@ -328,33 +339,43 @@ def insert_special_candidate(cursor, run: Dict, candidates: List[Dict]) -> Dict[
         matched_special_ids = _find_special_matches(cursor, candidate)
         match_status = 'MATCHED' if matched_special_ids else 'NOT_MATCHED'
 
+        insert_columns = [
+            'run_id', 'bar_id', 'bar_name', 'neighborhood', 'description', 'type', 'days_of_week',
+            'start_time', 'end_time', 'all_day', 'is_recurring', 'date', 'fetch_method', 'source',
+            'confidence', 'notes', 'approval_status', 'approval_date'
+        ]
+        insert_values = [
+            run_id,
+            candidate['bar_id'],
+            candidate['bar_name'],
+            candidate['neighborhood'],
+            candidate['description'],
+            candidate['type'],
+            json.dumps(candidate.get('days_of_week', [])),
+            candidate.get('start_time'),
+            candidate.get('end_time'),
+            candidate.get('all_day'),
+            candidate.get('is_recurring'),
+            candidate.get('date'),
+            candidate.get('fetch_method'),
+            candidate.get('source') or candidate.get('source_url'),
+            candidate.get('confidence'),
+            candidate.get('notes'),
+            approval_status,
+            approval_date,
+        ]
+        if has_match_status_column:
+            insert_columns.append('match_status')
+            insert_values.append(match_status)
+
+        placeholders = ', '.join(['%s'] * len(insert_columns))
         cursor.execute(
-            """
+            f"""
             INSERT INTO special_candidate
-            (run_id, bar_id, bar_name, neighborhood, description, type, days_of_week, start_time, end_time, all_day, is_recurring, date, fetch_method, source, confidence, notes, approval_status, approval_date, match_status)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            ({', '.join(insert_columns)})
+            VALUES ({placeholders})
             """,
-            (
-                run_id,
-                candidate['bar_id'],
-                candidate['bar_name'],
-                candidate['neighborhood'],
-                candidate['description'],
-                candidate['type'],
-                json.dumps(candidate.get('days_of_week', [])),
-                candidate.get('start_time'),
-                candidate.get('end_time'),
-                candidate.get('all_day'),
-                candidate.get('is_recurring'),
-                candidate.get('date'),
-                candidate.get('fetch_method'),
-                candidate.get('source') or candidate.get('source_url'),
-                candidate.get('confidence'),
-                candidate.get('notes'),
-                approval_status,
-                approval_date,
-                match_status,
-            ),
+            tuple(insert_values),
         )
         candidate_id = cursor.lastrowid
         if matched_special_ids:
