@@ -1,6 +1,8 @@
 import json
 import logging
 import os
+import re
+import unicodedata
 from datetime import datetime, time, timedelta
 from difflib import SequenceMatcher
 from typing import Dict, List
@@ -43,7 +45,12 @@ def _parse_confidence(value) -> float:
 
 
 def _normalize_description(value: str) -> str:
-    return ' '.join(str(value or '').lower().split())
+    normalized = str(value or '').lower()
+    normalized = unicodedata.normalize('NFKC', normalized)
+    normalized = normalized.replace('½', '1/2')
+    normalized = re.sub(r'[$€£¥]', '', normalized)
+    normalized = re.sub(r'[^a-z0-9/ ]+', ' ', normalized)
+    return ' '.join(normalized.split())
 
 
 def _descriptions_match(candidate_description: str, special_description: str) -> bool:
