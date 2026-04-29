@@ -647,7 +647,6 @@ def get_rejected_special_candidates(cursor):
             scr.date,
             scr.fetch_method,
             scr.source,
-            COUNT(scrj.special_candidate_id) AS candidate_matches,
             MAX(scrj.special_candidate_id) AS latest_special_candidate_id,
             MAX(linked_sc.insert_date) AS last_seen_candidate_insert_date,
             COUNT(DISTINCT scrj.special_candidate_id) AS linked_candidate_count
@@ -682,14 +681,7 @@ def get_rejected_special_candidates(cursor):
         SELECT
             scrj.reject_id,
             sc.special_candidate_id,
-            sc.description,
-            sc.days_of_week,
-            sc.type,
-            sc.start_time,
-            sc.end_time,
-            sc.all_day,
-            sc.is_recurring,
-            sc.date,
+            sc.run_id,
             sc.fetch_method,
             sc.source,
             sc.approval_status,
@@ -708,14 +700,7 @@ def get_rejected_special_candidates(cursor):
         linked_by_reject_id.setdefault(reject_id, []).append(
             {
                 'special_candidate_id': linked_row.get('special_candidate_id'),
-                'description': linked_row.get('description'),
-                'days_of_week': _parse_days_of_week(linked_row.get('days_of_week')),
-                'type': linked_row.get('type'),
-                'start_time': _normalize_time_value(linked_row.get('start_time')) or None,
-                'end_time': _normalize_time_value(linked_row.get('end_time')) or None,
-                'all_day': linked_row.get('all_day'),
-                'is_recurring': linked_row.get('is_recurring'),
-                'date': linked_row.get('date').isoformat() if hasattr(linked_row.get('date'), 'isoformat') and linked_row.get('date') else linked_row.get('date'),
+                'run_id': linked_row.get('run_id'),
                 'fetch_method': linked_row.get('fetch_method'),
                 'source': linked_row.get('source'),
                 'approval_status': linked_row.get('approval_status'),
@@ -744,7 +729,6 @@ def get_rejected_special_candidates(cursor):
                 'fetch_method': row.get('fetch_method'),
                 'source': row.get('source'),
                 'insert_date': row.get('last_seen_candidate_insert_date').isoformat() if row.get('last_seen_candidate_insert_date') else None,
-                'candidate_matches': int(row.get('candidate_matches') or 0),
                 'linked_candidate_count': int(row.get('linked_candidate_count') or 0),
                 'linked_candidates': linked_by_reject_id.get(reject_id, []),
             }
