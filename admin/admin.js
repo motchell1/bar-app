@@ -1217,6 +1217,9 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
           `
           : '';
 
+
+        const matchStatus = String(special.match_status || 'NOT_MATCHED').toUpperCase();
+        const showOverrideMatchAction = matchStatus === 'MATCHED';
         return `
           <article class="admin-candidate-card" data-candidate-id="${candidateId}">
             ${(isEditing || isReadOnlyCandidate) ? '' : `
@@ -1246,7 +1249,9 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
                     ? `<button class="admin-action-btn approve" type="button" data-candidate-action="save-edit" data-candidate-id="${candidateId}" ${state.savingCandidate ? 'disabled' : ''}>Save</button>
                        <button class="admin-secondary-btn" type="button" data-candidate-action="cancel-edit" data-candidate-id="${candidateId}" ${state.savingCandidate ? 'disabled' : ''}>Cancel</button>`
                     : `<button class="admin-action-btn approve" type="button" data-action="APPROVED" data-candidate-id="${candidateId}" ${isUpdating ? 'disabled' : ''}>Approve</button>
-                       <button class="admin-action-btn approve" type="button" data-action="APPROVED_OVERRIDE_MATCH" data-candidate-id="${candidateId}" ${isUpdating ? 'disabled' : ''}>Approve - Override Match</button>
+                       ${showOverrideMatchAction
+                         ? `<button class="admin-action-btn approve" type="button" data-action="APPROVED_OVERRIDE_MATCH" data-candidate-id="${candidateId}" ${isUpdating ? 'disabled' : ''}>Approve - Override Match</button>`
+                         : ''}
                        <button class="admin-action-btn reject" type="button" data-action="REJECTED" data-candidate-id="${candidateId}" ${isUpdating ? 'disabled' : ''}>Reject</button>`}
                 </div>`}
           </article>
