@@ -11,30 +11,6 @@ function format12Hour(timeStr) {
   return `${hour}:${minuteStr} ${ampm}`;
 }
 
-function formatSpecialTime(startTime, endTime) {
-  if (!startTime || !endTime) return '';
-
-  const formatSingle = (timeStr) => {
-    if (!timeStr) return '';
-    const [hourStr, minStr] = timeStr.split(':');
-    let hour = parseInt(hourStr, 10);
-
-    let ampm = hour >= 12 ? 'PM' : 'AM';
-    if (hour === 0) ampm = 'AM';
-    hour = hour % 12;
-    if (hour === 0) hour = 12;
-
-    return `${hour}:${minStr} ${ampm}`;
-  };
-
-  const sStr = formatSingle(startTime);
-  const eStr = formatSingle(endTime);
-
-  if (!sStr || !eStr) return '';
-
-  return `${sStr} – ${eStr}`;
-}
-
 function timeToMinutes(timeStr) {
   if (!timeStr) return 0;
   const [h, m] = timeStr.split(':').map(Number);
@@ -70,21 +46,6 @@ function isSpecialActive(special) {
   end.setHours(endHour, endMinute, 0, 0);
 
   return now >= start && now <= end;
-}
-
-function getOpenStatus(hours) {
-  if (!hours || hours.closed) {
-    return { status: 'closed', label: 'Closed', color: 'red' };
-  }
-  const now = new Date();
-  const currentMinutes = now.getHours() * 60 + now.getMinutes();
-  const openMinutes = timeToMinutes(hours.open_time);
-  const closeMinutes = timeToMinutes(hours.close_time);
-  if (currentMinutes >= openMinutes && currentMinutes <= closeMinutes) {
-    return { status: 'open', label: 'Open', color: 'green', time: hours.close_time };
-  }
-
-  return { status: 'closed', label: 'Closed', color: 'red', time: hours.open_time };
 }
 
 function groupSpecialsForUI(specials) {
