@@ -85,6 +85,8 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
     specialManagementSort: { key: 'neighborhood', direction: 'asc' },
     barManagementSort: { key: 'name', direction: 'asc' },
     rejectedSpecialSort: { key: 'neighborhood', direction: 'asc' },
+    actionRejectedSpecialId: null,
+    showRejectedDetails: false,
     creatingSpecial: false,
     savingNewSpecial: false,
     newSpecialForm: {
@@ -117,6 +119,7 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
     state.currentView = 'home';
     state.errorMessage = '';
     state.actionRejectedCandidateId = null;
+        state.actionRejectedSpecialId = null;
     state.actionSpecialId = null;
     state.detailSpecials = [];
     state.detailEditing = false;
@@ -2074,14 +2077,13 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
               <th class="admin-sortable-header" data-sort-table="rejected-special-management" data-sort-key="type">Type${getSortIndicator('rejected-special-management', 'type')}</th>
               <th class="admin-sortable-header" data-sort-table="rejected-special-management" data-sort-key="fetch_method">Method${getSortIndicator('rejected-special-management', 'fetch_method')}</th>
               <th class="admin-sortable-header" data-sort-table="rejected-special-management" data-sort-key="source">Source${getSortIndicator('rejected-special-management', 'source')}</th>
-              <th class="admin-sortable-header" data-sort-table="rejected-special-management" data-sort-key="web_ai_search_matches">Web AI Search Matches${getSortIndicator('rejected-special-management', 'web_ai_search_matches')}</th>
-              <th class="admin-sortable-header" data-sort-table="rejected-special-management" data-sort-key="web_crawl_matches">Web Crawl Matches${getSortIndicator('rejected-special-management', 'web_crawl_matches')}</th>
-              <th class="admin-sortable-header" data-sort-table="rejected-special-management" data-sort-key="insert_date">Insert Date${getSortIndicator('rejected-special-management', 'insert_date')}</th>
+              <th class="admin-sortable-header" data-sort-table="rejected-special-management" data-sort-key="linked_candidate_count">Linked Candidates${getSortIndicator('rejected-special-management', 'linked_candidate_count')}</th>
+              <th class="admin-sortable-header" data-sort-table="rejected-special-management" data-sort-key="insert_date">Last Seen${getSortIndicator('rejected-special-management', 'insert_date')}</th>
             </tr>
           </thead>
           <tbody>
             ${rows.map((row) => `
-              <tr class="admin-special-row" data-rejected-special-candidate-row="${row.special_candidate_id}">
+              <tr class="admin-special-row" data-rejected-special-row="${row.reject_id}">
                 <td>${row.neighborhood || '—'}</td>
                 <td>${row.bar_name || '—'}</td>
                 <td>${row.description || '—'}</td>
@@ -2092,8 +2094,7 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
                 <td>${row.type || '—'}</td>
                 <td>${row.fetch_method || '—'}</td>
                 <td>${getSourceMarkup(row.source)}</td>
-                <td>${row.web_ai_search_matches ?? 0}</td>
-                <td>${row.web_crawl_matches ?? 0}</td>
+                <td>${row.linked_candidate_count ?? 0}</td>
                 <td>${formatDateTime(row.insert_date)}</td>
               </tr>
             `).join('')}
@@ -2106,6 +2107,8 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
 
   function getRejectedSpecialActionMenuMarkup() {
     if (!state.actionRejectedCandidateId) return '';
+    const selectedRow = state.rejectedSpecials.find((row) => Number(row.reject_id) === Number(state.actionRejectedSpecialId));
+    const linkedCandidates = Array.isArray(selectedRow?.linked_candidates) ? selectedRow.linked_candidates : [];
     return `
       <div class="admin-modal-backdrop" data-close-rejected-action-menu="true">
         <div class="admin-modal" role="dialog" aria-label="Rejected special actions">
@@ -2118,8 +2121,47 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
           >
             Remove Rejected Special Candidate
           </button>
+          <button
+            type="button"
+            class="admin-tool-button"
+            data-rejected-special-action="view-details"
+          >
+            View Linked Candidates (${linkedCandidates.length})
+          </button>
+          ${state.showRejectedDetails ? getRejectedSpecialDetailsMarkup(selectedRow) : ''}
           <button type="button" class="admin-secondary-btn" data-close-rejected-action-menu="true">Close</button>
         </div>
+      </div>
+    `;
+  }
+
+
+
+  function getRejectedSpecialDetailsMarkup(selectedRow) {
+    if (!selectedRow || !state.actionRejectedSpecialId) return '';
+    const linkedCandidates = Array.isArray(selectedRow.linked_candidates) ? selectedRow.linked_candidates : [];
+    if (!linkedCandidates.length) return '<p class="admin-empty">No linked candidates found.</p>';
+    return `
+      <div class="admin-table-wrap" style="max-height: 240px; margin-top: 0.75rem;">
+        <table class="admin-special-table">
+          <thead>
+            <tr>
+              <th>Candidate ID</th><th>Run ID</th><th>Status</th><th>Method</th><th>Source</th><th>Insert Date</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${linkedCandidates.map((candidate) => `
+              <tr>
+                <td>${candidate.special_candidate_id || '—'}</td>
+                <td>${candidate.run_id || '—'}</td>
+                <td>${candidate.approval_status || '—'}</td>
+                <td>${candidate.fetch_method || '—'}</td>
+                <td>${getSourceMarkup(candidate.source)}</td>
+                <td>${formatDateTime(candidate.insert_date)}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
       </div>
     `;
   }
@@ -2147,11 +2189,15 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
       });
     }
 
-    screenElement.querySelectorAll('[data-rejected-special-candidate-row]').forEach((row) => {
+    screenElement.querySelectorAll('[data-rejected-special-row]').forEach((row) => {
       row.addEventListener('click', () => {
-        const specialCandidateId = Number(row.getAttribute('data-rejected-special-candidate-row'));
-        if (!specialCandidateId) return;
-        state.actionRejectedCandidateId = specialCandidateId;
+        const rejectId = Number(row.getAttribute('data-rejected-special-row'));
+        if (!rejectId) return;
+        const selectedRow = state.rejectedSpecials.find((item) => Number(item.reject_id) === rejectId);
+        if (!selectedRow) return;
+        state.actionRejectedSpecialId = rejectId;
+        state.actionRejectedCandidateId = Number(selectedRow.special_candidate_id) || null;
+        state.showRejectedDetails = false;
         render();
       });
     });
@@ -2160,6 +2206,8 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
       element.addEventListener('click', (event) => {
         if (event.currentTarget !== event.target) return;
         state.actionRejectedCandidateId = null;
+        state.actionRejectedSpecialId = null;
+        state.showRejectedDetails = false;
         render();
       });
     });
@@ -2169,7 +2217,16 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
         const specialCandidateId = Number(button.getAttribute('data-special-candidate-id'));
         if (!specialCandidateId) return;
         state.actionRejectedCandidateId = null;
+        state.actionRejectedSpecialId = null;
+        state.showRejectedDetails = false;
         await removeRejectedSpecialCandidate(specialCandidateId);
+      });
+    });
+
+    screenElement.querySelectorAll('[data-rejected-special-action="view-details"]').forEach((button) => {
+      button.addEventListener('click', () => {
+        state.showRejectedDetails = !state.showRejectedDetails;
+        render();
       });
     });
   }
