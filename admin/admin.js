@@ -548,7 +548,7 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
     }
   }
 
-  async function updateCandidateApproval(specialCandidateId, approvalStatus) {
+  async function updateCandidateApproval(specialCandidateId, approvalStatus, approvalAction = '') {
     state.updatingCandidateId = specialCandidateId;
     state.errorMessage = '';
     render();
@@ -557,7 +557,8 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
       await callAdminSync({
         mode: 'update_special_candidate_approval',
         special_candidate_id: specialCandidateId,
-        approval_status: approvalStatus
+        approval_status: approvalStatus,
+        approval_action: approvalAction
       });
       await loadUnapprovedSpecials();
     } catch (err) {
@@ -1135,6 +1136,8 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
         const isUpdating = state.updatingCandidateId === candidateId;
         const isEditing = !isAutoApproved && state.editingCandidateId === candidateId;
         const confidence = special.confidence === null || special.confidence === undefined ? '—' : String(special.confidence);
+        const matchedSpecials = Array.isArray(special.matched_specials) ? special.matched_specials : [];
+        const hasMatch = String(special.match_status || '').toUpperCase() === 'MATCHED';
         const editableValue = (field, fallback = '—') => {
           const value = special[field] ?? '';
           if (isEditing) {
@@ -1205,6 +1208,10 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
             <p><strong>Confidence:</strong> ${confidence}</p>
             <p><strong>Method:</strong> ${special.fetch_method || '—'}</p>
             <p><strong>Source:</strong> ${getSourceMarkup(special.source)}</p>
+            <p><strong>Match Status:</strong> ${special.match_status || 'NOT_MATCHED'}</p>
+            ${hasMatch
+              ? `<p><strong>Matched Specials:</strong> ${matchedSpecials.length ? matchedSpecials.map((matched) => `#${matched.special_id} (${matched.day_of_week})`).join(', ') : '—'}</p>`
+              : ''}
             <p><strong>Notes:</strong> ${special.notes || '—'}</p>
             ${isAutoApproved
               ? ''
@@ -1213,6 +1220,7 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
                     ? `<button class="admin-action-btn approve" type="button" data-candidate-action="save-edit" data-candidate-id="${candidateId}" ${state.savingCandidate ? 'disabled' : ''}>Save</button>
                        <button class="admin-secondary-btn" type="button" data-candidate-action="cancel-edit" data-candidate-id="${candidateId}" ${state.savingCandidate ? 'disabled' : ''}>Cancel</button>`
                     : `<button class="admin-action-btn approve" type="button" data-action="APPROVED" data-candidate-id="${candidateId}" ${isUpdating ? 'disabled' : ''}>Approve</button>
+                       ${hasMatch ? `<button class="admin-action-btn approve" type="button" data-action="APPROVED" data-approval-action="OVERRIDE_MATCH" data-candidate-id="${candidateId}" ${isUpdating ? 'disabled' : ''}>Approve - Override Match</button>` : ''}
                        <button class="admin-action-btn reject" type="button" data-action="REJECTED" data-candidate-id="${candidateId}" ${isUpdating ? 'disabled' : ''}>Reject</button>`}
                 </div>`}
           </article>
@@ -1410,8 +1418,9 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
       button.addEventListener('click', () => {
         const candidateId = Number(button.getAttribute('data-candidate-id'));
         const action = button.getAttribute('data-action');
+        const approvalAction = button.getAttribute('data-approval-action') || '';
         if (!candidateId || !action) return;
-        updateCandidateApproval(candidateId, action);
+        updateCandidateApproval(candidateId, action, approvalAction);
       });
     });
 
