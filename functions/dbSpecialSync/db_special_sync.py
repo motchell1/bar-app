@@ -250,6 +250,9 @@ def insert_special_candidate(cursor, run: Dict, candidates: List[Dict]) -> Dict[
     run_id = insert_special_candidate_run(cursor, run)
     inserted_count = 0
     auto_approved_count = 0
+    auto_rejected_count = 0
+    needs_approval_count = 0
+    matched_count = 0
 
     cursor.execute(
         """
@@ -288,6 +291,7 @@ def insert_special_candidate(cursor, run: Dict, candidates: List[Dict]) -> Dict[
         if is_rejected_candidate:
             approval_status = 'AUTO_REJECTED'
             approval_date = datetime.utcnow()
+            auto_rejected_count += 1
         else:
             fetch_method = (candidate.get('fetch_method') or '').strip()
             auto_approval_threshold = WEB_AI_SEARCH_AUTO_APPROVAL_THRESHOLD if fetch_method == 'web_ai_search' else WEB_SCRAPE_AUTO_APPROVAL_THRESHOLD
@@ -295,6 +299,8 @@ def insert_special_candidate(cursor, run: Dict, candidates: List[Dict]) -> Dict[
                 approval_status = 'AUTO_APPROVED'
                 approval_date = datetime.utcnow()
                 auto_approved_count += 1
+            else:
+                needs_approval_count += 1
 
         cursor.execute(
             """
@@ -380,6 +386,9 @@ def insert_special_candidate(cursor, run: Dict, candidates: List[Dict]) -> Dict[
             """,
             ('MATCHED' if matched_special_ids else 'NOT_MATCHED', candidate_id),
         )
+        if matched_special_ids:
+            matched_count += 1
+
         if matched_special_ids and approval_status == 'AUTO_APPROVED':
             for special_id in matched_special_ids:
                 cursor.execute(
@@ -418,6 +427,9 @@ def insert_special_candidate(cursor, run: Dict, candidates: List[Dict]) -> Dict[
         'run_id': run_id,
         'inserted_count': inserted_count,
         'auto_approved_count': auto_approved_count,
+        'auto_rejected_count': auto_rejected_count,
+        'needs_approval_count': needs_approval_count,
+        'matched_count': matched_count,
         'all_auto_approved': inserted_count > 0 and inserted_count == auto_approved_count,
     }
 
