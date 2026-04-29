@@ -633,34 +633,57 @@ def get_rejected_special_candidates(cursor):
     cursor.execute(
         """
         SELECT
-            sc.special_candidate_id,
-            sc.bar_id,
+            scr.reject_id,
+            scr.bar_id,
             b.name AS bar_name,
-            sc.neighborhood,
-            sc.description,
-            sc.days_of_week,
-            sc.type,
-            sc.start_time,
-            sc.end_time,
-            sc.all_day,
-            sc.is_recurring,
-            sc.date,
-            sc.fetch_method,
-            sc.source,
-            sc.approval_status,
-            sc.insert_date,
-            COALESCE(SUM(CASE WHEN scr.fetch_method = 'web_ai_search' THEN 1 ELSE 0 END), 0) AS web_ai_search_matches,
-            COALESCE(SUM(CASE WHEN scr.fetch_method = 'web_crawl' THEN 1 ELSE 0 END), 0) AS web_crawl_matches
-        FROM special_candidate sc
-        JOIN bar b ON b.bar_id = sc.bar_id
-        LEFT JOIN special_candidate_reject_join scrj ON scrj.special_candidate_id = sc.special_candidate_id
-        LEFT JOIN special_candidate_reject scr ON scr.reject_id = scrj.reject_id
-        WHERE sc.approval_status = 'REJECTED'
+            nb.name AS neighborhood,
+            scr.description,
+            scr.days_of_week,
+            COALESCE(MAX(sc.type), '') AS type,
+            scr.start_time,
+            scr.end_time,
+            scr.all_day,
+            scr.is_recurring,
+            scr.date,
+            scr.fetch_method,
+            scr.source,
+            COALESCE(SUM(CASE WHEN linked_sc.fetch_method = 'web_ai_search' THEN 1 ELSE 0 END), 0) AS web_ai_search_matches,
+            COALESCE(SUM(CASE WHEN linked_sc.fetch_method = 'web_crawl' THEN 1 ELSE 0 END), 0) AS web_crawl_matches,
+            MAX(scrj.special_candidate_id) AS latest_special_candidate_id,
+            MAX(linked_sc.insert_date) AS last_seen_candidate_insert_date,
+            COUNT(DISTINCT scrj.special_candidate_id) AS linked_candidate_count
+        FROM special_candidate_reject scr
+        JOIN bar b ON b.bar_id = scr.bar_id
+        LEFT JOIN neighborhood nb ON nb.neighborhood_id = b.neighborhood_id
+        LEFT JOIN special_candidate_reject_join scrj ON scrj.reject_id = scr.reject_id
+        LEFT JOIN special_candidate linked_sc ON linked_sc.special_candidate_id = scrj.special_candidate_id
         GROUP BY
-            sc.special_candidate_id,
-            sc.bar_id,
+            scr.reject_id,
+            scr.bar_id,
             b.name,
-            sc.neighborhood,
+            nb.name,
+            scr.description,
+            scr.days_of_week,
+            scr.start_time,
+            scr.end_time,
+            scr.all_day,
+            scr.is_recurring,
+            scr.date,
+            scr.fetch_method,
+            scr.source
+        ORDER BY
+            neighborhood ASC,
+            b.name ASC,
+            scr.reject_id DESC
+        """
+    )
+    rows = cursor.fetchall()
+
+    cursor.execute(
+        """
+        SELECT
+            scrj.reject_id,
+            sc.special_candidate_id,
             sc.description,
             sc.days_of_week,
             sc.type,
@@ -673,18 +696,42 @@ def get_rejected_special_candidates(cursor):
             sc.source,
             sc.approval_status,
             sc.insert_date
-        ORDER BY
-            sc.neighborhood ASC,
-            b.name ASC,
-            sc.special_candidate_id DESC
+        FROM special_candidate_reject_join scrj
+        JOIN special_candidate sc ON sc.special_candidate_id = scrj.special_candidate_id
+        ORDER BY sc.insert_date DESC, sc.special_candidate_id DESC
         """
     )
-    rows = cursor.fetchall()
+    linked_rows = cursor.fetchall()
+    linked_by_reject_id = {}
+    for linked_row in linked_rows:
+        reject_id = linked_row.get('reject_id')
+        if not reject_id:
+            continue
+        linked_by_reject_id.setdefault(reject_id, []).append(
+            {
+                'special_candidate_id': linked_row.get('special_candidate_id'),
+                'description': linked_row.get('description'),
+                'days_of_week': _parse_days_of_week(linked_row.get('days_of_week')),
+                'type': linked_row.get('type'),
+                'start_time': _normalize_time_value(linked_row.get('start_time')) or None,
+                'end_time': _normalize_time_value(linked_row.get('end_time')) or None,
+                'all_day': linked_row.get('all_day'),
+                'is_recurring': linked_row.get('is_recurring'),
+                'date': linked_row.get('date').isoformat() if hasattr(linked_row.get('date'), 'isoformat') and linked_row.get('date') else linked_row.get('date'),
+                'fetch_method': linked_row.get('fetch_method'),
+                'source': linked_row.get('source'),
+                'approval_status': linked_row.get('approval_status'),
+                'insert_date': linked_row.get('insert_date').isoformat() if linked_row.get('insert_date') else None,
+            }
+        )
+
     specials = []
     for row in rows:
+        reject_id = row.get('reject_id')
         specials.append(
             {
-                'special_candidate_id': row.get('special_candidate_id'),
+                'reject_id': reject_id,
+                'special_candidate_id': row.get('latest_special_candidate_id'),
                 'bar_id': row.get('bar_id'),
                 'bar_name': row.get('bar_name'),
                 'neighborhood': row.get('neighborhood'),
@@ -698,10 +745,11 @@ def get_rejected_special_candidates(cursor):
                 'date': row.get('date').isoformat() if hasattr(row.get('date'), 'isoformat') and row.get('date') else row.get('date'),
                 'fetch_method': row.get('fetch_method'),
                 'source': row.get('source'),
-                'approval_status': row.get('approval_status'),
-                'insert_date': row.get('insert_date').isoformat() if row.get('insert_date') else None,
+                'insert_date': row.get('last_seen_candidate_insert_date').isoformat() if row.get('last_seen_candidate_insert_date') else None,
                 'web_ai_search_matches': int(row.get('web_ai_search_matches') or 0),
                 'web_crawl_matches': int(row.get('web_crawl_matches') or 0),
+                'linked_candidate_count': int(row.get('linked_candidate_count') or 0),
+                'linked_candidates': linked_by_reject_id.get(reject_id, []),
             }
         )
     return {'specials': specials, 'special_count': len(specials)}
