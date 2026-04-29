@@ -17,6 +17,7 @@ DB_USER = os.environ['DB_USER']
 DB_PASSWORD = os.environ['DB_PASSWORD']
 DB_NAME = os.environ['DB_NAME']
 IGNORE_MANUAL_SPECIALS_ON_PUBLISH = 'Y'
+MISSED_RUN_DEACTIVATION_THRESHOLD = 3
 
 
 def get_connection():
@@ -265,6 +266,29 @@ def publish_special_candidate_run(cursor, bar_id: int, run_id: int, auto_publish
         if special['special_id'] not in matched_special_ids:
             cursor.execute(
                 """
+                INSERT INTO special_missed_runs (special_id, missed_run_count, last_run_id, update_date)
+                VALUES (%s, 1, %s, NOW())
+                ON DUPLICATE KEY UPDATE
+                    missed_run_count = IF(last_run_id = VALUES(last_run_id), missed_run_count, missed_run_count + 1),
+                    last_run_id = VALUES(last_run_id),
+                    update_date = NOW()
+                """,
+                (special['special_id'], run_id),
+            )
+            cursor.execute(
+                """
+                SELECT missed_run_count
+                FROM special_missed_runs
+                WHERE special_id = %s
+                """,
+                (special['special_id'],),
+            )
+            missed_run_record = cursor.fetchone() or {}
+            should_deactivate = int(missed_run_record.get('missed_run_count', 0)) >= MISSED_RUN_DEACTIVATION_THRESHOLD
+            if not should_deactivate:
+                continue
+            cursor.execute(
+                """
                 UPDATE special
                 SET is_active = 'N',
                     update_date = NOW()
@@ -294,6 +318,17 @@ def publish_special_candidate_run(cursor, bar_id: int, run_id: int, auto_publish
             ),
         )
         inserted_special_count += 1
+        cursor.execute(
+            """
+            INSERT INTO special_missed_runs (special_id, missed_run_count, last_run_id, update_date)
+            VALUES (%s, 0, %s, NOW())
+            ON DUPLICATE KEY UPDATE
+                missed_run_count = 0,
+                last_run_id = VALUES(last_run_id),
+                update_date = NOW()
+            """,
+            (cursor.lastrowid, run_id),
+        )
         special_to_candidate_id[cursor.lastrowid] = candidate['candidate_id']
 
     for special_id, candidate_id in special_to_candidate_id.items():
@@ -304,6 +339,17 @@ def publish_special_candidate_run(cursor, bar_id: int, run_id: int, auto_publish
             WHERE special_id = %s
             """,
             (candidate_id, special_id),
+        )
+        cursor.execute(
+            """
+            INSERT INTO special_missed_runs (special_id, missed_run_count, last_run_id, update_date)
+            VALUES (%s, 0, %s, NOW())
+            ON DUPLICATE KEY UPDATE
+                missed_run_count = 0,
+                last_run_id = VALUES(last_run_id),
+                update_date = NOW()
+            """,
+            (special_id, run_id),
         )
 
     deactivated_special_count = len(existing_specials) - len(matched_special_ids)
