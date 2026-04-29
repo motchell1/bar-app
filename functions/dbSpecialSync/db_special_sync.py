@@ -183,7 +183,7 @@ def _find_special_matches(cursor, candidate: Dict) -> List[int]:
             s.end_time,
             s.description,
             sc.source
-        FROM special
+        FROM special s
         LEFT JOIN special_candidate sc
             ON sc.special_candidate_id = s.special_candidate_id
         WHERE s.bar_id = %s
