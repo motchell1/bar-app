@@ -1,6 +1,8 @@
 import json
 import logging
 import os
+import re
+import unicodedata
 from datetime import datetime, time, timedelta
 from difflib import SequenceMatcher
 from typing import Dict, List
@@ -43,7 +45,12 @@ def _parse_confidence(value) -> float:
 
 
 def _normalize_description(value: str) -> str:
-    return ' '.join(str(value or '').lower().split())
+    normalized = str(value or '').lower()
+    normalized = unicodedata.normalize('NFKC', normalized)
+    normalized = normalized.replace('½', '1/2')
+    normalized = re.sub(r'[$€£¥]', '', normalized)
+    normalized = re.sub(r'[^a-z0-9/ ]+', ' ', normalized)
+    return ' '.join(normalized.split())
 
 
 def _descriptions_match(candidate_description: str, special_description: str) -> bool:
@@ -58,19 +65,51 @@ def _descriptions_match(candidate_description: str, special_description: str) ->
 
 def _parse_days_of_week(raw_days) -> List[str]:
     if isinstance(raw_days, str):
-        try:
-            raw_days = json.loads(raw_days)
-        except json.JSONDecodeError:
+        normalized_raw = raw_days.strip()
+        if not normalized_raw:
             raw_days = []
+        else:
+            try:
+                parsed_days = json.loads(normalized_raw)
+                if isinstance(parsed_days, str):
+                    raw_days = [parsed_days]
+                else:
+                    raw_days = parsed_days
+            except json.JSONDecodeError:
+                if ',' in normalized_raw:
+                    raw_days = [day.strip() for day in normalized_raw.split(',') if day.strip()]
+                else:
+                    raw_days = [normalized_raw]
     if not isinstance(raw_days, list):
         return []
-    return [day for day in raw_days if isinstance(day, str) and day.strip()]
+    normalized_days = []
+    for day in raw_days:
+        if not isinstance(day, str):
+            continue
+        normalized_day = day.strip()
+        if not normalized_day:
+            continue
+        normalized_day = normalized_day.strip('[]')
+        normalized_day = normalized_day.strip('\'"“”‘’')
+        if normalized_day:
+            normalized_days.append(normalized_day)
+    return normalized_days
 
 
 def _normalize_day_of_week(value) -> str:
     if value is None:
         return ''
-    return str(value).strip().upper()
+    normalized = str(value).strip().upper()
+    day_aliases = {
+        'MONDAY': 'MON',
+        'TUESDAY': 'TUE',
+        'WEDNESDAY': 'WED',
+        'THURSDAY': 'THU',
+        'FRIDAY': 'FRI',
+        'SATURDAY': 'SAT',
+        'SUNDAY': 'SUN',
+    }
+    return day_aliases.get(normalized, normalized)
 
 
 def _normalize_days_of_week_value(value) -> tuple:
@@ -118,10 +157,6 @@ def _normalize_text_value(value) -> str:
     return str(value or '').strip()
 
 
-def _candidate_and_special_sources_match(candidate_source, special_source) -> bool:
-    return _normalize_text_value(candidate_source) == _normalize_text_value(special_source)
-
-
 def _build_open_hours_lookup(open_hours_rows: List[Dict]) -> Dict[str, Dict]:
     lookup = {}
     for row in open_hours_rows:
@@ -164,11 +199,19 @@ def _append_missing_hours_note(note_suffixes: Dict[int, List[str]], candidate_id
 
 
 def _is_candidate_same_as_special(candidate_row: Dict, special_row: Dict) -> bool:
+    candidate_all_day = _normalize_yn_flag(candidate_row.get('all_day'))
+    special_all_day = _normalize_yn_flag(special_row.get('all_day'))
+    times_match = (
+        _normalize_time_value(candidate_row.get('start_time')) == _normalize_time_value(special_row.get('start_time'))
+        and _normalize_time_value(candidate_row.get('end_time')) == _normalize_time_value(special_row.get('end_time'))
+    )
+    if candidate_all_day == 'Y' and special_all_day == 'Y':
+        times_match = True
+
     return (
         _normalize_day_of_week(candidate_row.get('day_of_week')) == _normalize_day_of_week(special_row.get('day_of_week'))
-        and _normalize_yn_flag(candidate_row.get('all_day')) == _normalize_yn_flag(special_row.get('all_day'))
-        and _normalize_time_value(candidate_row.get('start_time')) == _normalize_time_value(special_row.get('start_time'))
-        and _normalize_time_value(candidate_row.get('end_time')) == _normalize_time_value(special_row.get('end_time'))
+        and candidate_all_day == special_all_day
+        and times_match
         and _descriptions_match(candidate_row.get('description'), special_row.get('description'))
     )
 
@@ -341,22 +384,16 @@ def insert_special_candidate(cursor, run: Dict, candidates: List[Dict]) -> Dict[
                     s.all_day,
                     s.start_time,
                     s.end_time,
-                    s.description,
-                    scx.source
+                    s.description
                 FROM special s
-                LEFT JOIN special_candidate scx
-                    ON scx.special_candidate_id = s.special_candidate_id
                 WHERE s.bar_id = %s
                     AND s.is_active = 'Y'
                 """,
                 (run['bar_id'],),
             )
-            candidate_source = candidate.get('source') or candidate.get('source_url')
             normalized_candidate_days = {_normalize_day_of_week(day) for day in candidate_days}
             for special in cursor.fetchall():
                 if _normalize_day_of_week(special.get('day_of_week')) not in normalized_candidate_days:
-                    continue
-                if not _candidate_and_special_sources_match(candidate_source, special.get('source')):
                     continue
                 if not _is_candidate_same_as_special(
                     {
