@@ -305,7 +305,6 @@ def insert_special_candidates(cursor, run: Dict, candidates: List[Dict]) -> Dict
     for candidate in candidates:
         approval_status = 'NOT_APPROVED'
         approval_date = None
-        approved_special_id = None
         confidence = _parse_confidence(candidate.get('confidence'))
 
         fetch_method = (candidate.get('fetch_method') or '').strip()
@@ -322,8 +321,8 @@ def insert_special_candidates(cursor, run: Dict, candidates: List[Dict]) -> Dict
         cursor.execute(
             """
             INSERT INTO special_candidate
-            (run_id, bar_id, bar_name, neighborhood, description, type, days_of_week, start_time, end_time, all_day, is_recurring, date, fetch_method, source, confidence, notes, approval_status, approval_date, approved_special_id)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            (run_id, bar_id, bar_name, neighborhood, description, type, days_of_week, start_time, end_time, all_day, is_recurring, date, fetch_method, source, confidence, notes, approval_status, approval_date)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """,
             (
                 run_id,
@@ -344,7 +343,6 @@ def insert_special_candidates(cursor, run: Dict, candidates: List[Dict]) -> Dict
                 candidate.get('notes'),
                 approval_status,
                 approval_date,
-                approved_special_id,
             ),
         )
         inserted_count += 1
@@ -410,21 +408,6 @@ def publish_candidate_specials(cursor, bar_id: int, run_id: int, auto_publish: s
     )
     existing_specials = cursor.fetchall()
 
-    approved_candidate_ids = [
-        candidate['special_candidate_id']
-        for candidate in approved_candidates
-        if candidate.get('special_candidate_id')
-    ]
-    for candidate_id in approved_candidate_ids:
-        cursor.execute(
-            """
-            UPDATE special_candidate
-            SET approved_special_id = NULL
-            WHERE special_candidate_id = %s
-            """,
-            (candidate_id,),
-        )
-
     matched_special_ids = set()
     candidate_to_special_ids = {}
     unmatched_candidates = []
@@ -478,15 +461,15 @@ def publish_candidate_specials(cursor, bar_id: int, run_id: int, auto_publish: s
         candidate_to_special_ids.setdefault(candidate['candidate_id'], set()).add(cursor.lastrowid)
 
     for candidate_id, special_ids in candidate_to_special_ids.items():
-        approved_special_id = min(special_ids) if special_ids else None
-        cursor.execute(
-            """
-            UPDATE special_candidate
-            SET approved_special_id = %s
-            WHERE special_candidate_id = %s
-            """,
-            (approved_special_id, candidate_id),
-        )
+        for special_id in special_ids:
+            cursor.execute(
+                """
+                UPDATE special
+                SET special_candidate_id = %s
+                WHERE special_id = %s
+                """,
+                (candidate_id, special_id),
+            )
 
     deactivated_special_count = len(existing_specials) - len(matched_special_ids)
     cursor.execute(
