@@ -118,10 +118,6 @@ def _normalize_text_value(value) -> str:
     return str(value or '').strip()
 
 
-def _candidate_and_special_sources_match(candidate_source, special_source) -> bool:
-    return _normalize_text_value(candidate_source) == _normalize_text_value(special_source)
-
-
 def _build_open_hours_lookup(open_hours_rows: List[Dict]) -> Dict[str, Dict]:
     lookup = {}
     for row in open_hours_rows:
@@ -341,22 +337,16 @@ def insert_special_candidate(cursor, run: Dict, candidates: List[Dict]) -> Dict[
                     s.all_day,
                     s.start_time,
                     s.end_time,
-                    s.description,
-                    scx.source
+                    s.description
                 FROM special s
-                LEFT JOIN special_candidate scx
-                    ON scx.special_candidate_id = s.special_candidate_id
                 WHERE s.bar_id = %s
                     AND s.is_active = 'Y'
                 """,
                 (run['bar_id'],),
             )
-            candidate_source = candidate.get('source') or candidate.get('source_url')
             normalized_candidate_days = {_normalize_day_of_week(day) for day in candidate_days}
             for special in cursor.fetchall():
                 if _normalize_day_of_week(special.get('day_of_week')) not in normalized_candidate_days:
-                    continue
-                if not _candidate_and_special_sources_match(candidate_source, special.get('source')):
                     continue
                 if not _is_candidate_same_as_special(
                     {
