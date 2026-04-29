@@ -389,6 +389,7 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
           insert_method: special.insert_method,
           insert_date: special.insert_date,
           update_date: special.update_date,
+          matched_candidate_count: 0,
           daySet: new Set(),
           specials: []
         });
@@ -396,6 +397,7 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
 
       const row = grouped.get(key);
       row.specials.push(special);
+      row.matched_candidate_count += Number(special.matched_candidate_count || 0);
       row.daySet.add(normalizeDay(special.day_of_week));
 
       const rowInsert = toTimestamp(row.insert_date);
@@ -1211,6 +1213,8 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
             <p><strong>Method:</strong> ${special.fetch_method || '—'}</p>
             <p><strong>Source:</strong> ${getSourceMarkup(special.source)}</p>
             <p><strong>Notes:</strong> ${special.notes || '—'}</p>
+            <p><strong>Match Status:</strong> ${special.match_status || 'NOT_MATCHED'}</p>
+            ${(special.matched_specials || []).length ? `<p><strong>Matched Specials:</strong> ${(special.matched_specials || []).map((matched) => `#${matched.special_id} ${matched.day_of_week} — ${matched.description || '—'}`).join('<br/>')}</p>` : ''}
             ${isReadOnlyCandidate
               ? ''
               : `<div class="admin-actions-row">
@@ -1218,6 +1222,7 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
                     ? `<button class="admin-action-btn approve" type="button" data-candidate-action="save-edit" data-candidate-id="${candidateId}" ${state.savingCandidate ? 'disabled' : ''}>Save</button>
                        <button class="admin-secondary-btn" type="button" data-candidate-action="cancel-edit" data-candidate-id="${candidateId}" ${state.savingCandidate ? 'disabled' : ''}>Cancel</button>`
                     : `<button class="admin-action-btn approve" type="button" data-action="APPROVED" data-candidate-id="${candidateId}" ${isUpdating ? 'disabled' : ''}>Approve</button>
+                       <button class="admin-action-btn approve" type="button" data-action="APPROVED_OVERRIDE_MATCH" data-candidate-id="${candidateId}" ${isUpdating ? 'disabled' : ''}>Approve - Override Match</button>
                        <button class="admin-action-btn reject" type="button" data-action="REJECTED" data-candidate-id="${candidateId}" ${isUpdating ? 'disabled' : ''}>Reject</button>`}
                 </div>`}
           </article>
@@ -1331,6 +1336,7 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
         <td>${row.type || '—'}</td>
         <td>${row.is_active || '—'}</td>
         <td>${row.insert_method || '—'}</td>
+        <td>${row.matched_candidate_count ?? 0}</td>
         <td>${formatDateTime(row.insert_date)}</td>
         <td>${formatDateTime(row.update_date)}</td>
       </tr>
@@ -1351,6 +1357,7 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
               <th class="admin-sortable-header" data-sort-table="special-management" data-sort-key="type">Type${getSortIndicator('special-management', 'type')}</th>
               <th class="admin-sortable-header" data-sort-table="special-management" data-sort-key="is_active">Is Active${getSortIndicator('special-management', 'is_active')}</th>
               <th class="admin-sortable-header" data-sort-table="special-management" data-sort-key="insert_method">Insert Method${getSortIndicator('special-management', 'insert_method')}</th>
+              <th class="admin-sortable-header" data-sort-table="special-management" data-sort-key="matched_candidate_count">Matched Candidates${getSortIndicator('special-management', 'matched_candidate_count')}</th>
               <th class="admin-sortable-header" data-sort-table="special-management" data-sort-key="insert_date">Insert Date${getSortIndicator('special-management', 'insert_date')}</th>
               <th class="admin-sortable-header" data-sort-table="special-management" data-sort-key="update_date">Update Date${getSortIndicator('special-management', 'update_date')}</th>
             </tr>

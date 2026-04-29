@@ -320,6 +320,65 @@ def insert_special_candidate(cursor, run: Dict, candidates: List[Dict]) -> Dict[
             ),
         )
         candidate_id = cursor.lastrowid
+        candidate_days = _parse_days_of_week(candidate.get('days_of_week'))
+        matched_special_ids = []
+        if candidate_days:
+            placeholders = ','.join(['%s'] * len(candidate_days))
+            cursor.execute(
+                f"""
+                SELECT s.special_id, s.day_of_week, s.description
+                FROM special s
+                WHERE s.bar_id = %s
+                    AND s.is_active = 'Y'
+                    AND s.day_of_week IN ({placeholders})
+                    AND COALESCE(s.all_day, 'N') = %s
+                    AND COALESCE(s.start_time, '00:00:00') = COALESCE(%s, '00:00:00')
+                    AND COALESCE(s.end_time, '00:00:00') = COALESCE(%s, '00:00:00')
+                    AND EXISTS (
+                        SELECT 1
+                        FROM special_candidate scx
+                        WHERE scx.special_candidate_id = s.special_candidate_id
+                            AND COALESCE(scx.source, '') = COALESCE(%s, '')
+                    )
+                """,
+                (
+                    run['bar_id'],
+                    *candidate_days,
+                    _normalize_yn_flag(candidate.get('all_day')),
+                    candidate.get('start_time'),
+                    candidate.get('end_time'),
+                    candidate.get('source') or candidate.get('source_url'),
+                ),
+            )
+            for special in cursor.fetchall():
+                if _descriptions_match(candidate.get('description'), special.get('description')):
+                    matched_special_ids.append(special['special_id'])
+                    cursor.execute(
+                        """
+                        INSERT INTO special_candidate_special_match (special_id, special_candidate_id)
+                        VALUES (%s, %s)
+                        """,
+                        (special['special_id'], candidate_id),
+                    )
+        cursor.execute(
+            """
+            UPDATE special_candidate
+            SET match_status = %s
+            WHERE special_candidate_id = %s
+            """,
+            ('MATCHED' if matched_special_ids else 'NOT_MATCHED', candidate_id),
+        )
+        if matched_special_ids and approval_status == 'AUTO_APPROVED':
+            for special_id in matched_special_ids:
+                cursor.execute(
+                    """
+                    UPDATE special
+                    SET update_date = NOW(),
+                        special_candidate_id = %s
+                    WHERE special_id = %s
+                    """,
+                    (candidate_id, special_id),
+                )
         if is_rejected_candidate:
             for reject_id in matched_reject_ids:
                 cursor.execute(
