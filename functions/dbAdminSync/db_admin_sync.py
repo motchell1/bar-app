@@ -417,7 +417,15 @@ def get_unapproved_special_candidates(cursor):
                 WHERE sc2.approval_status = 'NOT_APPROVED'
                     AND COALESCE(sc2.is_recurring, 'Y') = 'Y'
             )
-        ORDER BY scr.run_id DESC, sc.special_candidate_id ASC
+        ORDER BY
+            scr.run_id DESC,
+            CASE sc.approval_status
+                WHEN 'NOT_APPROVED' THEN 0
+                WHEN 'AUTO_APPROVED' THEN 1
+                WHEN 'AUTO_REJECTED' THEN 2
+                ELSE 3
+            END ASC,
+            sc.special_candidate_id ASC
         """
     )
     rows = cursor.fetchall()
