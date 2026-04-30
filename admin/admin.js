@@ -576,7 +576,27 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
     }
   }
 
-  async function saveCandidateUpdates(payload) {
+    async function confirmCandidateMatch(specialCandidateId, specialId) {
+    state.updatingCandidateId = specialCandidateId;
+    state.errorMessage = '';
+    render();
+
+    try {
+      await callAdminSync({
+        mode: 'confirm_special_candidate_match',
+        special_candidate_id: specialCandidateId,
+        special_id: specialId
+      });
+      await loadUnapprovedSpecials();
+    } catch (err) {
+      console.error('Failed to confirm candidate match:', err);
+      state.errorMessage = err?.message || 'Failed to confirm candidate match.';
+      state.updatingCandidateId = null;
+      render();
+    }
+  }
+
+async function saveCandidateUpdates(payload) {
     state.savingCandidate = true;
     state.errorMessage = '';
     render();
@@ -1212,6 +1232,7 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
         };
 
         const matchedSpecials = Array.isArray(special.matched_specials) ? special.matched_specials : [];
+        const matchStatus = String(special.match_status || 'NOT_MATCHED').toUpperCase();
         const matchedSpecialsMarkup = matchedSpecials.length
           ? `
             <div class="admin-matched-specials">
@@ -1229,6 +1250,9 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
                     <p><strong>Type:</strong> ${matched.type || '—'}</p>
                     <p><strong>Insert Date:</strong> ${formatDateTime(matched.insert_date)}</p>
                     <p><strong>Update Date:</strong> ${formatDateTime(matched.update_date)}</p>
+                    ${(matchStatus === 'MATCH_PENDING' && !isReadOnlyCandidate)
+                      ? `<button class="admin-secondary-btn" type="button" data-candidate-action="confirm-match" data-candidate-id="${candidateId}" data-special-id="${matched.special_id}" ${isUpdating ? 'disabled' : ''}>Confirm Match</button>`
+                      : ''}
                   </article>
                 `).join('')}
               </div>
@@ -1237,7 +1261,6 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
           : '';
 
 
-        const matchStatus = String(special.match_status || 'NOT_MATCHED').toUpperCase();
         const showOverrideMatchAction = matchStatus === 'MATCHED';
         return `
           <article class="admin-candidate-card" data-candidate-id="${candidateId}">
@@ -1490,6 +1513,13 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
         if (action === 'cancel-edit') {
           state.editingCandidateId = null;
           render();
+          return;
+        }
+
+        if (action === 'confirm-match') {
+          const specialId = Number(button.getAttribute('data-special-id'));
+          if (!specialId) return;
+          await confirmCandidateMatch(candidateId, specialId);
           return;
         }
 
