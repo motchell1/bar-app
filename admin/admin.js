@@ -77,6 +77,7 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
     generatingBarSecondsElapsed: 0,
     generateResultPayload: null,
     runs: [],
+    pendingApprovalCount: 0,
     confirmingDeleteRunId: null,
     deletingRunId: null,
     rejectedSpecials: [],
@@ -461,9 +462,11 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
     try {
       const result = await callAdminSync({ mode: 'get_unapproved_special_candidates' });
       state.runs = Array.isArray(result?.runs) ? result.runs : [];
+      state.pendingApprovalCount = Number(result?.not_approved_count) || 0;
     } catch (err) {
       console.error('Failed to load unapproved specials:', err);
       state.errorMessage = err?.message || 'Failed to load unapproved specials.';
+      state.pendingApprovalCount = 0;
     } finally {
       state.loading = false;
       render();
@@ -1933,6 +1936,7 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
     screenElement.innerHTML = `
       <section class="admin-specials-view" aria-label="Special approvals">
         <h2>Specials Pending Approval</h2>
+        <p class="admin-meta"><strong>Remaining NOT_APPROVED:</strong> ${state.pendingApprovalCount}</p>
         ${state.errorMessage ? `<p class="admin-error">${state.errorMessage}</p>` : ''}
         ${buildRunsMarkup()}
       </section>

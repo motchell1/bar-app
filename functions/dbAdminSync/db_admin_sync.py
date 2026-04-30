@@ -512,7 +512,18 @@ def get_unapproved_special_candidates(cursor):
             special['matched_specials'] = match_lookup.get(candidate_id, [])
 
     runs = list(grouped_runs.values())
-    return {'runs': runs, 'run_count': len(runs), 'special_count': len(rows)}
+    not_approved_count = sum(
+        1
+        for run in runs
+        for special in run.get('specials', [])
+        if special.get('approval_status') == 'NOT_APPROVED'
+    )
+    return {
+        'runs': runs,
+        'run_count': len(runs),
+        'special_count': len(rows),
+        'not_approved_count': not_approved_count,
+    }
 
 
 def get_not_approved_special_candidate_summary(cursor) -> Dict[str, object]:
