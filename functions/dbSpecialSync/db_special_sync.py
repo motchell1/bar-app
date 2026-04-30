@@ -451,6 +451,12 @@ def insert_special_candidate(cursor, run: Dict, candidates: List[Dict]) -> Dict[
             approval_date = datetime.utcnow()
             auto_approved_count += 1
             needs_approval_count = max(0, needs_approval_count - 1)
+        match_status = 'NOT_MATCHED'
+        if matched_special_ids:
+            match_status = 'MATCHED'
+        if matched_reject_ids:
+            match_status = 'MATCHED_REJECTED'
+
         cursor.execute(
             """
             UPDATE special_candidate
@@ -460,7 +466,7 @@ def insert_special_candidate(cursor, run: Dict, candidates: List[Dict]) -> Dict[
             WHERE special_candidate_id = %s
             """,
             (
-                'MATCHED' if matched_special_ids else 'NOT_MATCHED',
+                match_status,
                 approval_status,
                 approval_date,
                 candidate_id,
