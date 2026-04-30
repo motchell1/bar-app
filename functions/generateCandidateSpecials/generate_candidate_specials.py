@@ -969,12 +969,13 @@ def lambda_handler(event, context):
         )
         data_audit_invoked = False
         data_audit_error = None
-        try:
-            invoke_data_audit({'mode': 'pending_special_candidates'})
-            data_audit_invoked = True
-        except Exception as audit_exc:
-            data_audit_error = str(audit_exc)
-            LOGGER.exception('Failed to invoke dataAudit pending_special_candidates mode')
+        if needs_approval_count > 0:
+            try:
+                invoke_data_audit({'mode': 'pending_special_candidates'})
+                data_audit_invoked = True
+            except Exception as audit_exc:
+                data_audit_error = str(audit_exc)
+                LOGGER.exception('Failed to invoke dataAudit pending_special_candidates mode')
 
         return {
             'statusCode': 200,
