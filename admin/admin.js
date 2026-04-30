@@ -571,12 +571,13 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
     } catch (err) {
       console.error('Failed to update candidate approval:', err);
       state.errorMessage = err?.message || 'Failed to update candidate approval status.';
+    } finally {
       state.updatingCandidateId = null;
       render();
     }
   }
 
-    async function confirmCandidateMatch(specialCandidateId, specialId) {
+  async function confirmCandidateMatch(specialCandidateId, specialId) {
     state.updatingCandidateId = specialCandidateId;
     state.errorMessage = '';
     render();
@@ -591,12 +592,13 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
     } catch (err) {
       console.error('Failed to confirm candidate match:', err);
       state.errorMessage = err?.message || 'Failed to confirm candidate match.';
+    } finally {
       state.updatingCandidateId = null;
       render();
     }
   }
 
-async function saveCandidateUpdates(payload) {
+  async function saveCandidateUpdates(payload) {
     state.savingCandidate = true;
     state.errorMessage = '';
     render();
@@ -1241,7 +1243,7 @@ async function saveCandidateUpdates(payload) {
                 ${matchedSpecials.map((matched) => `
                   <article class="admin-matched-special-card">
                     <p><strong>Special ID:</strong> ${matched.special_id ?? '—'}</p>
-                    <p><strong>Description Match Score:</strong> ${matched.fuzzy_description_match_score ?? '—'}</p>
+                    <p><strong>Description Match Score:</strong> ${matched.fuzzy_description_match_score === null || matched.fuzzy_description_match_score === undefined ? '—' : Number(matched.fuzzy_description_match_score).toFixed(2)}</p>
                     <p><strong>Day of Week:</strong> ${matched.day_of_week || '—'}</p>
                     <p><strong>Description:</strong> ${matched.description || '—'}</p>
                     <p><strong>All Day:</strong> ${matched.all_day || '—'}</p>
