@@ -378,6 +378,7 @@ def get_unapproved_special_candidates(cursor):
         """
         SELECT
             scr.run_id,
+            scr.bar_id,
             b.name AS bar_name,
             scr.total_candidates,
             scr.auto_approved_candidates,
@@ -427,6 +428,7 @@ def get_unapproved_special_candidates(cursor):
             run_id,
             {
                 'run_id': run_id,
+                'bar_id': row.get('bar_id'),
                 'bar_name': row.get('bar_name'),
                 'neighborhood': row.get('neighborhood'),
                 'total_candidates': row.get('total_candidates'),
