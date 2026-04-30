@@ -323,6 +323,8 @@ def insert_special_candidate(cursor, run: Dict, candidates: List[Dict]) -> Dict[
         approval_status = 'NOT_APPROVED'
         approval_date = None
         confidence = _parse_confidence(candidate.get('confidence'))
+        candidate_notes = candidate.get('notes')
+        missing_day_data = candidate.get('days_of_week') is None
 
         matched_reject_ids = [
             rejected_candidate.get('reject_id')
@@ -330,12 +332,19 @@ def insert_special_candidate(cursor, run: Dict, candidates: List[Dict]) -> Dict[
             if _is_candidate_same_as_reject(candidate, rejected_candidate)
             and rejected_candidate.get('reject_id')
         ]
-        is_rejected_candidate = bool(matched_reject_ids)
+        is_rejected_candidate = bool(matched_reject_ids) or missing_day_data
 
         if is_rejected_candidate:
             approval_status = 'AUTO_REJECTED'
             approval_date = datetime.utcnow()
             auto_rejected_count += 1
+            if missing_day_data:
+                missing_day_notes_suffix = ' - rejected due to missing day data'
+                candidate_notes = (
+                    f"{candidate_notes}{missing_day_notes_suffix}"
+                    if candidate_notes
+                    else missing_day_notes_suffix.lstrip()
+                )
         else:
             fetch_method = (candidate.get('fetch_method') or '').strip()
             auto_approval_threshold = WEB_AI_SEARCH_AUTO_APPROVAL_THRESHOLD if fetch_method == 'web_ai_search' else WEB_SCRAPE_AUTO_APPROVAL_THRESHOLD
@@ -368,7 +377,7 @@ def insert_special_candidate(cursor, run: Dict, candidates: List[Dict]) -> Dict[
                 candidate.get('fetch_method'),
                 candidate.get('source') or candidate.get('source_url'),
                 candidate.get('confidence'),
-                candidate.get('notes'),
+                candidate_notes,
                 approval_status,
                 approval_date,
             ),
