@@ -18,6 +18,8 @@ DB_PASSWORD = os.environ['DB_PASSWORD']
 DB_NAME = os.environ['DB_NAME']
 WEB_SCRAPE_AUTO_APPROVAL_THRESHOLD = 1
 WEB_AI_SEARCH_AUTO_APPROVAL_THRESHOLD = 1
+SPECIAL_CANDIDATE_SPECIAL_MATCH_FUZZY_DESCRIPTION_THRESHOLD = 0.78
+SPECIAL_CANDIDATE_SPECIAL_MATCH_AUTO_APPROVAL_THRESHOLD = 0.9
 IGNORE_MANUAL_SPECIALS_ON_PUBLISH = 'Y'
 MISSED_RUN_DEACTIVATION_THRESHOLD = 3
 
@@ -61,7 +63,18 @@ def _descriptions_match(candidate_description: str, special_description: str) ->
         return False
     if candidate_normalized == special_normalized:
         return True
-    return SequenceMatcher(None, candidate_normalized, special_normalized).ratio() >= 0.78
+    return (
+        SequenceMatcher(None, candidate_normalized, special_normalized).ratio()
+        >= SPECIAL_CANDIDATE_SPECIAL_MATCH_FUZZY_DESCRIPTION_THRESHOLD
+    )
+
+
+def _description_match_score(candidate_description: str, special_description: str) -> float:
+    candidate_normalized = _normalize_description(candidate_description)
+    special_normalized = _normalize_description(special_description)
+    if not candidate_normalized or not special_normalized:
+        return 0.0
+    return SequenceMatcher(None, candidate_normalized, special_normalized).ratio()
 
 
 def _parse_days_of_week(raw_days) -> List[str]:
@@ -416,22 +429,42 @@ def insert_special_candidate(cursor, run: Dict, candidates: List[Dict]) -> Dict[
                     special,
                 ):
                     continue
+                fuzzy_description_match_score = _description_match_score(
+                    candidate.get('description'),
+                    special.get('description'),
+                )
                 if _descriptions_match(candidate.get('description'), special.get('description')):
                     matched_special_ids.append(special['special_id'])
                     cursor.execute(
                         """
-                        INSERT INTO special_candidate_special_match (special_id, special_candidate_id)
-                        VALUES (%s, %s)
+                        INSERT INTO special_candidate_special_match (special_id, special_candidate_id, fuzzy_description_match_score)
+                        VALUES (%s, %s, %s)
                         """,
-                        (special['special_id'], candidate_id),
+                        (special['special_id'], candidate_id, fuzzy_description_match_score),
                     )
+        if (
+            matched_special_ids
+            and approval_status == 'NOT_APPROVED'
+            and confidence > SPECIAL_CANDIDATE_SPECIAL_MATCH_AUTO_APPROVAL_THRESHOLD
+        ):
+            approval_status = 'AUTO_APPROVED'
+            approval_date = datetime.utcnow()
+            auto_approved_count += 1
+            needs_approval_count = max(0, needs_approval_count - 1)
         cursor.execute(
             """
             UPDATE special_candidate
-            SET match_status = %s
+            SET match_status = %s,
+                approval_status = %s,
+                approval_date = COALESCE(%s, approval_date)
             WHERE special_candidate_id = %s
             """,
-            ('MATCHED' if matched_special_ids else 'NOT_MATCHED', candidate_id),
+            (
+                'MATCHED' if matched_special_ids else 'NOT_MATCHED',
+                approval_status,
+                approval_date,
+                candidate_id,
+            ),
         )
         if matched_special_ids:
             matched_count += 1
