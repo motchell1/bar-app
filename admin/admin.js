@@ -1136,7 +1136,22 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
     }
 
     return state.runs.map((run) => {
-      const specialsMarkup = (run.specials || []).map((special) => {
+      const sortedSpecials = [...(run.specials || [])].sort((left, right) => {
+        const statusPriority = (special) => {
+          const approvalStatus = String(special?.approval_status || '').trim().toUpperCase();
+          if (approvalStatus === 'NOT_APPROVED') return 0;
+          if (approvalStatus === 'AUTO_APPROVED') return 1;
+          if (approvalStatus === 'AUTO_REJECTED') return 2;
+          return 3;
+        };
+
+        const priorityDiff = statusPriority(left) - statusPriority(right);
+        if (priorityDiff !== 0) return priorityDiff;
+
+        return Number(left?.special_candidate_id || 0) - Number(right?.special_candidate_id || 0);
+      });
+
+      const specialsMarkup = sortedSpecials.map((special) => {
         const candidateId = Number(special.special_candidate_id);
         const approvalStatus = String(special.approval_status || '').trim().toUpperCase();
         const isAutoApproved = approvalStatus === 'AUTO_APPROVED';
