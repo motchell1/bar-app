@@ -571,6 +571,28 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
     } catch (err) {
       console.error('Failed to update candidate approval:', err);
       state.errorMessage = err?.message || 'Failed to update candidate approval status.';
+    } finally {
+      state.updatingCandidateId = null;
+      render();
+    }
+  }
+
+  async function confirmCandidateMatch(specialCandidateId, specialId) {
+    state.updatingCandidateId = specialCandidateId;
+    state.errorMessage = '';
+    render();
+
+    try {
+      await callAdminSync({
+        mode: 'confirm_special_candidate_match',
+        special_candidate_id: specialCandidateId,
+        special_id: specialId
+      });
+      await loadUnapprovedSpecials();
+    } catch (err) {
+      console.error('Failed to confirm candidate match:', err);
+      state.errorMessage = err?.message || 'Failed to confirm candidate match.';
+    } finally {
       state.updatingCandidateId = null;
       render();
     }
@@ -1212,6 +1234,7 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
         };
 
         const matchedSpecials = Array.isArray(special.matched_specials) ? special.matched_specials : [];
+        const matchStatus = String(special.match_status || 'NOT_MATCHED').toUpperCase();
         const matchedSpecialsMarkup = matchedSpecials.length
           ? `
             <div class="admin-matched-specials">
@@ -1220,7 +1243,7 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
                 ${matchedSpecials.map((matched) => `
                   <article class="admin-matched-special-card">
                     <p><strong>Special ID:</strong> ${matched.special_id ?? '—'}</p>
-                    <p><strong>Fuzzy Description Match Score:</strong> ${matched.fuzzy_description_match_score ?? '—'}</p>
+                    <p><strong>Description Match Score:</strong> ${matched.fuzzy_description_match_score ?? '—'}</p>
                     <p><strong>Day of Week:</strong> ${matched.day_of_week || '—'}</p>
                     <p><strong>Description:</strong> ${matched.description || '—'}</p>
                     <p><strong>All Day:</strong> ${matched.all_day || '—'}</p>
@@ -1229,6 +1252,9 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
                     <p><strong>Type:</strong> ${matched.type || '—'}</p>
                     <p><strong>Insert Date:</strong> ${formatDateTime(matched.insert_date)}</p>
                     <p><strong>Update Date:</strong> ${formatDateTime(matched.update_date)}</p>
+                    ${(matchStatus === 'MATCH_PENDING')
+                      ? `<button class="admin-secondary-btn" type="button" data-candidate-action="confirm-match" data-candidate-id="${candidateId}" data-special-id="${matched.special_id}" ${isUpdating ? 'disabled' : ''}>Confirm Match</button>`
+                      : ''}
                   </article>
                 `).join('')}
               </div>
@@ -1237,7 +1263,6 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
           : '';
 
 
-        const matchStatus = String(special.match_status || 'NOT_MATCHED').toUpperCase();
         const showOverrideMatchAction = matchStatus === 'MATCHED';
         return `
           <article class="admin-candidate-card" data-candidate-id="${candidateId}">
@@ -1490,6 +1515,13 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
         if (action === 'cancel-edit') {
           state.editingCandidateId = null;
           render();
+          return;
+        }
+
+        if (action === 'confirm-match') {
+          const specialId = Number(button.getAttribute('data-special-id'));
+          if (!specialId) return;
+          await confirmCandidateMatch(candidateId, specialId);
           return;
         }
 
