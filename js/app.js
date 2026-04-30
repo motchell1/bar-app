@@ -70,13 +70,6 @@ function resetFilterInputs() {
   }
 }
 
-function resetFilters() {
-  activeFilters.types = [];
-  activeFilters.neighborhoods = [];
-  activeFilters.favoritesOnly = false;
-  resetFilterInputs();
-}
-
 function getFiltersStorageKey() {
   const normalizedDeviceId = String(deviceId || '').trim();
   if (!normalizedDeviceId) return null;
