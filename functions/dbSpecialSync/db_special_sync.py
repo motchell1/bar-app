@@ -453,6 +453,11 @@ def insert_special_candidate(cursor, run: Dict, candidates: List[Dict]) -> Dict[
             if len(possible_matches) == 1 and top_score >= SPECIAL_CANDIDATE_SPECIAL_MATCH_AUTO_APPROVAL_THRESHOLD:
                 matched_special_ids = [possible_matches[0]['special_id']]
                 match_status = 'AUTO_MATCHED'
+                if approval_status == 'NOT_APPROVED' and confidence > SPECIAL_CANDIDATE_SPECIAL_MATCH_AUTO_APPROVAL_THRESHOLD:
+                    approval_status = 'AUTO_APPROVED'
+                    approval_date = datetime.utcnow()
+                    auto_approved_count += 1
+                    needs_approval_count = max(0, needs_approval_count - 1)
             else:
                 match_status = 'MATCH_PENDING'
                 matched_special_ids = [match['special_id'] for match in possible_matches]
