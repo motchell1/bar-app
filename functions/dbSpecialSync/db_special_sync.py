@@ -340,7 +340,8 @@ def insert_special_candidate(cursor, run: Dict, candidates: List[Dict]) -> Dict[
         approval_date = None
         confidence = _parse_confidence(candidate.get('confidence'))
         candidate_notes = candidate.get('notes')
-        missing_day_data = candidate.get('days_of_week') is None
+        candidate_days_raw = _parse_days_of_week(candidate.get('days_of_week'))
+        missing_day_data = len(candidate_days_raw) == 0
 
         matched_reject_ids = [
             rejected_candidate.get('reject_id')
@@ -399,7 +400,7 @@ def insert_special_candidate(cursor, run: Dict, candidates: List[Dict]) -> Dict[
             ),
         )
         candidate_id = cursor.lastrowid
-        candidate_days = _parse_days_of_week(candidate.get('days_of_week'))
+        candidate_days = candidate_days_raw
         matched_special_ids = []
         possible_matches = []
         if candidate_days and not is_rejected_candidate:
@@ -447,7 +448,7 @@ def insert_special_candidate(cursor, run: Dict, candidates: List[Dict]) -> Dict[
                 )
         match_status = 'NOT_MATCHED'
         if matched_reject_ids:
-            match_status = 'AUTO_REJECTED'
+            match_status = 'MATCHED_REJECT'
         elif possible_matches:
             top_score = max(match.get('score', 0.0) for match in possible_matches)
             if len(possible_matches) == 1 and top_score >= SPECIAL_CANDIDATE_SPECIAL_MATCH_AUTO_APPROVAL_THRESHOLD:
