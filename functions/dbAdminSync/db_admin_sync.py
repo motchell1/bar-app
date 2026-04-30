@@ -474,6 +474,7 @@ def get_unapproved_special_candidates(cursor):
             SELECT
                 scsm.special_candidate_id,
                 s.special_id,
+                scsm.fuzzy_description_match_score,
                 s.day_of_week,
                 s.description,
                 s.start_time,
@@ -495,6 +496,7 @@ def get_unapproved_special_candidates(cursor):
             match_lookup.setdefault(candidate_id, []).append(
                 {
                     'special_id': row.get('special_id'),
+                    'fuzzy_description_match_score': row.get('fuzzy_description_match_score'),
                     'day_of_week': row.get('day_of_week'),
                     'description': row.get('description'),
                     'start_time': _normalize_time_value(row.get('start_time')) or None,

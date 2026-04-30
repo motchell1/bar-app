@@ -1205,6 +1205,7 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
                 ${matchedSpecials.map((matched) => `
                   <article class="admin-matched-special-card">
                     <p><strong>Special ID:</strong> ${matched.special_id ?? '—'}</p>
+                    <p><strong>Fuzzy Description Match Score:</strong> ${matched.fuzzy_description_match_score ?? '—'}</p>
                     <p><strong>Day of Week:</strong> ${matched.day_of_week || '—'}</p>
                     <p><strong>Description:</strong> ${matched.description || '—'}</p>
                     <p><strong>All Day:</strong> ${matched.all_day || '—'}</p>
