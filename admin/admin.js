@@ -1241,7 +1241,7 @@ async function saveCandidateUpdates(payload) {
                 ${matchedSpecials.map((matched) => `
                   <article class="admin-matched-special-card">
                     <p><strong>Special ID:</strong> ${matched.special_id ?? '—'}</p>
-                    <p><strong>Fuzzy Description Match Score:</strong> ${matched.fuzzy_description_match_score ?? '—'}</p>
+                    <p><strong>Description Match Score:</strong> ${matched.fuzzy_description_match_score ?? '—'}</p>
                     <p><strong>Day of Week:</strong> ${matched.day_of_week || '—'}</p>
                     <p><strong>Description:</strong> ${matched.description || '—'}</p>
                     <p><strong>All Day:</strong> ${matched.all_day || '—'}</p>
@@ -1250,7 +1250,7 @@ async function saveCandidateUpdates(payload) {
                     <p><strong>Type:</strong> ${matched.type || '—'}</p>
                     <p><strong>Insert Date:</strong> ${formatDateTime(matched.insert_date)}</p>
                     <p><strong>Update Date:</strong> ${formatDateTime(matched.update_date)}</p>
-                    ${(matchStatus === 'MATCH_PENDING' && !isReadOnlyCandidate)
+                    ${(matchStatus === 'MATCH_PENDING')
                       ? `<button class="admin-secondary-btn" type="button" data-candidate-action="confirm-match" data-candidate-id="${candidateId}" data-special-id="${matched.special_id}" ${isUpdating ? 'disabled' : ''}>Confirm Match</button>`
                       : ''}
                   </article>
