@@ -83,6 +83,10 @@ def publish_duplicate_specials_alert(result: Dict) -> Dict[str, object]:
 
 def publish_pending_approval_alert(result: Dict) -> Dict[str, object]:
     pending_count = int(result.get('not_approved_count', 0) or 0)
+    if pending_count == 0:
+        LOGGER.info('dataAudit: no pending approvals found; skipping alert publish')
+        return {'email_sent': False, 'email_reason': 'NO_PENDING_APPROVALS'}
+
     subject = f"Specials Pending Approval ({pending_count} specials)"
     message_lines = [
         f"There are {pending_count} pending approval.",
