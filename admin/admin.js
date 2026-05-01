@@ -1752,7 +1752,19 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
 
         if (action === 'reject') {
           const groupedRow = getGroupedRowByRepresentativeId(specialId);
-          const specialIdsToReject = (groupedRow?.specials || []).map((special) => Number(special.special_id)).filter(Boolean);
+          const groupedSpecials = groupedRow?.specials || [];
+          const targetSpecials = groupedSpecials.length
+            ? groupedSpecials
+            : (getSpecialById(specialId) ? [getSpecialById(specialId)] : []);
+          const hasManualSpecial = targetSpecials.some(
+            (special) => String(special?.insert_method || '').toUpperCase() !== 'AUTO'
+          );
+          if (hasManualSpecial) {
+            state.errorMessage = 'Cannot reject a special that is manually created';
+            render();
+            return;
+          }
+          const specialIdsToReject = targetSpecials.map((special) => Number(special.special_id)).filter(Boolean);
           const ids = specialIdsToReject.length ? specialIdsToReject : [specialId];
           const rejectCount = ids.length;
           const confirmed = window.confirm(

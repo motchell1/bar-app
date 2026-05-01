@@ -1499,6 +1499,7 @@ def reject_special(cursor, event):
             s.special_id,
             s.bar_id,
             s.description,
+            s.insert_method,
             s.day_of_week,
             s.start_time,
             s.end_time,
@@ -1517,6 +1518,8 @@ def reject_special(cursor, event):
     target = cursor.fetchone()
     if not target:
         raise ValueError('special_id was not found')
+    if str(target.get('insert_method') or '').strip().upper() != 'AUTO':
+        raise ValueError('Cannot reject a special that is manually created')
 
     days_of_week = json.dumps([_normalize_day_of_week(target.get('day_of_week'))])
     cursor.execute(
