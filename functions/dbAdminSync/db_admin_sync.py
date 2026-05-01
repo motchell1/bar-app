@@ -1065,17 +1065,22 @@ def get_all_specials(cursor):
             s.is_active,
             s.insert_method,
             s.insert_date,
-            s.update_date,
-            COALESCE(smr.missed_run_count, 0) AS missed_run_count
+            s.update_date
         FROM special s
         JOIN bar b
             ON b.bar_id = s.bar_id
-        LEFT JOIN special_missed_runs smr
-            ON smr.special_id = s.special_id
         ORDER BY b.neighborhood ASC, b.name ASC, s.description ASC, s.insert_date ASC, s.special_id ASC
         """
     )
     special_rows = cursor.fetchall()
+    cursor.execute(
+        """
+        SELECT special_id, MAX(missed_run_count) AS missed_run_count
+        FROM special_missed_runs
+        GROUP BY special_id
+        """
+    )
+    missed_run_lookup = {row['special_id']: int(row.get('missed_run_count') or 0) for row in cursor.fetchall()}
     cursor.execute(
         """
         SELECT special_id, COUNT(*) AS matched_candidate_count
@@ -1171,7 +1176,7 @@ def get_all_specials(cursor):
                     [str(candidate.get('special_candidate_id')) for candidate in candidate_rows if candidate.get('special_candidate_id')]
                 ),
                 'matched_candidate_count': match_count_lookup.get(special_id, 0),
-                'missed_run_count': int(row.get('missed_run_count') or 0),
+                'missed_run_count': missed_run_lookup.get(special_id, 0),
             }
         )
 
