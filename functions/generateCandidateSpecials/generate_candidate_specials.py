@@ -958,7 +958,11 @@ def lambda_handler(event, context):
                     'auto_publish': 'Y'
                 })
                 auto_published_runs += 1
-            elif int(insert_result.get('inserted_count', 0)) == 0 and run_id:
+            elif (
+                run_id
+                and int(insert_result.get('auto_approved_count', 0)) == 0
+                and int(insert_result.get('needs_approval_count', 0)) == 0
+            ):
                 invoke_db_special_sync({
                     'mode': 'update_missed_runs_for_run',
                     'bar_id': bar['bar_id'],
