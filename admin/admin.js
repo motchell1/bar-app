@@ -695,6 +695,31 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
     }
   }
 
+  async function rejectSpecials(specialIds) {
+    const ids = Array.isArray(specialIds) ? specialIds : [specialIds];
+    const validIds = [...new Set(ids.map((id) => Number(id)).filter((id) => Number.isFinite(id) && id > 0))];
+    if (!validIds.length) return;
+
+    state.savingSpecial = true;
+    state.errorMessage = '';
+    render();
+
+    try {
+      for (const specialId of validIds) {
+        await callAdminSync({ mode: 'reject_special', special_id: specialId });
+      }
+      await loadAllSpecials();
+      state.detailSpecials = [];
+      state.detailEditing = false;
+    } catch (err) {
+      console.error('Failed to reject special:', err);
+      state.errorMessage = err?.message || 'Failed to reject special.';
+    } finally {
+      state.savingSpecial = false;
+      render();
+    }
+  }
+
   async function saveBarUpdates(barPayload, openHoursRows) {
     state.savingBar = true;
     state.errorMessage = '';
@@ -811,6 +836,7 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
           <button type="button" class="admin-tool-button" data-special-action="view-details" data-special-id="${state.actionSpecialId}">View Details</button>
           <button type="button" class="admin-tool-button" data-special-action="activate" data-special-id="${state.actionSpecialId}">Activate Special</button>
           <button type="button" class="admin-tool-button" data-special-action="deactivate" data-special-id="${state.actionSpecialId}">Deactivate Special</button>
+          <button type="button" class="admin-tool-button danger" data-special-action="reject" data-special-id="${state.actionSpecialId}">Reject Special</button>
           <button type="button" class="admin-tool-button danger" data-special-action="delete" data-special-id="${state.actionSpecialId}">Delete Special</button>
           <button type="button" class="admin-secondary-btn" data-close-action-menu="true">Close</button>
         </div>
@@ -1721,6 +1747,33 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
           );
           if (!confirmed) return;
           await deleteSpecials(ids);
+          return;
+        }
+
+        if (action === 'reject') {
+          const groupedRow = getGroupedRowByRepresentativeId(specialId);
+          const groupedSpecials = groupedRow?.specials || [];
+          const targetSpecials = groupedSpecials.length
+            ? groupedSpecials
+            : (getSpecialById(specialId) ? [getSpecialById(specialId)] : []);
+          const hasManualSpecial = targetSpecials.some(
+            (special) => String(special?.insert_method || '').toUpperCase() !== 'AUTO'
+          );
+          if (hasManualSpecial) {
+            state.errorMessage = 'Cannot reject a special that is manually created';
+            render();
+            return;
+          }
+          const specialIdsToReject = targetSpecials.map((special) => Number(special.special_id)).filter(Boolean);
+          const ids = specialIdsToReject.length ? specialIdsToReject : [specialId];
+          const rejectCount = ids.length;
+          const confirmed = window.confirm(
+            rejectCount > 1
+              ? `Reject ${rejectCount} specials? This will move them to rejected specials and delete the active specials.`
+              : 'Reject this special? This will move it to rejected specials and delete the active special.'
+          );
+          if (!confirmed) return;
+          await rejectSpecials(ids);
         }
       });
     });

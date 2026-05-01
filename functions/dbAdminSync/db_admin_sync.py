@@ -1488,6 +1488,99 @@ def delete_special(cursor, event):
     return {'special_id': special_id, 'deleted': True}
 
 
+def reject_special(cursor, event):
+    special_id = event.get('special_id')
+    if not special_id:
+        raise ValueError('special_id is required for reject_special')
+
+    cursor.execute(
+        """
+        SELECT
+            s.special_id,
+            s.bar_id,
+            s.description,
+            s.insert_method,
+            s.day_of_week,
+            s.start_time,
+            s.end_time,
+            s.all_day,
+            sc.is_recurring,
+            sc.date,
+            sc.fetch_method,
+            sc.source,
+            s.special_candidate_id
+        FROM special s
+        LEFT JOIN special_candidate sc ON sc.special_candidate_id = s.special_candidate_id
+        WHERE s.special_id = %s
+        """,
+        (special_id,),
+    )
+    target = cursor.fetchone()
+    if not target:
+        raise ValueError('special_id was not found')
+    if str(target.get('insert_method') or '').strip().upper() != 'AUTO':
+        raise ValueError('Cannot reject a special that is manually created')
+
+    days_of_week = json.dumps([_normalize_day_of_week(target.get('day_of_week'))])
+    cursor.execute(
+        """
+        INSERT INTO special_candidate_reject
+        (
+            bar_id,
+            description,
+            days_of_week,
+            start_time,
+            end_time,
+            all_day,
+            is_recurring,
+            date,
+            fetch_method,
+            source
+        )
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """,
+        (
+            target.get('bar_id'),
+            target.get('description'),
+            days_of_week,
+            target.get('start_time'),
+            target.get('end_time'),
+            target.get('all_day'),
+            target.get('is_recurring'),
+            target.get('date'),
+            target.get('fetch_method'),
+            target.get('source'),
+        ),
+    )
+    reject_id = cursor.lastrowid
+
+    if target.get('special_candidate_id'):
+        cursor.execute(
+            """
+            INSERT INTO special_candidate_reject_join (reject_id, special_candidate_id)
+            VALUES (%s, %s)
+            """,
+            (reject_id, target.get('special_candidate_id')),
+        )
+
+    cursor.execute(
+        """
+        DELETE FROM device_special_favorite
+        WHERE special_id = %s
+        """,
+        (special_id,),
+    )
+    cursor.execute(
+        """
+        DELETE FROM special
+        WHERE special_id = %s
+        """,
+        (special_id,),
+    )
+
+    return {'special_id': special_id, 'reject_id': reject_id, 'rejected': True}
+
+
 def update_special_candidate(cursor, event):
     special_candidate_id = event.get('special_candidate_id')
     if not special_candidate_id:
@@ -1639,6 +1732,7 @@ def lambda_handler(event, context):
         'get_all_specials',
         'update_special',
         'delete_special',
+        'reject_special',
         'insert_special',
         'update_special_candidate',
         'get_all_bars',
@@ -1657,7 +1751,7 @@ def lambda_handler(event, context):
                         'detect_duplicate_websites, detect_duplicate_specials, '
                         'remove_rejected_special_candidate, '
                         'delete_special_candidate_run, '
-                        'update_special_candidate_approval, confirm_special_candidate_match, get_all_specials, update_special, delete_special, insert_special, '
+                        'update_special_candidate_approval, confirm_special_candidate_match, get_all_specials, update_special, delete_special, reject_special, insert_special, '
                         'update_special_candidate, get_all_bars, get_bar_details, update_bar, update_open_hours'
                     )
                 }
@@ -1718,6 +1812,8 @@ def lambda_handler(event, context):
                 result = update_special_candidate(cursor, event)
             elif mode == 'delete_special':
                 result = delete_special(cursor, event)
+            elif mode == 'reject_special':
+                result = reject_special(cursor, event)
             elif mode == 'insert_special':
                 result = insert_special(cursor, event)
             else:
