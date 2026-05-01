@@ -235,10 +235,9 @@ def publish_special_candidate_run(cursor, bar_id: int, run_id: int, auto_publish
     manual_filter_clause = "AND insert_method <> 'MANUAL'" if IGNORE_MANUAL_SPECIALS_ON_PUBLISH == 'Y' else ''
     cursor.execute(
         f"""
-        SELECT special_id, day_of_week, all_day, start_time, end_time, description
+        SELECT special_id, day_of_week, all_day, start_time, end_time, description, is_active
         FROM special
         WHERE bar_id = %s
-            AND is_active = 'Y'
             {manual_filter_clause}
         """,
         (bar_id,),
@@ -285,7 +284,7 @@ def publish_special_candidate_run(cursor, bar_id: int, run_id: int, auto_publish
             )
             missed_run_record = cursor.fetchone() or {}
             should_deactivate = int(missed_run_record.get('missed_run_count', 0)) >= MISSED_RUN_DEACTIVATION_THRESHOLD
-            if not should_deactivate:
+            if not should_deactivate or special.get('is_active') != 'Y':
                 continue
             cursor.execute(
                 """
@@ -336,6 +335,8 @@ def publish_special_candidate_run(cursor, bar_id: int, run_id: int, auto_publish
             """
             UPDATE special
             SET special_candidate_id = %s
+                , is_active = 'Y'
+                , update_date = NOW()
             WHERE special_id = %s
             """,
             (candidate_id, special_id),
