@@ -800,13 +800,73 @@ def publish_special_candidate_run(cursor, bar_id: int, run_id: int, auto_publish
     }
 
 
+def update_missed_runs_for_run(cursor, bar_id: int, run_id: int) -> Dict[str, int]:
+    manual_filter_clause = "AND insert_method <> 'MANUAL'" if IGNORE_MANUAL_SPECIALS_ON_PUBLISH == 'Y' else ''
+    cursor.execute(
+        f"""
+        SELECT special_id, is_active
+        FROM special
+        WHERE bar_id = %s
+            {manual_filter_clause}
+        """,
+        (bar_id,),
+    )
+    existing_specials = cursor.fetchall()
+    deactivated_special_count = 0
+    updated_missed_special_count = 0
+
+    for special in existing_specials:
+        if special.get('is_active') != 'Y':
+            continue
+        cursor.execute(
+            """
+            INSERT INTO special_missed_runs (special_id, missed_run_count, last_run_id, update_date)
+            VALUES (%s, 1, %s, NOW())
+            ON DUPLICATE KEY UPDATE
+                missed_run_count = IF(last_run_id = VALUES(last_run_id), missed_run_count, missed_run_count + 1),
+                last_run_id = VALUES(last_run_id),
+                update_date = NOW()
+            """,
+            (special['special_id'], run_id),
+        )
+        updated_missed_special_count += 1
+        cursor.execute(
+            """
+            SELECT missed_run_count
+            FROM special_missed_runs
+            WHERE special_id = %s
+            """,
+            (special['special_id'],),
+        )
+        missed_run_record = cursor.fetchone() or {}
+        should_deactivate = int(missed_run_record.get('missed_run_count', 0)) >= MISSED_RUN_DEACTIVATION_THRESHOLD
+        if not should_deactivate:
+            continue
+        cursor.execute(
+            """
+            UPDATE special
+            SET is_active = 'N',
+                update_date = NOW()
+            WHERE special_id = %s
+            """,
+            (special['special_id'],),
+        )
+        deactivated_special_count += 1
+
+    return {
+        'run_id': run_id,
+        'updated_missed_special_count': updated_missed_special_count,
+        'deactivated_special_count': deactivated_special_count,
+    }
+
+
 def lambda_handler(event, context):
     event = event or {}
     mode = event.get('mode')
-    if mode not in {'insert_special_candidate', 'publish_special_candidate_run'}:
+    if mode not in {'insert_special_candidate', 'publish_special_candidate_run', 'update_missed_runs_for_run'}:
         return {
             'statusCode': 400,
-            'body': json.dumps({'error': 'mode must be one of insert_special_candidate, publish_special_candidate_run'}),
+            'body': json.dumps({'error': 'mode must be one of insert_special_candidate, publish_special_candidate_run, update_missed_runs_for_run'}),
         }
 
     conn = get_connection()
@@ -826,6 +886,14 @@ def lambda_handler(event, context):
                 if not run_id:
                     raise ValueError('run_id is required for publish_special_candidate_run')
                 result = publish_special_candidate_run(cursor, bar_id, run_id, auto_publish)
+            elif mode == 'update_missed_runs_for_run':
+                bar_id = event.get('bar_id')
+                run_id = event.get('run_id')
+                if not bar_id:
+                    raise ValueError('bar_id is required for update_missed_runs_for_run')
+                if not run_id:
+                    raise ValueError('run_id is required for update_missed_runs_for_run')
+                result = update_missed_runs_for_run(cursor, bar_id, run_id)
             conn.commit()
 
         LOGGER.info('dbSpecialSync %s result=%s', mode, result)

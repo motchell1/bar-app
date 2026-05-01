@@ -958,6 +958,12 @@ def lambda_handler(event, context):
                     'auto_publish': 'Y'
                 })
                 auto_published_runs += 1
+            elif int(insert_result.get('inserted_count', 0)) == 0 and run_id:
+                invoke_db_special_sync({
+                    'mode': 'update_missed_runs_for_run',
+                    'bar_id': bar['bar_id'],
+                    'run_id': run_id
+                })
 
         elapsed = time.perf_counter() - started_at
         LOGGER.info(
