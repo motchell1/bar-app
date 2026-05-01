@@ -662,7 +662,7 @@ def publish_special_candidate_run(cursor, bar_id: int, run_id: int, auto_publish
                     INSERT INTO special_missed_runs (special_id, missed_run_count, last_run_id, update_date)
                     VALUES (%s, 1, %s, NOW())
                     ON DUPLICATE KEY UPDATE
-                        missed_run_count = IF(last_run_id = VALUES(last_run_id), missed_run_count, missed_run_count + 1),
+                        missed_run_count = missed_run_count + 1,
                         last_run_id = VALUES(last_run_id),
                         update_date = NOW()
                     """,
