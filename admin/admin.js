@@ -495,6 +495,16 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
     }
   }
 
+  async function loadSpecialDetails(specialIds) {
+    const ids = [...new Set((Array.isArray(specialIds) ? specialIds : [specialIds])
+      .map((id) => Number(id))
+      .filter((id) => Number.isFinite(id) && id > 0))];
+    if (!ids.length) return [];
+
+    const result = await callAdminSync({ mode: 'get_specials_by_ids', special_ids: ids });
+    return Array.isArray(result?.specials) ? result.specials : [];
+  }
+
   async function loadRejectedSpecials() {
     state.loadingRejectedSpecials = true;
     state.errorMessage = '';
@@ -1724,9 +1734,21 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
         state.actionSpecialId = null;
         if (action === 'view-details') {
           const groupedRow = getGroupedRowByRepresentativeId(specialId);
-          state.detailSpecials = groupedRow?.specials || (getSpecialById(specialId) ? [getSpecialById(specialId)] : []);
-          state.detailEditing = false;
+          const ids = (groupedRow?.specials || []).map((special) => Number(special.special_id)).filter(Boolean);
+          const detailIds = ids.length ? ids : [specialId];
+          state.loadingSpecials = true;
           render();
+          try {
+            state.detailSpecials = await loadSpecialDetails(detailIds);
+            state.detailEditing = false;
+          } catch (err) {
+            console.error('Failed to load special details:', err);
+            state.errorMessage = err?.message || 'Failed to load special details.';
+            state.detailSpecials = [];
+          } finally {
+            state.loadingSpecials = false;
+            render();
+          }
           return;
         }
 

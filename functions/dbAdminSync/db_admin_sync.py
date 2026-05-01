@@ -1037,9 +1037,16 @@ def update_special_candidate_approval(cursor, special_candidate_id: int, approva
     }
 
 
-def get_all_specials(cursor):
+def get_all_specials(cursor, include_candidate_rows=False, special_ids=None):
+    where_clause = ''
+    query_params = []
+    if special_ids:
+        placeholders = ','.join(['%s'] * len(special_ids))
+        where_clause = f'WHERE s.special_id IN ({placeholders})'
+        query_params = list(special_ids)
+
     cursor.execute(
-        """
+        f"""
         SELECT
             s.special_id,
             s.bar_id,
@@ -1061,8 +1068,10 @@ def get_all_specials(cursor):
             ON smr.special_id = s.special_id
         JOIN bar b
             ON b.bar_id = s.bar_id
+        {where_clause}
         ORDER BY b.neighborhood ASC, b.name ASC, s.description ASC, s.insert_date ASC, s.special_id ASC
-        """
+        """,
+        query_params,
     )
     special_rows = cursor.fetchall()
     cursor.execute(
@@ -1076,7 +1085,7 @@ def get_all_specials(cursor):
     special_ids = [row.get('special_id') for row in special_rows if row.get('special_id')]
 
     candidate_rows_by_special = {}
-    if special_ids:
+    if include_candidate_rows and special_ids:
         placeholders = ','.join(['%s'] * len(special_ids))
         cursor.execute(
             f"""
@@ -1145,20 +1154,20 @@ def get_all_specials(cursor):
                 'insert_method': row.get('insert_method'),
                 'insert_date': row.get('insert_date').isoformat() if row.get('insert_date') else None,
                 'update_date': row.get('update_date').isoformat() if row.get('update_date') else None,
-                'special_candidate_id': primary_candidate.get('special_candidate_id'),
-                'confidence': primary_candidate.get('confidence'),
-                'fetch_method': primary_candidate.get('fetch_method'),
-                'notes': primary_candidate.get('notes'),
-                'source': primary_candidate.get('source'),
-                'approval_date': primary_candidate.get('approval_date'),
-                'run_id': primary_candidate.get('run_id'),
-                'published_at': primary_candidate.get('published_at'),
-                'candidate_rows': candidate_rows,
-                'candidate_count': len(candidate_rows),
-                'special_candidate_ids': [candidate.get('special_candidate_id') for candidate in candidate_rows if candidate.get('special_candidate_id')],
+                'special_candidate_id': primary_candidate.get('special_candidate_id') if include_candidate_rows else None,
+                'confidence': primary_candidate.get('confidence') if include_candidate_rows else None,
+                'fetch_method': primary_candidate.get('fetch_method') if include_candidate_rows else None,
+                'notes': primary_candidate.get('notes') if include_candidate_rows else None,
+                'source': primary_candidate.get('source') if include_candidate_rows else None,
+                'approval_date': primary_candidate.get('approval_date') if include_candidate_rows else None,
+                'run_id': primary_candidate.get('run_id') if include_candidate_rows else None,
+                'published_at': primary_candidate.get('published_at') if include_candidate_rows else None,
+                'candidate_rows': candidate_rows if include_candidate_rows else [],
+                'candidate_count': len(candidate_rows) if include_candidate_rows else 0,
+                'special_candidate_ids': [candidate.get('special_candidate_id') for candidate in candidate_rows if candidate.get('special_candidate_id')] if include_candidate_rows else [],
                 'special_candidate_ids_csv': ','.join(
                     [str(candidate.get('special_candidate_id')) for candidate in candidate_rows if candidate.get('special_candidate_id')]
-                ),
+                ) if include_candidate_rows else '',
                 'matched_candidate_count': match_count_lookup.get(special_id, 0),
                 'missed_run_count': int(row.get('missed_run_count') or 0),
             }
@@ -1734,6 +1743,7 @@ def lambda_handler(event, context):
         'update_special_candidate_approval',
         'confirm_special_candidate_match',
         'get_all_specials',
+        'get_specials_by_ids',
         'update_special',
         'delete_special',
         'reject_special',
@@ -1755,7 +1765,7 @@ def lambda_handler(event, context):
                         'detect_duplicate_websites, detect_duplicate_specials, '
                         'remove_rejected_special_candidate, '
                         'delete_special_candidate_run, '
-                        'update_special_candidate_approval, confirm_special_candidate_match, get_all_specials, update_special, delete_special, reject_special, insert_special, '
+                        'update_special_candidate_approval, confirm_special_candidate_match, get_all_specials, get_specials_by_ids, update_special, delete_special, reject_special, insert_special, '
                         'update_special_candidate, get_all_bars, get_bar_details, update_bar, update_open_hours'
                     )
                 }
@@ -1800,7 +1810,13 @@ def lambda_handler(event, context):
                     raise ValueError('run_id is required for delete_special_candidate_run')
                 result = delete_special_candidate_run(cursor, int(run_id))
             elif mode == 'get_all_specials':
-                result = get_all_specials(cursor)
+                result = get_all_specials(cursor, include_candidate_rows=False)
+            elif mode == 'get_specials_by_ids':
+                special_ids = event.get('special_ids')
+                if not isinstance(special_ids, list) or not special_ids:
+                    raise ValueError('special_ids array is required for get_specials_by_ids')
+                parsed_special_ids = [int(item) for item in special_ids if str(item).strip()]
+                result = get_all_specials(cursor, include_candidate_rows=True, special_ids=parsed_special_ids)
             elif mode == 'get_all_bars':
                 result = get_all_bars(cursor)
             elif mode == 'get_bar_details':
