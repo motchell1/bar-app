@@ -1054,10 +1054,13 @@ def get_all_specials(cursor):
             s.is_active,
             s.insert_method,
             s.insert_date,
-            s.update_date
+            s.update_date,
+            COALESCE(smr.missed_run_count, 0) AS missed_run_count
         FROM special s
         JOIN bar b
             ON b.bar_id = s.bar_id
+        LEFT JOIN special_missed_runs smr
+            ON smr.special_id = s.special_id
         ORDER BY b.neighborhood ASC, b.name ASC, s.description ASC, s.insert_date ASC, s.special_id ASC
         """
     )
@@ -1142,6 +1145,7 @@ def get_all_specials(cursor):
                 'insert_method': row.get('insert_method'),
                 'insert_date': row.get('insert_date').isoformat() if row.get('insert_date') else None,
                 'update_date': row.get('update_date').isoformat() if row.get('update_date') else None,
+                'missed_run_count': int(row.get('missed_run_count') or 0),
                 'special_candidate_id': primary_candidate.get('special_candidate_id'),
                 'confidence': primary_candidate.get('confidence'),
                 'fetch_method': primary_candidate.get('fetch_method'),
