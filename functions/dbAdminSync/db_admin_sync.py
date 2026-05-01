@@ -993,10 +993,21 @@ def update_special_candidate_approval(cursor, special_candidate_id: int, approva
             UPDATE special s
             JOIN special_candidate_special_match scsm ON scsm.special_id = s.special_id
             SET s.update_date = NOW(),
+                s.is_active = 'Y',
                 s.special_candidate_id = %s
             WHERE scsm.special_candidate_id = %s
             """,
             (special_candidate_id, special_candidate_id),
+        )
+        cursor.execute(
+            """
+            UPDATE special_missed_runs smr
+            JOIN special_candidate_special_match scsm ON scsm.special_id = smr.special_id
+            SET smr.missed_run_count = 0,
+                smr.update_date = NOW()
+            WHERE scsm.special_candidate_id = %s
+            """,
+            (special_candidate_id,),
         )
 
     cursor.execute(
@@ -1054,10 +1065,13 @@ def get_all_specials(cursor):
             s.is_active,
             s.insert_method,
             s.insert_date,
-            s.update_date
+            s.update_date,
+            COALESCE(smr.missed_run_count, 0) AS missed_run_count
         FROM special s
         JOIN bar b
             ON b.bar_id = s.bar_id
+        LEFT JOIN special_missed_runs smr
+            ON smr.special_id = s.special_id
         ORDER BY b.neighborhood ASC, b.name ASC, s.description ASC, s.insert_date ASC, s.special_id ASC
         """
     )
@@ -1157,6 +1171,7 @@ def get_all_specials(cursor):
                     [str(candidate.get('special_candidate_id')) for candidate in candidate_rows if candidate.get('special_candidate_id')]
                 ),
                 'matched_candidate_count': match_count_lookup.get(special_id, 0),
+                'missed_run_count': int(row.get('missed_run_count') or 0),
             }
         )
 
