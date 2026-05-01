@@ -18,8 +18,9 @@ DB_PASSWORD = os.environ['DB_PASSWORD']
 DB_NAME = os.environ['DB_NAME']
 WEB_SCRAPE_AUTO_APPROVAL_THRESHOLD = 1
 WEB_AI_SEARCH_AUTO_APPROVAL_THRESHOLD = 1
-SPECIAL_CANDIDATE_SPECIAL_MATCH_FLOOR_THRESHOLD = float(os.environ.get('SPECIAL_CANDIDATE_SPECIAL_MATCH_FLOOR_THRESHOLD', '0.78'))
-SPECIAL_CANDIDATE_SPECIAL_MATCH_AUTO_APPROVAL_THRESHOLD = float(os.environ.get('SPECIAL_CANDIDATE_SPECIAL_MATCH_AUTO_APPROVAL_THRESHOLD', '0.9'))
+SPECIAL_CANDIDATE_SPECIAL_MATCH_DESC_FLOOR_THRESHOLD = float(os.environ.get('SPECIAL_CANDIDATE_SPECIAL_MATCH_DESC_FLOOR_THRESHOLD', '0.78'))
+SPECIAL_CANDIDATE_SPECIAL_MATCH_DESC_AUTO_MATCH_THRESHOLD = float(os.environ.get('SPECIAL_CANDIDATE_SPECIAL_MATCH_DESC_AUTO_MATCH_THRESHOLD', '0.9'))
+SPECIAL_CANDIDATE_SPECIAL_MATCH_CONFIDENCE_AUTO_APPROVAL_THRESHOLD = float(os.environ.get('SPECIAL_CANDIDATE_SPECIAL_MATCH_CONFIDENCE_AUTO_APPROVAL_THRESHOLD', '0.9'))
 IGNORE_MANUAL_SPECIALS_ON_PUBLISH = 'Y'
 MISSED_RUN_DEACTIVATION_THRESHOLD = 3
 
@@ -65,7 +66,7 @@ def _descriptions_match(candidate_description: str, special_description: str) ->
         return True
     return (
         SequenceMatcher(None, candidate_normalized, special_normalized).ratio()
-        >= SPECIAL_CANDIDATE_SPECIAL_MATCH_FLOOR_THRESHOLD
+        >= SPECIAL_CANDIDATE_SPECIAL_MATCH_DESC_FLOOR_THRESHOLD
     )
 
 
@@ -433,7 +434,7 @@ def insert_special_candidate(cursor, run: Dict, candidates: List[Dict]) -> Dict[
                     candidate.get('description'),
                     special.get('description'),
                 )
-                if fuzzy_description_match_score < SPECIAL_CANDIDATE_SPECIAL_MATCH_FLOOR_THRESHOLD:
+                if fuzzy_description_match_score < SPECIAL_CANDIDATE_SPECIAL_MATCH_DESC_FLOOR_THRESHOLD:
                     continue
                 possible_matches.append({
                     'special_id': special['special_id'],
@@ -451,10 +452,10 @@ def insert_special_candidate(cursor, run: Dict, candidates: List[Dict]) -> Dict[
             match_status = 'MATCHED_REJECT'
         elif possible_matches:
             top_score = max(match.get('score', 0.0) for match in possible_matches)
-            if len(possible_matches) == 1 and top_score >= SPECIAL_CANDIDATE_SPECIAL_MATCH_AUTO_APPROVAL_THRESHOLD:
+            if len(possible_matches) == 1 and top_score >= SPECIAL_CANDIDATE_SPECIAL_MATCH_DESC_AUTO_MATCH_THRESHOLD:
                 matched_special_ids = [possible_matches[0]['special_id']]
                 match_status = 'AUTO_MATCHED'
-                if approval_status == 'NOT_APPROVED' and confidence > SPECIAL_CANDIDATE_SPECIAL_MATCH_AUTO_APPROVAL_THRESHOLD:
+                if approval_status == 'NOT_APPROVED' and confidence >= SPECIAL_CANDIDATE_SPECIAL_MATCH_CONFIDENCE_AUTO_APPROVAL_THRESHOLD:
                     approval_status = 'AUTO_APPROVED'
                     approval_date = datetime.utcnow()
                     auto_approved_count += 1
