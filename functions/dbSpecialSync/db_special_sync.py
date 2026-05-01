@@ -18,8 +18,9 @@ DB_PASSWORD = os.environ['DB_PASSWORD']
 DB_NAME = os.environ['DB_NAME']
 WEB_SCRAPE_AUTO_APPROVAL_THRESHOLD = 1
 WEB_AI_SEARCH_AUTO_APPROVAL_THRESHOLD = 1
-SPECIAL_CANDIDATE_SPECIAL_MATCH_FUZZY_DESCRIPTION_THRESHOLD = 0.78
-SPECIAL_CANDIDATE_SPECIAL_MATCH_AUTO_APPROVAL_THRESHOLD = 0.9
+SPECIAL_CANDIDATE_SPECIAL_MATCH_DESC_FLOOR_THRESHOLD = float(os.environ.get('SPECIAL_CANDIDATE_SPECIAL_MATCH_DESC_FLOOR_THRESHOLD', '0.78'))
+SPECIAL_CANDIDATE_SPECIAL_MATCH_DESC_AUTO_MATCH_THRESHOLD = float(os.environ.get('SPECIAL_CANDIDATE_SPECIAL_MATCH_DESC_AUTO_MATCH_THRESHOLD', '0.9'))
+SPECIAL_CANDIDATE_SPECIAL_MATCH_CONFIDENCE_AUTO_APPROVAL_THRESHOLD = float(os.environ.get('SPECIAL_CANDIDATE_SPECIAL_MATCH_CONFIDENCE_AUTO_APPROVAL_THRESHOLD', '0.9'))
 IGNORE_MANUAL_SPECIALS_ON_PUBLISH = 'Y'
 MISSED_RUN_DEACTIVATION_THRESHOLD = 3
 
@@ -65,7 +66,7 @@ def _descriptions_match(candidate_description: str, special_description: str) ->
         return True
     return (
         SequenceMatcher(None, candidate_normalized, special_normalized).ratio()
-        >= SPECIAL_CANDIDATE_SPECIAL_MATCH_FUZZY_DESCRIPTION_THRESHOLD
+        >= SPECIAL_CANDIDATE_SPECIAL_MATCH_DESC_FLOOR_THRESHOLD
     )
 
 
@@ -74,7 +75,10 @@ def _description_match_score(candidate_description: str, special_description: st
     special_normalized = _normalize_description(special_description)
     if not candidate_normalized or not special_normalized:
         return 0.0
-    return SequenceMatcher(None, candidate_normalized, special_normalized).ratio()
+    ratio = SequenceMatcher(None, candidate_normalized, special_normalized).ratio()
+    if candidate_normalized in special_normalized or special_normalized in candidate_normalized:
+        ratio = max(ratio, 0.95)
+    return ratio
 
 
 def _parse_days_of_week(raw_days) -> List[str]:
@@ -337,7 +341,8 @@ def insert_special_candidate(cursor, run: Dict, candidates: List[Dict]) -> Dict[
         approval_date = None
         confidence = _parse_confidence(candidate.get('confidence'))
         candidate_notes = candidate.get('notes')
-        missing_day_data = candidate.get('days_of_week') is None
+        candidate_days_raw = _parse_days_of_week(candidate.get('days_of_week'))
+        missing_day_data = len(candidate_days_raw) == 0
 
         matched_reject_ids = [
             rejected_candidate.get('reject_id')
@@ -396,9 +401,10 @@ def insert_special_candidate(cursor, run: Dict, candidates: List[Dict]) -> Dict[
             ),
         )
         candidate_id = cursor.lastrowid
-        candidate_days = _parse_days_of_week(candidate.get('days_of_week'))
+        candidate_days = candidate_days_raw
         matched_special_ids = []
-        if candidate_days:
+        possible_matches = []
+        if candidate_days and not is_rejected_candidate:
             cursor.execute(
                 """
                 SELECT
@@ -418,44 +424,45 @@ def insert_special_candidate(cursor, run: Dict, candidates: List[Dict]) -> Dict[
             for special in cursor.fetchall():
                 if _normalize_day_of_week(special.get('day_of_week')) not in normalized_candidate_days:
                     continue
-                if not _is_candidate_same_as_special(
-                    {
-                        'day_of_week': special.get('day_of_week'),
-                        'all_day': candidate.get('all_day'),
-                        'start_time': candidate.get('start_time'),
-                        'end_time': candidate.get('end_time'),
-                        'description': candidate.get('description'),
-                    },
-                    special,
-                ):
+                if _normalize_yn_flag(candidate.get('all_day')) != _normalize_yn_flag(special.get('all_day')):
+                    continue
+                if _normalize_time_value(candidate.get('start_time')) != _normalize_time_value(special.get('start_time')):
+                    continue
+                if _normalize_time_value(candidate.get('end_time')) != _normalize_time_value(special.get('end_time')):
                     continue
                 fuzzy_description_match_score = _description_match_score(
                     candidate.get('description'),
                     special.get('description'),
                 )
-                if _descriptions_match(candidate.get('description'), special.get('description')):
-                    matched_special_ids.append(special['special_id'])
-                    cursor.execute(
-                        """
-                        INSERT INTO special_candidate_special_match (special_id, special_candidate_id, fuzzy_description_match_score)
-                        VALUES (%s, %s, %s)
-                        """,
-                        (special['special_id'], candidate_id, fuzzy_description_match_score),
-                    )
-        if (
-            matched_special_ids
-            and approval_status == 'NOT_APPROVED'
-            and confidence > SPECIAL_CANDIDATE_SPECIAL_MATCH_AUTO_APPROVAL_THRESHOLD
-        ):
-            approval_status = 'AUTO_APPROVED'
-            approval_date = datetime.utcnow()
-            auto_approved_count += 1
-            needs_approval_count = max(0, needs_approval_count - 1)
+                if fuzzy_description_match_score < SPECIAL_CANDIDATE_SPECIAL_MATCH_DESC_FLOOR_THRESHOLD:
+                    continue
+                possible_matches.append({
+                    'special_id': special['special_id'],
+                    'score': fuzzy_description_match_score,
+                })
+                cursor.execute(
+                    """
+                    INSERT INTO special_candidate_special_match (special_id, special_candidate_id, fuzzy_description_match_score)
+                    VALUES (%s, %s, %s)
+                    """,
+                    (special['special_id'], candidate_id, fuzzy_description_match_score),
+                )
         match_status = 'NOT_MATCHED'
-        if matched_special_ids:
-            match_status = 'MATCHED'
         if matched_reject_ids:
-            match_status = 'MATCHED_REJECTED'
+            match_status = 'MATCHED_REJECT'
+        elif possible_matches:
+            top_score = max(match.get('score', 0.0) for match in possible_matches)
+            if len(possible_matches) == 1 and top_score >= SPECIAL_CANDIDATE_SPECIAL_MATCH_DESC_AUTO_MATCH_THRESHOLD:
+                matched_special_ids = [possible_matches[0]['special_id']]
+                match_status = 'AUTO_MATCHED'
+                if approval_status == 'NOT_APPROVED' and confidence >= SPECIAL_CANDIDATE_SPECIAL_MATCH_CONFIDENCE_AUTO_APPROVAL_THRESHOLD:
+                    approval_status = 'AUTO_APPROVED'
+                    approval_date = datetime.utcnow()
+                    auto_approved_count += 1
+                    needs_approval_count = max(0, needs_approval_count - 1)
+            else:
+                match_status = 'MATCH_PENDING'
+                matched_special_ids = [match['special_id'] for match in possible_matches]
 
         cursor.execute(
             """
@@ -475,7 +482,6 @@ def insert_special_candidate(cursor, run: Dict, candidates: List[Dict]) -> Dict[
         if matched_special_ids:
             matched_count += 1
 
-        if matched_special_ids and approval_status == 'AUTO_APPROVED':
             for special_id in matched_special_ids:
                 cursor.execute(
                     """

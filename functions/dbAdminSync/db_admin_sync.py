@@ -504,7 +504,7 @@ def get_unapproved_special_candidates(cursor):
             match_lookup.setdefault(candidate_id, []).append(
                 {
                     'special_id': row.get('special_id'),
-                    'fuzzy_description_match_score': row.get('fuzzy_description_match_score'),
+                    'fuzzy_description_match_score': (round(float(row.get('fuzzy_description_match_score')), 2) if row.get('fuzzy_description_match_score') is not None else None),
                     'day_of_week': row.get('day_of_week'),
                     'description': row.get('description'),
                     'start_time': _normalize_time_value(row.get('start_time')) or None,
@@ -1555,6 +1555,56 @@ def update_special_candidate(cursor, event):
 
 
 
+
+def confirm_special_candidate_match(cursor, special_candidate_id: int, special_id: int):
+    cursor.execute(
+        """
+        SELECT special_candidate_id, approval_status
+        FROM special_candidate
+        WHERE special_candidate_id = %s
+        """,
+        (special_candidate_id,),
+    )
+    candidate = cursor.fetchone()
+    if not candidate:
+        raise ValueError('special_candidate_id was not found')
+
+    cursor.execute(
+        """
+        SELECT 1
+        FROM special_candidate_special_match
+        WHERE special_candidate_id = %s AND special_id = %s
+        """,
+        (special_candidate_id, special_id),
+    )
+    if not cursor.fetchone():
+        raise ValueError('special_id is not a possible match for this candidate')
+
+    cursor.execute(
+        """
+        DELETE FROM special_candidate_special_match
+        WHERE special_candidate_id = %s
+          AND special_id <> %s
+        """,
+        (special_candidate_id, special_id),
+    )
+
+    cursor.execute(
+        """
+        UPDATE special_candidate
+        SET match_status = 'MATCHED'
+        WHERE special_candidate_id = %s
+        """,
+        (special_candidate_id,),
+    )
+
+    return {
+        'special_candidate_id': special_candidate_id,
+        'special_id': special_id,
+        'match_status': 'MATCHED',
+        'approval_status': candidate.get('approval_status'),
+    }
+
 def _parse_event_payload(event):
     if not isinstance(event, dict):
         return {}
@@ -1585,6 +1635,7 @@ def lambda_handler(event, context):
         'remove_rejected_special_candidate',
         'delete_special_candidate_run',
         'update_special_candidate_approval',
+        'confirm_special_candidate_match',
         'get_all_specials',
         'update_special',
         'delete_special',
@@ -1606,7 +1657,7 @@ def lambda_handler(event, context):
                         'detect_duplicate_websites, detect_duplicate_specials, '
                         'remove_rejected_special_candidate, '
                         'delete_special_candidate_run, '
-                        'update_special_candidate_approval, get_all_specials, update_special, delete_special, insert_special, '
+                        'update_special_candidate_approval, confirm_special_candidate_match, get_all_specials, update_special, delete_special, insert_special, '
                         'update_special_candidate, get_all_bars, get_bar_details, update_bar, update_open_hours'
                     )
                 }
@@ -1634,6 +1685,12 @@ def lambda_handler(event, context):
                 if not special_candidate_id:
                     raise ValueError('special_candidate_id is required for update_special_candidate_approval')
                 result = update_special_candidate_approval(cursor, special_candidate_id, approval_status)
+            elif mode == 'confirm_special_candidate_match':
+                special_candidate_id = event.get('special_candidate_id')
+                special_id = event.get('special_id')
+                if not special_candidate_id or not special_id:
+                    raise ValueError('special_candidate_id and special_id are required for confirm_special_candidate_match')
+                result = confirm_special_candidate_match(cursor, int(special_candidate_id), int(special_id))
             elif mode == 'remove_rejected_special_candidate':
                 special_candidate_id = event.get('special_candidate_id')
                 if not special_candidate_id:
