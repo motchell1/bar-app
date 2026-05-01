@@ -235,10 +235,9 @@ def publish_special_candidate_run(cursor, bar_id: int, run_id: int, auto_publish
     manual_filter_clause = "AND insert_method <> 'MANUAL'" if IGNORE_MANUAL_SPECIALS_ON_PUBLISH == 'Y' else ''
     cursor.execute(
         f"""
-        SELECT special_id, day_of_week, all_day, start_time, end_time, description
+        SELECT special_id, day_of_week, all_day, start_time, end_time, description, is_active
         FROM special
         WHERE bar_id = %s
-            AND is_active = 'Y'
             {manual_filter_clause}
         """,
         (bar_id,),
@@ -269,7 +268,7 @@ def publish_special_candidate_run(cursor, bar_id: int, run_id: int, auto_publish
                 INSERT INTO special_missed_runs (special_id, missed_run_count, last_run_id, update_date)
                 VALUES (%s, 1, %s, NOW())
                 ON DUPLICATE KEY UPDATE
-                    missed_run_count = IF(last_run_id = VALUES(last_run_id), missed_run_count, missed_run_count + 1),
+                    missed_run_count = missed_run_count + 1,
                     last_run_id = VALUES(last_run_id),
                     update_date = NOW()
                 """,
@@ -285,7 +284,7 @@ def publish_special_candidate_run(cursor, bar_id: int, run_id: int, auto_publish
             )
             missed_run_record = cursor.fetchone() or {}
             should_deactivate = int(missed_run_record.get('missed_run_count', 0)) >= MISSED_RUN_DEACTIVATION_THRESHOLD
-            if not should_deactivate:
+            if not should_deactivate or special.get('is_active') != 'Y':
                 continue
             cursor.execute(
                 """
@@ -336,6 +335,8 @@ def publish_special_candidate_run(cursor, bar_id: int, run_id: int, auto_publish
             """
             UPDATE special
             SET special_candidate_id = %s
+                , is_active = 'Y'
+                , update_date = NOW()
             WHERE special_id = %s
             """,
             (candidate_id, special_id),
@@ -993,10 +994,21 @@ def update_special_candidate_approval(cursor, special_candidate_id: int, approva
             UPDATE special s
             JOIN special_candidate_special_match scsm ON scsm.special_id = s.special_id
             SET s.update_date = NOW(),
+                s.is_active = 'Y',
                 s.special_candidate_id = %s
             WHERE scsm.special_candidate_id = %s
             """,
             (special_candidate_id, special_candidate_id),
+        )
+        cursor.execute(
+            """
+            UPDATE special_missed_runs smr
+            JOIN special_candidate_special_match scsm ON scsm.special_id = smr.special_id
+            SET smr.missed_run_count = 0,
+                smr.update_date = NOW()
+            WHERE scsm.special_candidate_id = %s
+            """,
+            (special_candidate_id,),
         )
 
     cursor.execute(
@@ -1062,6 +1074,14 @@ def get_all_specials(cursor):
         """
     )
     special_rows = cursor.fetchall()
+    cursor.execute(
+        """
+        SELECT special_id, MAX(missed_run_count) AS missed_run_count
+        FROM special_missed_runs
+        GROUP BY special_id
+        """
+    )
+    missed_run_lookup = {row['special_id']: int(row.get('missed_run_count') or 0) for row in cursor.fetchall()}
     cursor.execute(
         """
         SELECT special_id, COUNT(*) AS matched_candidate_count
@@ -1157,6 +1177,7 @@ def get_all_specials(cursor):
                     [str(candidate.get('special_candidate_id')) for candidate in candidate_rows if candidate.get('special_candidate_id')]
                 ),
                 'matched_candidate_count': match_count_lookup.get(special_id, 0),
+                'missed_run_count': missed_run_lookup.get(special_id, 0),
             }
         )
 

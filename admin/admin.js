@@ -327,6 +327,7 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
   }
 
   function specialSortValue(row, key) {
+    if (key === 'matched_candidate_count' || key === 'missed_run_count') return Number(row[key]) || 0;
     if (key === 'days_of_week') return formatDayGroup(row.days_of_week || []);
     if (key === 'insert_date' || key === 'update_date') return toTimestamp(row[key]);
     if (key === 'start_time' || key === 'end_time') return toTimeNumber(row[key]);
@@ -391,6 +392,7 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
           insert_date: special.insert_date,
           update_date: special.update_date,
           matched_candidate_count: 0,
+          missed_run_count: 0,
           daySet: new Set(),
           specials: []
         });
@@ -399,6 +401,7 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
       const row = grouped.get(key);
       row.specials.push(special);
       row.matched_candidate_count += Number(special.matched_candidate_count || 0);
+      row.missed_run_count = Math.max(row.missed_run_count, Number(special.missed_run_count || 0));
       row.daySet.add(normalizeDay(special.day_of_week));
 
       const rowInsert = toTimestamp(row.insert_date);
@@ -1436,6 +1439,7 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
         <td>${row.is_active || '—'}</td>
         <td>${row.insert_method || '—'}</td>
         <td>${row.matched_candidate_count ?? 0}</td>
+        <td>${row.missed_run_count ?? 0}</td>
         <td>${formatDateTime(row.insert_date)}</td>
         <td>${formatDateTime(row.update_date)}</td>
       </tr>
@@ -1457,6 +1461,7 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
               <th class="admin-sortable-header" data-sort-table="special-management" data-sort-key="is_active">Is Active${getSortIndicator('special-management', 'is_active')}</th>
               <th class="admin-sortable-header" data-sort-table="special-management" data-sort-key="insert_method">Insert Method${getSortIndicator('special-management', 'insert_method')}</th>
               <th class="admin-sortable-header" data-sort-table="special-management" data-sort-key="matched_candidate_count">Matched Candidates${getSortIndicator('special-management', 'matched_candidate_count')}</th>
+              <th class="admin-sortable-header" data-sort-table="special-management" data-sort-key="missed_run_count">Missed Runs${getSortIndicator('special-management', 'missed_run_count')}</th>
               <th class="admin-sortable-header" data-sort-table="special-management" data-sort-key="insert_date">Insert Date${getSortIndicator('special-management', 'insert_date')}</th>
               <th class="admin-sortable-header" data-sort-table="special-management" data-sort-key="update_date">Update Date${getSortIndicator('special-management', 'update_date')}</th>
             </tr>
