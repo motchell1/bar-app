@@ -245,8 +245,11 @@ def build_startup_payload(device_id=None):
         )
 
         bars_lookup = {}
+        ordered_bar_ids = []
         for bar in bars:
-            bars_lookup[str(bar['bar_id'])] = {
+            bar_id = str(bar['bar_id'])
+            ordered_bar_ids.append(bar_id)
+            bars_lookup[bar_id] = {
                 'name': bar['name'],
                 'neighborhood': bar['neighborhood'],
                 'image_url': build_bar_image_url(bar['image_file']),
@@ -352,6 +355,7 @@ def build_startup_payload(device_id=None):
                     'google_map_id': GOOGLE_MAP_ID
                 },
                 'bars': bars_lookup,
+                'bar_order': ordered_bar_ids,
                 'open_hours': open_hours_lookup,
                 'specials': specials_lookup,
                 'specials_by_day': specials_by_day

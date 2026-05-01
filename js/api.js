@@ -7,8 +7,12 @@ function buildLegacyBarsData(payload) {
   const barsLookup = payload?.bars || {};
   const openHoursLookup = payload?.open_hours || {};
   const specialsLookup = payload?.specials || {};
+  const orderedBarIds = Array.isArray(payload?.bar_order)
+    ? payload.bar_order.map((barId) => String(barId)).filter((barId) => barsLookup[barId])
+    : Object.keys(barsLookup);
 
-  return Object.entries(barsLookup).map(([barId, bar]) => {
+  return orderedBarIds.map((barId) => {
+    const bar = barsLookup[barId];
     const barSpecialsByDay = {};
 
     Object.entries(specialsLookup).forEach(([specialId, special]) => {
