@@ -438,6 +438,7 @@ def insert_special_candidate(cursor, run: Dict, candidates: List[Dict]) -> Dict[
                     continue
                 possible_matches.append({
                     'special_id': special['special_id'],
+                    'day_of_week': _normalize_day_of_week(special.get('day_of_week')),
                     'score': fuzzy_description_match_score,
                 })
                 cursor.execute(
@@ -452,8 +453,28 @@ def insert_special_candidate(cursor, run: Dict, candidates: List[Dict]) -> Dict[
             match_status = 'MATCHED_REJECT'
         elif possible_matches:
             top_score = max(match.get('score', 0.0) for match in possible_matches)
-            if len(possible_matches) == 1 and top_score >= SPECIAL_CANDIDATE_SPECIAL_MATCH_DESC_AUTO_MATCH_THRESHOLD:
-                matched_special_ids = [possible_matches[0]['special_id']]
+            can_auto_match = len(possible_matches) == 1 and top_score >= SPECIAL_CANDIDATE_SPECIAL_MATCH_DESC_AUTO_MATCH_THRESHOLD
+
+            if not can_auto_match and normalized_candidate_days:
+                matches_by_day = {day: [] for day in normalized_candidate_days}
+                for possible_match in possible_matches:
+                    match_day = possible_match.get('day_of_week')
+                    if match_day in matches_by_day:
+                        matches_by_day[match_day].append(possible_match)
+
+                has_exactly_one_match_per_day = (
+                    set(matches_by_day.keys()) == normalized_candidate_days
+                    and all(len(day_matches) == 1 for day_matches in matches_by_day.values())
+                    and all(
+                        day_matches[0].get('score', 0.0) >= SPECIAL_CANDIDATE_SPECIAL_MATCH_DESC_AUTO_MATCH_THRESHOLD
+                        for day_matches in matches_by_day.values()
+                    )
+                )
+                if has_exactly_one_match_per_day:
+                    can_auto_match = True
+
+            if can_auto_match:
+                matched_special_ids = [match['special_id'] for match in possible_matches]
                 match_status = 'AUTO_MATCHED'
                 if approval_status == 'NOT_APPROVED' and confidence >= SPECIAL_CANDIDATE_SPECIAL_MATCH_CONFIDENCE_AUTO_APPROVAL_THRESHOLD:
                     approval_status = 'AUTO_APPROVED'
