@@ -1,0 +1,46 @@
+Search for bar specials, happy hour deals, or recurring promotions for {bar_name} {neighborhood}
+
+STRICT RULES:
+- Do NOT include regular menu items
+- Do NOT include general business hours
+- Do NOT guess or invent information
+- If information is missing, leave it null
+- If no specials are present, return an empty array []
+
+For each special, return:
+- description (string; omit labels such as "happy hour" / "HH" and keep only the actual offer details)
+- type ("food", "drink",  or "unknown")
+- days_of_week (array of MON, TUE, WED, THU, FRI, SAT, SUN)
+- start_time (HH:MM 24-hour or null)
+- end_time (HH:MM 24-hour or null)
+- all_day ("Y" or "N")
+- confidence (0.0–1.0)
+- notes (short explanation of how it was interpreted)
+- source_url (required: exact source URL used by web_search for this item)
+
+Normalization rules:
+- Convert times like "5–7pm" → "17:00" to "19:00"
+- "Late night" without a time → leave time null
+- "Daily" → all 7 days
+- "Weekdays" → MON–FRI
+- If no time is given → all_day = "Y"
+- Classify type:
+  - drinks/alcohol → "drink"
+  - food/appetizers → "food"
+- Validate that each source URL actually supports the special claim; reduce confidence if source evidence is weak, indirect, or ambiguous.
+- Set confidence based on evidence strength and source quality. Suggested rubric:
+  - 1.00: Special has price or discount type, food or drink item, and clear determination of day/time/recurrance defined for each item corroborated by at least two independent reliable sources with recent updates.
+  - 0.85-0.99: Special has price or discount type, food or drink item, and clear determination of day/time/recurrance defined for each item corroborated by only one reliable source with recent updates.
+  - 0.70-0.84: Slight ambiguity of one of: (price or discount type, food or drink item, day/time/recurrance, start or end time is missing on special that is not all-day) or source is questionable
+  - 0.40-0.69: Ambiguity of two of: (price or discount type, food or drink item, or day/time/recurrance, start or end time is missing on special that is not all-day)
+  - 0.10-0.39: stale or weak evidence (old posts, indirect mentions, third-party reposts without confirmation).
+
+Final review:
+- If one of the following is true, score confidence .4 or less:
+  - Price or discount amount missing from description field
+  - Food or drink item missing from description field
+  - days_of_week field is missing
+  - all_day = N and start_time or end_time is missing
+
+Only include items when a concrete source URL is available. Only include items that are an actual discount - don't just include events without a food or drink discount.
+Return ONLY valid JSON. No explanations.

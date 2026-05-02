@@ -38,6 +38,19 @@ FOOD_DRINK_CLUES = (
     'burger', 'wings', 'taco', 'pizza', 'app', 'appetizer', 'fries', 'nachos'
 )
 
+
+PROMPTS_DIR = os.path.dirname(__file__)
+
+
+def _load_prompt_template(filename):
+    path = os.path.join(PROMPTS_DIR, filename)
+    with open(path, 'r', encoding='utf-8') as file:
+        return file.read().strip()
+
+
+WEB_CRAWL_PROMPT_TEMPLATE = _load_prompt_template('web_crawl_prompt.txt')
+WEB_AI_SEARCH_PROMPT_TEMPLATE = _load_prompt_template('web_ai_search_prompt.txt')
+
 LOGGER = logging.getLogger(__name__)
 LOGGER.setLevel(logging.INFO)
 LAMBDA_CLIENT = boto3.client('lambda')
@@ -432,132 +445,20 @@ def build_crawl_prompt(bar_name, neighborhood, homepage_url, page_payloads):
 
     content = '\n\n'.join(pages_blob)
 
-    return f"""
-You are extracting candidate bar specials.
-
-Bar: {bar_name}
-Neighborhood: {neighborhood}
-Homepage: {homepage_url}
-
-Use ONLY the provided page text. Do not infer beyond it.
-
-STRICT RULES:
-- Do NOT include regular menu items
-- Do NOT include general business hours
-- Do NOT guess or invent information
-- If information is missing, leave it null
-- If no specials are present, return an empty array []
-- If an item does not clearly mention food or drink, exclude it.
-- Confidence scoring should be determined based on inclusion of the following elements and only set as 1 if all three elements are included:
-  - Price or discount included in description
-  - Food or drink item
-  - Clear determination of day/time/recurrance for each item
-  - If special is not all day, clear determination of start and end time
-  - If a price, discount, or deal amount is explicitly stated for an item, it MUST be included in the description
-  - Never output an item name alone if its price/discount is clearly present nearby
-  - If item name and price appear on separate but adjascent lines, merge them into a single description
-
-Extraction strategy (important):
-- Prioritize sections/headings that contain words like: specials, weekly specials, happy hour, deals, promotions.
-- When a section defines a shared schedule (example: "Happy Hour Monday-Friday 4pm-6pm"), apply that schedule to each offer listed under it unless an item overrides it.
-- Split grouped offers into separate specials. If a line contains multiple offers separated by dashes, bullets, semicolons, or conjunctions, output one JSON object per offer.
-- Keep explicit promotional items even when the same page also contains menu and general hours text.
-- Do not discard a valid special just because it appears near menu content.
-- Use layout clues embedded in text (section separators, heading-like boundaries, and image clues such as `[IMAGE ... file=tuesday.png alt=Tuesday ...]`) to infer when offers belong to different day/column groupings. 
-- Treat weekday signals in nearby image metadata (e.g. `file=tuesday.png`, `alt=Tuesday`) as strong local day context for the nearest offers directly below/adjacent to that image.
-- Do NOT force one shared day/time across all offers if image/section clues indicate separate groups (for example Tuesday-only section vs Happy Hour section).
-- If day/time attribution is ambiguous after using all clues, keep fields null/empty as needed and assign lower confidence (generally 0.15-0.45).
-
-For each special, return:
-- description (string; omit labels such as "happy hour" / "HH" and keep only the actual offer details)
-- type ("food", "drink", "combo" (if special is for both food and drink combined), or "unknown")
-- days_of_week (array of MON, TUE, WED, THU, FRI, SAT, SUN)
-- start_time (HH:MM 24-hour or null)
-- end_time (HH:MM 24-hour or null)
-- all_day ("Y" or "N")
-- confidence (0.0–1.0)
-- notes (short explanation of confidence score)
-- source_url (required: exact page URL where this special was found; must be one of the provided crawl URLs)
-
-Normalization rules:
-- Convert times like "5–7pm" → "17:00" to "19:00"
-- "Late night" without a time → leave time null
-- "Daily" → all 7 days
-- "Weekdays" → MON–FRI
-- If no time is given → all_day = "Y"
-- Classify type:
-  - drinks/alcohol → "drink"
-  - food/appetizers → "food"
-  - food and drink → "combo"
-- Review the parsed special description/timing and rescore confidence based on inclusion of the following elements:
-  - Price or discount amount
-  - Food or drink item
-  - Clear determination of day/time/recurrance for each item
-  - If a price or discount is visible in the source text but missing from description, fix the description.
-  - If a special is not all-day and the start time or end time is missing, lower the confidence
-  - Omit labels such as "happy hour" or time descriptors from description and keep only the actual offer details in the description.
-- If one of the following are missing from the parsed description, score confidence .5 or less:
-  - Price or discount amount
-  - Food or drink item
-  - Day of week
-  - All_day = N and start_time or end_time is missing
-
-Return ONLY valid JSON (an array). No explanations.
-
-PAGE CONTENT:
-{content}
-""".strip()
+    return WEB_CRAWL_PROMPT_TEMPLATE.format(
+        bar_name=bar_name,
+        neighborhood=neighborhood,
+        homepage_url=homepage_url,
+        content=content
+    )
 
 
 def build_search_prompt(bar_name, neighborhood):
-    return f"""
-Search for bar specials, happy hour deals, or recurring promotions for {bar_name} {neighborhood}
+    return WEB_AI_SEARCH_PROMPT_TEMPLATE.format(
+        bar_name=bar_name,
+        neighborhood=neighborhood
+    )
 
-STRICT RULES:
-- Do NOT include regular menu items
-- Do NOT include general business hours
-- Do NOT guess or invent information
-- If information is missing, leave it null
-- If no specials are present, return an empty array []
-
-For each special, return:
-- description (string; omit labels such as "happy hour" / "HH" and keep only the actual offer details)
-- type ("food", "drink",  or "unknown")
-- days_of_week (array of MON, TUE, WED, THU, FRI, SAT, SUN)
-- start_time (HH:MM 24-hour or null)
-- end_time (HH:MM 24-hour or null)
-- all_day ("Y" or "N")
-- confidence (0.0–1.0)
-- notes (short explanation of how it was interpreted)
-- source_url (required: exact source URL used by web_search for this item)
-
-Normalization rules:
-- Convert times like "5–7pm" → "17:00" to "19:00"
-- "Late night" without a time → leave time null
-- "Daily" → all 7 days
-- "Weekdays" → MON–FRI
-- If no time is given → all_day = "Y"
-- Classify type:
-  - drinks/alcohol → "drink"
-  - food/appetizers → "food"
-- Validate that each source URL actually supports the special claim; reduce confidence if source evidence is weak, indirect, or ambiguous.
-- Set confidence based on evidence strength and source quality. Suggested rubric:
-  - 1.00: Special has price or discount type, food or drink item, and clear determination of day/time/recurrance defined for each item corroborated by at least two independent reliable sources with recent updates.
-  - 0.85-0.99: Special has price or discount type, food or drink item, and clear determination of day/time/recurrance defined for each item corroborated by only one reliable source with recent updates.
-  - 0.70-0.84: Slight ambiguity of one of: (price or discount type, food or drink item, day/time/recurrance, start or end time is missing on special that is not all-day) or source is questionable
-  - 0.40-0.69: Ambiguity of two of: (price or discount type, food or drink item, or day/time/recurrance, start or end time is missing on special that is not all-day)
-  - 0.10-0.39: stale or weak evidence (old posts, indirect mentions, third-party reposts without confirmation).
-
-Final review:
-- If one of the following is true, score confidence .4 or less:
-  - Price or discount amount missing from description field
-  - Food or drink item missing from description field
-  - days_of_week field is missing
-  - all_day = N and start_time or end_time is missing
-
-Only include items when a concrete source URL is available. Only include items that are an actual discount - don't just include events without a food or drink discount.
-Return ONLY valid JSON. No explanations.
-""".strip()
 
 
 def call_openai(payload):
