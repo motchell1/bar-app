@@ -580,16 +580,17 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
     }
   }
 
-  async function confirmCandidateMatch(specialCandidateId, specialId) {
+  async function confirmCandidateMatch(specialCandidateId, specialIds) {
     state.updatingCandidateId = specialCandidateId;
     state.errorMessage = '';
     render();
 
     try {
+      const normalizedSpecialIds = Array.isArray(specialIds) ? specialIds : [specialIds];
       await callAdminSync({
         mode: 'confirm_special_candidate_match',
         special_candidate_id: specialCandidateId,
-        special_id: specialId
+        special_ids: normalizedSpecialIds
       });
       await loadUnapprovedSpecials();
     } catch (err) {
@@ -1312,10 +1313,7 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
                     <p><strong>Insert Date:</strong> ${formatDateTime(matched.insert_date)}</p>
                     <p><strong>Update Date:</strong> ${formatDateTime(matched.update_date)}</p>
                     ${(matchStatus === 'MATCH_PENDING')
-                      ? `${(matched.special_ids && matched.special_ids.length ? matched.special_ids : [matched.special_id])
-                        .filter((specialId) => specialId !== undefined && specialId !== null)
-                        .map((specialId) => `<button class="admin-secondary-btn" type="button" data-candidate-action="confirm-match" data-candidate-id="${candidateId}" data-special-id="${specialId}" ${isUpdating ? 'disabled' : ''}>Confirm Match (${specialId})</button>`)
-                        .join(' ')}`
+                      ? `<button class="admin-secondary-btn" type="button" data-candidate-action="confirm-match" data-candidate-id="${candidateId}" data-special-ids="${escapeAttribute((matched.special_ids && matched.special_ids.length ? matched.special_ids : [matched.special_id]).filter((specialId) => specialId !== undefined && specialId !== null).join(','))}" ${isUpdating ? 'disabled' : ''}>Confirm Match</button>`
                       : ''}
                   </article>
                 `).join('')}
@@ -1583,9 +1581,13 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
         }
 
         if (action === 'confirm-match') {
-          const specialId = Number(button.getAttribute('data-special-id'));
-          if (!specialId) return;
-          await confirmCandidateMatch(candidateId, specialId);
+          const rawSpecialIds = String(button.getAttribute('data-special-ids') || '');
+          const specialIds = rawSpecialIds
+            .split(',')
+            .map((value) => Number(value))
+            .filter(Boolean);
+          if (!specialIds.length) return;
+          await confirmCandidateMatch(candidateId, specialIds);
           return;
         }
 
