@@ -1312,7 +1312,10 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
                     <p><strong>Insert Date:</strong> ${formatDateTime(matched.insert_date)}</p>
                     <p><strong>Update Date:</strong> ${formatDateTime(matched.update_date)}</p>
                     ${(matchStatus === 'MATCH_PENDING')
-                      ? `<button class="admin-secondary-btn" type="button" data-candidate-action="confirm-match" data-candidate-id="${candidateId}" data-special-id="${matched.special_id}" ${isUpdating ? 'disabled' : ''}>Confirm Match</button>`
+                      ? `${(matched.special_ids && matched.special_ids.length ? matched.special_ids : [matched.special_id])
+                        .filter((specialId) => specialId !== undefined && specialId !== null)
+                        .map((specialId) => `<button class="admin-secondary-btn" type="button" data-candidate-action="confirm-match" data-candidate-id="${candidateId}" data-special-id="${specialId}" ${isUpdating ? 'disabled' : ''}>Confirm Match (${specialId})</button>`)
+                        .join(' ')}`
                       : ''}
                   </article>
                 `).join('')}
