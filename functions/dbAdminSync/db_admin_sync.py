@@ -174,7 +174,7 @@ def publish_special_candidate_run(cursor, bar_id: int, run_id: int, auto_publish
 
     cursor.execute(
         """
-        SELECT special_candidate_id, description, type, days_of_week, start_time, end_time, all_day
+        SELECT special_candidate_id, description, type, days_of_week, start_time, end_time, all_day, match_status
         FROM special_candidate
         WHERE bar_id = %s
             AND run_id = %s
@@ -219,6 +219,7 @@ def publish_special_candidate_run(cursor, bar_id: int, run_id: int, auto_publish
                     'start_time': start_time,
                     'end_time': end_time,
                     'all_day': all_day,
+                    'match_status': candidate.get('match_status'),
                 }
             )
 
@@ -245,7 +246,13 @@ def publish_special_candidate_run(cursor, bar_id: int, run_id: int, auto_publish
     )
     existing_specials = cursor.fetchall()
 
-    candidate_ids = list({row['candidate_id'] for row in candidate_rows if row.get('candidate_id')})
+    candidate_ids = list(
+        {
+            row['candidate_id']
+            for row in candidate_rows
+            if row.get('candidate_id') and str(row.get('match_status') or '').upper() == 'MATCHED'
+        }
+    )
     confirmed_match_by_candidate = {}
     if candidate_ids:
         placeholders = ','.join(['%s'] * len(candidate_ids))
