@@ -1265,6 +1265,12 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
 
         const matchedSpecials = Array.isArray(special.matched_specials) ? special.matched_specials : [];
         const groupedMatchedSpecials = (() => {
+          const getDescriptionMatchScore = (matched) => {
+            const rawScore = matched?.fuzzy_description_match_score;
+            if (rawScore === null || rawScore === undefined || rawScore === '') return Number.NEGATIVE_INFINITY;
+            const numericScore = Number(rawScore);
+            return Number.isFinite(numericScore) ? numericScore : Number.NEGATIVE_INFINITY;
+          };
           const grouped = new Map();
           matchedSpecials.forEach((matched) => {
             const descriptionKey = String(matched?.description || '').trim().toLowerCase();
@@ -1288,11 +1294,13 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
               row.day_of_week.push(matched.day_of_week);
             }
           });
-          return [...grouped.values()].map((row) => ({
-            ...row,
-            special_ids: [...new Set(row.special_ids)],
-            day_of_week: sortDays(row.day_of_week)
-          }));
+          return [...grouped.values()]
+            .map((row) => ({
+              ...row,
+              special_ids: [...new Set(row.special_ids)],
+              day_of_week: sortDays(row.day_of_week)
+            }))
+            .sort((left, right) => getDescriptionMatchScore(right) - getDescriptionMatchScore(left));
         })();
         const matchStatus = String(special.match_status || 'NOT_MATCHED').toUpperCase();
         const matchedSpecialsMarkup = groupedMatchedSpecials.length
