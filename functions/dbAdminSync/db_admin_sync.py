@@ -1653,7 +1653,12 @@ def update_special_candidate(cursor, event):
 
 
 
-def confirm_special_candidate_match(cursor, special_candidate_id: int, special_id: int):
+def confirm_special_candidate_match(cursor, special_candidate_id: int, special_ids):
+    normalized_special_ids = [int(special_id) for special_id in special_ids if special_id]
+    normalized_special_ids = list(dict.fromkeys(normalized_special_ids))
+    if not normalized_special_ids:
+        raise ValueError('At least one special_id is required')
+
     cursor.execute(
         """
         SELECT special_candidate_id, approval_status
@@ -1666,24 +1671,26 @@ def confirm_special_candidate_match(cursor, special_candidate_id: int, special_i
     if not candidate:
         raise ValueError('special_candidate_id was not found')
 
+    ids_placeholders = ','.join(['%s'] * len(normalized_special_ids))
     cursor.execute(
-        """
-        SELECT 1
+        f"""
+        SELECT special_id
         FROM special_candidate_special_match
-        WHERE special_candidate_id = %s AND special_id = %s
+        WHERE special_candidate_id = %s AND special_id IN ({ids_placeholders})
         """,
-        (special_candidate_id, special_id),
+        [special_candidate_id, *normalized_special_ids],
     )
-    if not cursor.fetchone():
-        raise ValueError('special_id is not a possible match for this candidate')
+    valid_matches = {int(row.get('special_id')) for row in cursor.fetchall() if row.get('special_id') is not None}
+    if len(valid_matches) != len(normalized_special_ids):
+        raise ValueError('One or more special_ids are not possible matches for this candidate')
 
     cursor.execute(
-        """
+        f"""
         DELETE FROM special_candidate_special_match
         WHERE special_candidate_id = %s
-          AND special_id <> %s
+          AND special_id NOT IN ({ids_placeholders})
         """,
-        (special_candidate_id, special_id),
+        [special_candidate_id, *normalized_special_ids],
     )
 
     cursor.execute(
@@ -1695,9 +1702,18 @@ def confirm_special_candidate_match(cursor, special_candidate_id: int, special_i
         (special_candidate_id,),
     )
 
+    cursor.execute(
+        f"""
+        UPDATE special
+        SET update_date = NOW()
+        WHERE special_id IN ({ids_placeholders})
+        """,
+        normalized_special_ids,
+    )
+
     return {
         'special_candidate_id': special_candidate_id,
-        'special_id': special_id,
+        'special_ids': normalized_special_ids,
         'match_status': 'MATCHED',
         'approval_status': candidate.get('approval_status'),
     }
@@ -1785,10 +1801,12 @@ def lambda_handler(event, context):
                 result = update_special_candidate_approval(cursor, special_candidate_id, approval_status)
             elif mode == 'confirm_special_candidate_match':
                 special_candidate_id = event.get('special_candidate_id')
-                special_id = event.get('special_id')
-                if not special_candidate_id or not special_id:
-                    raise ValueError('special_candidate_id and special_id are required for confirm_special_candidate_match')
-                result = confirm_special_candidate_match(cursor, int(special_candidate_id), int(special_id))
+                special_ids = event.get('special_ids')
+                if not special_ids and event.get('special_id'):
+                    special_ids = [event.get('special_id')]
+                if not special_candidate_id or not special_ids:
+                    raise ValueError('special_candidate_id and special_ids are required for confirm_special_candidate_match')
+                result = confirm_special_candidate_match(cursor, int(special_candidate_id), special_ids)
             elif mode == 'remove_rejected_special_candidate':
                 special_candidate_id = event.get('special_candidate_id')
                 if not special_candidate_id:

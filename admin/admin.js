@@ -580,16 +580,17 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
     }
   }
 
-  async function confirmCandidateMatch(specialCandidateId, specialId) {
+  async function confirmCandidateMatch(specialCandidateId, specialIds) {
     state.updatingCandidateId = specialCandidateId;
     state.errorMessage = '';
     render();
 
     try {
+      const normalizedSpecialIds = Array.isArray(specialIds) ? specialIds : [specialIds];
       await callAdminSync({
         mode: 'confirm_special_candidate_match',
         special_candidate_id: specialCandidateId,
-        special_id: specialId
+        special_ids: normalizedSpecialIds
       });
       await loadUnapprovedSpecials();
     } catch (err) {
@@ -1263,17 +1264,47 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
         };
 
         const matchedSpecials = Array.isArray(special.matched_specials) ? special.matched_specials : [];
+        const groupedMatchedSpecials = (() => {
+          const grouped = new Map();
+          matchedSpecials.forEach((matched) => {
+            const descriptionKey = String(matched?.description || '').trim().toLowerCase();
+            const typeKey = String(matched?.type || '').trim().toLowerCase();
+            const allDayKey = normalizeDay(matched?.all_day);
+            const startTimeKey = String(matched?.start_time || '').trim();
+            const endTimeKey = String(matched?.end_time || '').trim();
+            const groupKey = `${descriptionKey}__${typeKey}__${allDayKey}__${startTimeKey}__${endTimeKey}`;
+            if (!grouped.has(groupKey)) {
+              grouped.set(groupKey, {
+                ...matched,
+                special_ids: [],
+                day_of_week: []
+              });
+            }
+            const row = grouped.get(groupKey);
+            if (matched?.special_id !== undefined && matched?.special_id !== null) {
+              row.special_ids.push(matched.special_id);
+            }
+            if (matched?.day_of_week) {
+              row.day_of_week.push(matched.day_of_week);
+            }
+          });
+          return [...grouped.values()].map((row) => ({
+            ...row,
+            special_ids: [...new Set(row.special_ids)],
+            day_of_week: sortDays(row.day_of_week)
+          }));
+        })();
         const matchStatus = String(special.match_status || 'NOT_MATCHED').toUpperCase();
-        const matchedSpecialsMarkup = matchedSpecials.length
+        const matchedSpecialsMarkup = groupedMatchedSpecials.length
           ? `
             <div class="admin-matched-specials">
               <p><strong>Matched Specials:</strong></p>
               <div class="admin-matched-specials-list">
-                ${matchedSpecials.map((matched) => `
+                ${groupedMatchedSpecials.map((matched) => `
                   <article class="admin-matched-special-card">
-                    <p><strong>Special ID:</strong> ${matched.special_id ?? '—'}</p>
+                    <p><strong>Special ID:</strong> ${matched.special_ids.join(', ') || matched.special_id || '—'}</p>
                     <p><strong>Description Match Score:</strong> ${matched.fuzzy_description_match_score ?? '—'}</p>
-                    <p><strong>Day of Week:</strong> ${matched.day_of_week || '—'}</p>
+                    <p><strong>Day of Week:</strong> ${formatDayGroup(matched.day_of_week)}</p>
                     <p><strong>Description:</strong> ${matched.description || '—'}</p>
                     <p><strong>All Day:</strong> ${matched.all_day || '—'}</p>
                     <p><strong>Start Time:</strong> ${matched.start_time || '—'}</p>
@@ -1282,7 +1313,7 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
                     <p><strong>Insert Date:</strong> ${formatDateTime(matched.insert_date)}</p>
                     <p><strong>Update Date:</strong> ${formatDateTime(matched.update_date)}</p>
                     ${(matchStatus === 'MATCH_PENDING')
-                      ? `<button class="admin-secondary-btn" type="button" data-candidate-action="confirm-match" data-candidate-id="${candidateId}" data-special-id="${matched.special_id}" ${isUpdating ? 'disabled' : ''}>Confirm Match</button>`
+                      ? `<button class="admin-secondary-btn" type="button" data-candidate-action="confirm-match" data-candidate-id="${candidateId}" data-special-ids="${escapeAttribute((matched.special_ids && matched.special_ids.length ? matched.special_ids : [matched.special_id]).filter((specialId) => specialId !== undefined && specialId !== null).join(','))}" ${isUpdating ? 'disabled' : ''}>Confirm Match</button>`
                       : ''}
                   </article>
                 `).join('')}
@@ -1550,9 +1581,13 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
         }
 
         if (action === 'confirm-match') {
-          const specialId = Number(button.getAttribute('data-special-id'));
-          if (!specialId) return;
-          await confirmCandidateMatch(candidateId, specialId);
+          const rawSpecialIds = String(button.getAttribute('data-special-ids') || '');
+          const specialIds = rawSpecialIds
+            .split(',')
+            .map((value) => Number(value))
+            .filter(Boolean);
+          if (!specialIds.length) return;
+          await confirmCandidateMatch(candidateId, specialIds);
           return;
         }
 
