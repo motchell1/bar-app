@@ -216,6 +216,23 @@ def _append_missing_hours_note(note_suffixes: Dict[int, List[str]], candidate_id
     )
 
 
+def _resolve_effective_special_window(day_of_week, all_day, start_time, end_time, open_hours_lookup: Dict[str, Dict]) -> tuple:
+    normalized_all_day = _normalize_yn_flag(all_day)
+    normalized_start = _normalize_time_value(start_time)
+    normalized_end = _normalize_time_value(end_time)
+
+    if normalized_all_day == 'Y':
+        return (normalized_all_day, normalized_start, normalized_end)
+
+    day_key = _normalize_day_of_week(day_of_week)
+    day_hours = open_hours_lookup.get(day_key, {}) if day_key else {}
+    if not normalized_start:
+        normalized_start = _normalize_time_value(day_hours.get('open_time'))
+    if not normalized_end:
+        normalized_end = _normalize_time_value(day_hours.get('close_time'))
+    return (normalized_all_day, normalized_start, normalized_end)
+
+
 def _is_candidate_same_as_special(candidate_row: Dict, special_row: Dict) -> bool:
     candidate_all_day = _normalize_yn_flag(candidate_row.get('all_day'))
     special_all_day = _normalize_yn_flag(special_row.get('all_day'))
@@ -335,6 +352,15 @@ def insert_special_candidate(cursor, run: Dict, candidates: List[Dict]) -> Dict[
         (run['bar_id'],),
     )
     rejected_candidates = cursor.fetchall()
+    cursor.execute(
+        """
+        SELECT day_of_week, open_time, close_time, is_closed
+        FROM open_hours
+        WHERE bar_id = %s
+        """,
+        (run['bar_id'],),
+    )
+    open_hours_lookup = _build_open_hours_lookup(cursor.fetchall())
 
     for candidate in candidates:
         approval_status = 'NOT_APPROVED'
@@ -422,13 +448,28 @@ def insert_special_candidate(cursor, run: Dict, candidates: List[Dict]) -> Dict[
             )
             normalized_candidate_days = {_normalize_day_of_week(day) for day in candidate_days}
             for special in cursor.fetchall():
-                if _normalize_day_of_week(special.get('day_of_week')) not in normalized_candidate_days:
+                special_day = _normalize_day_of_week(special.get('day_of_week'))
+                if special_day not in normalized_candidate_days:
                     continue
-                if _normalize_yn_flag(candidate.get('all_day')) != _normalize_yn_flag(special.get('all_day')):
+                candidate_all_day, candidate_start, candidate_end = _resolve_effective_special_window(
+                    special_day,
+                    candidate.get('all_day'),
+                    candidate.get('start_time'),
+                    candidate.get('end_time'),
+                    open_hours_lookup,
+                )
+                special_all_day, special_start, special_end = _resolve_effective_special_window(
+                    special_day,
+                    special.get('all_day'),
+                    special.get('start_time'),
+                    special.get('end_time'),
+                    open_hours_lookup,
+                )
+                if candidate_all_day != special_all_day:
                     continue
-                if _normalize_time_value(candidate.get('start_time')) != _normalize_time_value(special.get('start_time')):
+                if candidate_start != special_start:
                     continue
-                if _normalize_time_value(candidate.get('end_time')) != _normalize_time_value(special.get('end_time')):
+                if candidate_end != special_end:
                     continue
                 fuzzy_description_match_score = _description_match_score(
                     candidate.get('description'),
