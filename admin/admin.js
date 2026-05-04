@@ -420,6 +420,9 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
     return [...grouped.values()]
       .map((row) => ({
         ...row,
+        matched_candidate_count: row.specials.length
+          ? row.matched_candidate_count / row.specials.length
+          : 0,
         days_of_week: sortDays([...row.daySet]),
         representative_special_id: row.specials[0]?.special_id
       }))
