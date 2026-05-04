@@ -704,6 +704,7 @@ def generate_from_search(bar_name, neighborhood):
     stats = {
         'web_ai_search_prompt_char_count': 0,
         'web_ai_search_attempted': 'N',
+        'web_ai_search_timeout_failed': 'N',
     }
     started_at = time.perf_counter()
     LOGGER.info('Starting direct web_search flow bar_name=%s neighborhood=%s', bar_name, neighborhood)
@@ -739,6 +740,7 @@ def generate_from_search(bar_name, neighborhood):
                     attempt,
                     attempts
                 )
+                stats['web_ai_search_timeout_failed'] = 'Y'
                 return [], stats
 
     if raw_response is None:
@@ -782,6 +784,7 @@ def lambda_handler(event, context):
         inserted_count = 0
         runs_created = 0
         auto_published_runs = 0
+        timeout_skipped_bars = 0
 
         if parsed_event['mode'] == 'bars':
             bars = parsed_event['bars']
@@ -832,7 +835,16 @@ def lambda_handler(event, context):
                 search_stats = {
                     'web_ai_search_prompt_char_count': 0,
                     'web_ai_search_attempted': 'N',
+                    'web_ai_search_timeout_failed': 'N',
                 }
+
+            if search_stats.get('web_ai_search_timeout_failed') == 'Y' and not specials:
+                timeout_skipped_bars += 1
+                LOGGER.warning(
+                    'Skipping candidate run creation for bar_name=%s due to repeated web_search timeout',
+                    bar_name
+                )
+                continue
             bar_candidates = []
             bar_crawl_specials_count = 0
             bar_web_ai_search_specials_count = 0
@@ -930,6 +942,7 @@ def lambda_handler(event, context):
                 'web_ai_search_specials': web_ai_search_specials_count,
                 'candidate_runs_created': runs_created,
                 'candidate_runs_auto_published': auto_published_runs,
+                'bars_skipped_due_to_web_ai_timeout': timeout_skipped_bars,
                 'data_audit_invoked': data_audit_invoked,
                 'data_audit_error': data_audit_error,
             })
