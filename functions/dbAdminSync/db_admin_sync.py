@@ -245,12 +245,40 @@ def publish_special_candidate_run(cursor, bar_id: int, run_id: int, auto_publish
     )
     existing_specials = cursor.fetchall()
 
+    candidate_ids = list({row['candidate_id'] for row in candidate_rows if row.get('candidate_id')})
+    confirmed_match_by_candidate = {}
+    if candidate_ids:
+        placeholders = ','.join(['%s'] * len(candidate_ids))
+        cursor.execute(
+            f"""
+            SELECT special_candidate_id, special_id
+            FROM special_candidate_special_match
+            WHERE special_candidate_id IN ({placeholders})
+            ORDER BY special_id ASC
+            """,
+            candidate_ids,
+        )
+        for row in cursor.fetchall():
+            candidate_id = row.get('special_candidate_id')
+            special_id = row.get('special_id')
+            if not candidate_id or not special_id:
+                continue
+            confirmed_match_by_candidate.setdefault(int(candidate_id), []).append(int(special_id))
+
     matched_special_ids = set()
     special_to_candidate_id = {}
     unmatched_candidates = []
     for candidate in candidate_rows:
         matched_id = None
+        for confirmed_special_id in confirmed_match_by_candidate.get(candidate.get('candidate_id'), []):
+            if confirmed_special_id in matched_special_ids:
+                continue
+            if any(int(special.get('special_id')) == confirmed_special_id for special in existing_specials):
+                matched_id = confirmed_special_id
+                break
         for special in existing_specials:
+            if matched_id is not None:
+                break
             if special['special_id'] in matched_special_ids:
                 continue
             if _is_candidate_same_as_special(candidate, special):
