@@ -1101,23 +1101,39 @@ def get_all_specials(cursor):
         """
     )
     special_rows = cursor.fetchall()
-    cursor.execute(
-        """
-        SELECT scsm.special_id, sc.run_id
-        FROM special_candidate_special_match scsm
-        JOIN special_candidate sc
-            ON sc.special_candidate_id = scsm.special_candidate_id
-        WHERE sc.run_id IS NOT NULL
-        """
-    )
-    matched_run_ids_by_special = {}
-    for row in cursor.fetchall():
-        special_id = row.get('special_id')
-        run_id = row.get('run_id')
-        if not special_id or run_id is None:
-            continue
-        matched_run_ids_by_special.setdefault(special_id, set()).add(run_id)
     special_ids = [row.get('special_id') for row in special_rows if row.get('special_id')]
+    matched_run_ids_by_special = {}
+    matched_run_count_by_special = {}
+
+    if special_ids:
+        placeholders = ','.join(['%s'] * len(special_ids))
+        cursor.execute(
+            f"""
+            SELECT
+                scsm.special_id,
+                COUNT(DISTINCT sc.run_id) AS matched_candidate_count,
+                GROUP_CONCAT(DISTINCT sc.run_id ORDER BY sc.run_id ASC) AS matched_candidate_run_ids_csv
+            FROM special_candidate_special_match scsm
+            JOIN special_candidate sc
+                ON sc.special_candidate_id = scsm.special_candidate_id
+            WHERE sc.run_id IS NOT NULL
+              AND scsm.special_id IN ({placeholders})
+            GROUP BY scsm.special_id
+            """,
+            special_ids,
+        )
+        for row in cursor.fetchall():
+            special_id = row.get('special_id')
+            if not special_id:
+                continue
+            run_ids_csv = row.get('matched_candidate_run_ids_csv') or ''
+            run_ids = [
+                int(value)
+                for value in str(run_ids_csv).split(',')
+                if str(value).strip() != ''
+            ]
+            matched_run_ids_by_special[special_id] = run_ids
+            matched_run_count_by_special[special_id] = int(row.get('matched_candidate_count') or 0)
 
     candidate_rows_by_special = {}
     if special_ids:
@@ -1204,8 +1220,8 @@ def get_all_specials(cursor):
                 'special_candidate_ids_csv': ','.join(
                     [str(candidate.get('special_candidate_id')) for candidate in candidate_rows if candidate.get('special_candidate_id')]
                 ),
-                'matched_candidate_run_ids': sorted(matched_run_ids_by_special.get(special_id, set())),
-                'matched_candidate_count': len(matched_run_ids_by_special.get(special_id, set())),
+                'matched_candidate_run_ids': matched_run_ids_by_special.get(special_id, []),
+                'matched_candidate_count': matched_run_count_by_special.get(special_id, 0),
             }
         )
 
