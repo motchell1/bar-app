@@ -37,6 +37,8 @@ FOOD_DRINK_CLUES = (
     'food', 'drink', 'beer', 'wine', 'cocktail', 'draft', 'shot', 'margarita',
     'burger', 'wings', 'taco', 'pizza', 'app', 'appetizer', 'fries', 'nachos'
 )
+WEB_AI_SEARCH_TIMEOUT_SECONDS = int(os.environ.get('WEB_AI_SEARCH_TIMEOUT_SECONDS', '30'))
+WEB_AI_SEARCH_TIMEOUT_RETRIES = 1
 
 
 PROMPTS_DIR = os.path.dirname(__file__)
@@ -461,7 +463,7 @@ def build_search_prompt(bar_name, neighborhood):
 
 
 
-def call_openai(payload):
+def call_openai(payload, timeout_seconds=45):
     if not OPENAI_API_KEY:
         raise RuntimeError('OPENAI_API_KEY is required')
 
@@ -478,7 +480,7 @@ def call_openai(payload):
         payload.get('tools', []),
         input_chars
     )
-    response = requests.post(OPENAI_RESPONSES_URL, headers=headers, json=payload, timeout=45)
+    response = requests.post(OPENAI_RESPONSES_URL, headers=headers, json=payload, timeout=timeout_seconds)
     response.raise_for_status()
     elapsed = time.perf_counter() - started_at
     LOGGER.info('OpenAI Responses API call completed in %.2fs', elapsed)
@@ -714,7 +716,33 @@ def generate_from_search(bar_name, neighborhood):
         'temperature': 0
     }
     stats['web_ai_search_attempted'] = 'Y'
-    raw_response = call_openai(payload)
+    attempts = WEB_AI_SEARCH_TIMEOUT_RETRIES + 1
+    raw_response = None
+    for attempt in range(1, attempts + 1):
+        try:
+            raw_response = call_openai(payload, timeout_seconds=WEB_AI_SEARCH_TIMEOUT_SECONDS)
+            break
+        except requests.exceptions.Timeout:
+            if attempt < attempts:
+                LOGGER.warning(
+                    'OpenAI web_search timed out after %ss for bar_name=%s (attempt %d/%d); retrying once',
+                    WEB_AI_SEARCH_TIMEOUT_SECONDS,
+                    bar_name,
+                    attempt,
+                    attempts
+                )
+            else:
+                LOGGER.exception(
+                    'OpenAI web_search timed out after %ss for bar_name=%s on final attempt (%d/%d)',
+                    WEB_AI_SEARCH_TIMEOUT_SECONDS,
+                    bar_name,
+                    attempt,
+                    attempts
+                )
+                return [], stats
+
+    if raw_response is None:
+        return [], stats
     raw_text = extract_output_text(raw_response)
     items = parse_json_array(raw_text)
 
