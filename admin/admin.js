@@ -392,7 +392,6 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
           insert_date: special.insert_date,
           update_date: special.update_date,
           matched_candidate_count: 0,
-          matchedRunIdSet: new Set(),
           missed_run_count: 0,
           daySet: new Set(),
           specials: []
@@ -401,12 +400,7 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
 
       const row = grouped.get(key);
       row.specials.push(special);
-      const matchedRunIds = Array.isArray(special.matched_candidate_run_ids)
-        ? special.matched_candidate_run_ids
-        : [];
-      matchedRunIds.forEach((runId) => {
-        if (runId !== null && runId !== undefined) row.matchedRunIdSet.add(runId);
-      });
+      row.matched_candidate_count = Math.max(row.matched_candidate_count, Number(special.matched_candidate_count || 0));
       row.missed_run_count = Math.max(row.missed_run_count, Number(special.missed_run_count || 0));
       row.daySet.add(normalizeDay(special.day_of_week));
 
@@ -426,7 +420,6 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
     return [...grouped.values()]
       .map((row) => ({
         ...row,
-        matched_candidate_count: row.matchedRunIdSet.size,
         days_of_week: sortDays([...row.daySet]),
         representative_special_id: row.specials[0]?.special_id
       }))
