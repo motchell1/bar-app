@@ -1,4 +1,4 @@
-Search for bar specials, happy hour deals, or recurring promotions for {bar_name} {neighborhood}
+Search for bar specials, happy hour deals, or recurring promotions for {bar_name} {neighborhood} Pittsburgh
 
 STRICT RULES:
 - Do NOT include regular menu items
@@ -6,6 +6,7 @@ STRICT RULES:
 - Do NOT guess or invent information
 - If information is missing, leave it null
 - If no specials are present, return an empty array []
+- Verify that the source you are using is actually for the correct location
 
 For each special, return:
 - description (string; omit labels such as "happy hour" / "HH" and keep only the actual offer details)
@@ -24,14 +25,18 @@ Normalization rules:
 - "Daily" → all 7 days
 - "Weekdays" → MON–FRI
 - If no time is given → all_day = "Y"
+- Grouping:
+  - Each item should be its own special (Ex: $2 off beers, $5 wings, $2 off appetizers should be three separate specials)
+  - BUT when multiple items share the same price or discount, day, and time range, group them into a single special by combining the item names into one description (e.g., "$2 Miller Lite, Bud Light, and White Claw").
 - Classify type:
   - drinks/alcohol → "drink"
   - food/appetizers → "food"
+  - If the special implies both types of items must be ordered for the total price of the deal, assign the type as "combo"  (Ex: two tacos and a margarita for $12)
 - Validate that each source URL actually supports the special claim; reduce confidence if source evidence is weak, indirect, or ambiguous.
 - Set confidence based on evidence strength and source quality. Suggested rubric:
   - 1.00: Special has price or discount type, food or drink item, and clear determination of day/time/recurrance defined for each item corroborated by at least two independent reliable sources with recent updates.
   - 0.85-0.99: Special has price or discount type, food or drink item, and clear determination of day/time/recurrance defined for each item corroborated by only one reliable source with recent updates.
-  - 0.70-0.84: Slight ambiguity of one of: (price or discount type, food or drink item, day/time/recurrance, start or end time is missing on special that is not all-day) or source is questionable
+  - 0.70-0.84: Slight ambiguity of one of: (price or discount type, food or drink item, day/time/recurrance, start or end time is missing on special that is not all-day) or source is questionable/third-party
   - 0.40-0.69: Ambiguity of two of: (price or discount type, food or drink item, or day/time/recurrance, start or end time is missing on special that is not all-day)
   - 0.10-0.39: stale or weak evidence (old posts, indirect mentions, third-party reposts without confirmation).
 
@@ -41,6 +46,10 @@ Final review:
   - Food or drink item missing from description field
   - days_of_week field is missing
   - all_day = N and start_time or end_time is missing
+  - Source is not for correct location
+- Review the parsed specials and split based on the following grouping rules:
+  - Each item should be its own special (Ex: $2 off beers, $5 wings, $2 off appetizers should be three separate specials)
+  - BUT when multiple items share the same price or discount, day, and time range, group them into a single special by combining the item names into one description (e.g., "$2 Miller Lite, Bud Light, and White Claw").
 
 Only include items when a concrete source URL is available. Only include items that are an actual discount - don't just include events without a food or drink discount.
 Return ONLY valid JSON. No explanations.
