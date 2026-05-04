@@ -250,7 +250,8 @@ def publish_special_candidate_run(cursor, bar_id: int, run_id: int, auto_publish
         {
             row['candidate_id']
             for row in candidate_rows
-            if row.get('candidate_id') and str(row.get('match_status') or '').upper() == 'MATCHED'
+            if row.get('candidate_id')
+            and str(row.get('match_status') or '').upper() in {'MATCHED', 'AUTO_MATCHED'}
         }
     )
     confirmed_match_by_candidate = {}
