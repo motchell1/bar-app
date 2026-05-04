@@ -37,6 +37,8 @@ FOOD_DRINK_CLUES = (
     'food', 'drink', 'beer', 'wine', 'cocktail', 'draft', 'shot', 'margarita',
     'burger', 'wings', 'taco', 'pizza', 'app', 'appetizer', 'fries', 'nachos'
 )
+WEB_AI_SEARCH_TIMEOUT_SECONDS = int(os.environ.get('WEB_AI_SEARCH_TIMEOUT_SECONDS', '30'))
+WEB_AI_SEARCH_TIMEOUT_RETRIES = 1
 
 
 PROMPTS_DIR = os.path.dirname(__file__)
@@ -461,7 +463,7 @@ def build_search_prompt(bar_name, neighborhood):
 
 
 
-def call_openai(payload):
+def call_openai(payload, timeout_seconds=45):
     if not OPENAI_API_KEY:
         raise RuntimeError('OPENAI_API_KEY is required')
 
@@ -478,7 +480,7 @@ def call_openai(payload):
         payload.get('tools', []),
         input_chars
     )
-    response = requests.post(OPENAI_RESPONSES_URL, headers=headers, json=payload, timeout=45)
+    response = requests.post(OPENAI_RESPONSES_URL, headers=headers, json=payload, timeout=timeout_seconds)
     response.raise_for_status()
     elapsed = time.perf_counter() - started_at
     LOGGER.info('OpenAI Responses API call completed in %.2fs', elapsed)
@@ -702,6 +704,7 @@ def generate_from_search(bar_name, neighborhood):
     stats = {
         'web_ai_search_prompt_char_count': 0,
         'web_ai_search_attempted': 'N',
+        'web_ai_search_timeout_failed': 'N',
     }
     started_at = time.perf_counter()
     LOGGER.info('Starting direct web_search flow bar_name=%s neighborhood=%s', bar_name, neighborhood)
@@ -714,7 +717,34 @@ def generate_from_search(bar_name, neighborhood):
         'temperature': 0
     }
     stats['web_ai_search_attempted'] = 'Y'
-    raw_response = call_openai(payload)
+    attempts = WEB_AI_SEARCH_TIMEOUT_RETRIES + 1
+    raw_response = None
+    for attempt in range(1, attempts + 1):
+        try:
+            raw_response = call_openai(payload, timeout_seconds=WEB_AI_SEARCH_TIMEOUT_SECONDS)
+            break
+        except requests.exceptions.Timeout:
+            if attempt < attempts:
+                LOGGER.warning(
+                    'OpenAI web_search timed out after %ss for bar_name=%s (attempt %d/%d); retrying once',
+                    WEB_AI_SEARCH_TIMEOUT_SECONDS,
+                    bar_name,
+                    attempt,
+                    attempts
+                )
+            else:
+                LOGGER.exception(
+                    'OpenAI web_search timed out after %ss for bar_name=%s on final attempt (%d/%d)',
+                    WEB_AI_SEARCH_TIMEOUT_SECONDS,
+                    bar_name,
+                    attempt,
+                    attempts
+                )
+                stats['web_ai_search_timeout_failed'] = 'Y'
+                return [], stats
+
+    if raw_response is None:
+        return [], stats
     raw_text = extract_output_text(raw_response)
     items = parse_json_array(raw_text)
 
@@ -754,6 +784,7 @@ def lambda_handler(event, context):
         inserted_count = 0
         runs_created = 0
         auto_published_runs = 0
+        timeout_skipped_bars = 0
 
         if parsed_event['mode'] == 'bars':
             bars = parsed_event['bars']
@@ -804,7 +835,16 @@ def lambda_handler(event, context):
                 search_stats = {
                     'web_ai_search_prompt_char_count': 0,
                     'web_ai_search_attempted': 'N',
+                    'web_ai_search_timeout_failed': 'N',
                 }
+
+            if search_stats.get('web_ai_search_timeout_failed') == 'Y' and not specials:
+                timeout_skipped_bars += 1
+                LOGGER.warning(
+                    'Skipping candidate run creation for bar_name=%s due to repeated web_search timeout',
+                    bar_name
+                )
+                continue
             bar_candidates = []
             bar_crawl_specials_count = 0
             bar_web_ai_search_specials_count = 0
@@ -902,6 +942,7 @@ def lambda_handler(event, context):
                 'web_ai_search_specials': web_ai_search_specials_count,
                 'candidate_runs_created': runs_created,
                 'candidate_runs_auto_published': auto_published_runs,
+                'bars_skipped_due_to_web_ai_timeout': timeout_skipped_bars,
                 'data_audit_invoked': data_audit_invoked,
                 'data_audit_error': data_audit_error,
             })
