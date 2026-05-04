@@ -1102,6 +1102,27 @@ def get_all_specials(cursor):
     )
     special_rows = cursor.fetchall()
     special_ids = [row.get('special_id') for row in special_rows if row.get('special_id')]
+    matched_candidate_count_by_special = {}
+
+    if special_ids:
+        placeholders = ','.join(['%s'] * len(special_ids))
+        cursor.execute(
+            f"""
+            SELECT
+                scsm.special_id,
+                COUNT(DISTINCT scsm.special_candidate_id) AS matched_candidate_count
+            FROM special_candidate_special_match scsm
+            WHERE scsm.special_id IN ({placeholders})
+            GROUP BY scsm.special_id
+            """,
+            special_ids,
+        )
+        for row in cursor.fetchall():
+            special_id = row.get('special_id')
+            if not special_id:
+                continue
+            matched_candidate_count_by_special[special_id] = int(row.get('matched_candidate_count') or 0)
+
     candidate_rows_by_special = {}
     if special_ids:
         placeholders = ','.join(['%s'] * len(special_ids))
@@ -1187,7 +1208,7 @@ def get_all_specials(cursor):
                 'special_candidate_ids_csv': ','.join(
                     [str(candidate.get('special_candidate_id')) for candidate in candidate_rows if candidate.get('special_candidate_id')]
                 ),
-                'matched_candidate_count': len(candidate_rows),
+                'matched_candidate_count': matched_candidate_count_by_special.get(special_id, 0),
             }
         )
 
