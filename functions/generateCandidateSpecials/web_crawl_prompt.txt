@@ -50,10 +50,13 @@ Normalization rules:
 - "Daily" → all 7 days
 - "Weekdays" → MON–FRI
 - If no time is given → all_day = "Y"
+- Grouping:
+  - Each item should be its own special (Ex: $2 off beers, $5 wings, $2 off appetizers should be three separate specials)
+  - BUT when multiple items share the same price or discount, day, and time range, group them into a single special by combining the item names into one description (e.g., "$2 Miller Lite, Bud Light, and White Claw").
 - Classify type:
   - drinks/alcohol → "drink"
   - food/appetizers → "food"
-  - food and drink → "combo"
+  - If the special implies both types of items must be ordered for the total price of the deal, assign the type as "combo"  (Ex: two tacos and a margarita for $12)
 - Review the parsed special description/timing and rescore confidence based on inclusion of the following elements:
   - Price or discount amount
   - Food or drink item
@@ -66,6 +69,14 @@ Normalization rules:
   - Food or drink item
   - Day of week
   - All_day = N and start_time or end_time is missing
+
+Final check:
+- After formulating specials, consolidate using the following logic:
+  - Each item should be its own special (Ex: $2 off beers, $5 wings, $2 off appetizers should be three separate specials)
+  - BUT when multiple items share the same price or discount, day, and time range, group them into a single special by combining the item names into one description (e.g., "$2 Miller Lite, Bud Light, and White Claw").
+  - Ensure special type is still accurate for each parsed special
+- Ensure there are no duplicated specials sent in the response
+  - Criteria for duplicate: matching description, days_of_week, all_day, start_time, end_time
 
 Return ONLY valid JSON (an array). No explanations.
 
