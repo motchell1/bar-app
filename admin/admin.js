@@ -400,7 +400,7 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
 
       const row = grouped.get(key);
       row.specials.push(special);
-      row.matched_candidate_count += Number(special.matched_candidate_count || 0);
+      row.matched_candidate_count = Math.max(row.matched_candidate_count, Number(special.matched_candidate_count || 0));
       row.missed_run_count = Math.max(row.missed_run_count, Number(special.missed_run_count || 0));
       row.daySet.add(normalizeDay(special.day_of_week));
 
@@ -420,6 +420,7 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
     return [...grouped.values()]
       .map((row) => ({
         ...row,
+        matched_candidate_count: row.matched_candidate_count,
         days_of_week: sortDays([...row.daySet]),
         representative_special_id: row.specials[0]?.special_id
       }))
