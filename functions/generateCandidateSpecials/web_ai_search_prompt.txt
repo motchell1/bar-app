@@ -26,8 +26,10 @@ Normalization rules:
 - "Weekdays" → MON–FRI
 - If no time is given → all_day = "Y"
 - Grouping:
-  - Each item should be its own special (Ex: $2 off beers, $5 wings, $2 off appetizers should be three separate specials)
-  - BUT when multiple items share the same price or discount, day, and time range, group them into a single special by combining the item names into one description (e.g., "$2 Miller Lite, Bud Light, and White Claw").
+  - Each distinct offer should be its own special by default.
+  - EXCEPTION (must override default split): when multiple items share the same type, price/discount, day, and time range, group them into a single special by combining item names into one description (e.g., "$2 Miller Lite, Bud Light, and White Claw").
+  - Combo exception: if one offer is a bundled total-price food+drink deal (e.g., two tacos and a margarita for $12), keep it as one special with type "combo" (do not split).
+  - If a section/header provides a shared price (e.g., "$12 Cocktails ..."), inherit that price into each listed item before split/merge decisions, and keep that price in description.
 - Classify type:
   - drinks/alcohol → "drink"
   - food/appetizers → "food"
@@ -45,11 +47,12 @@ Final review (must do in order):
 - Split text into one candidate per distinct offer clause. Distinct offer clauses are usually separated by commas, bullets, slashes, semicolons, line breaks, "and", or "&" when each clause has its own price/discount.
 - If a single description contains multiple different prices/discounts (example: "$7 ..., $9 ..., $27 ..."), this is invalid and MUST be split into multiple specials.
 2) Merge pass:
-- Merge ONLY candidates that have identical: (price/discount amount), (days_of_week), (all_day), (start_time), and (end_time).
-- Never merge candidates with different price/discount amounts.
+- Merge ONLY candidates that have identical: (type), (price/discount amount), (days_of_week), (all_day), (start_time), and (end_time).
+- Never merge candidates with different types or different price/discount amounts.
 3) Output integrity checks:
 - Every special description must contain exactly one price/discount amount unless it is a same-price grouped list (example: "$7 House Margarita, Frozen Margarita, Skinny Margarita").
 - Reject merged descriptions that mix different prices.
+- For grouped same-price lists, include the shared price once at the start of description (e.g., "$12 cocktails: A, B, C").
 
 Final confidence guardrails:
 - If one of the following is true, score confidence .4 or less:
