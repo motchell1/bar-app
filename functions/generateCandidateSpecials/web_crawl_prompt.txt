@@ -63,6 +63,7 @@ Normalization rules:
   - Clear determination of day/time/recurrance for each item
   - If a price or discount is visible in the source text but missing from description, fix the description.
   - If a special is not all-day and the start time or end time is missing, lower the confidence
+  - Exception: do not lower confidence when end_time is missing but the source clearly indicates the special runs until close/closing (treat missing end_time as closing time for that day).
   - Omit labels such as "happy hour" or time descriptors from description and keep only the actual offer details in the description.
 - If one of the following are missing from the parsed description, score confidence .5 or less:
   - Price or discount amount
