@@ -75,8 +75,10 @@ Final check:
   - Each item should be its own special (Ex: $2 off beers, $5 wings, $2 off appetizers should be three separate specials)
   - BUT when multiple items share the same price or discount, day, and time range, group them into a single special by combining the item names into one description (e.g., "$2 Miller Lite, Bud Light, and White Claw").
   - Ensure special type is still accurate for each parsed special
-- Ensure there are no duplicated specials sent in the response
-  - Criteria for duplicate: matching description, days_of_week, all_day, start_time, end_time
+- Ensure there are no duplicated specials sent in the response.
+  - Criteria for duplicate: matching description, type, days_of_week, all_day, start_time, end_time, and source_url.
+  - Do not emit duplicate candidates even as low-confidence entries; keep only one copy (the most complete version) and remove all others before returning JSON.
+  - Notes must explain extraction confidence only; never mention that an item is repeated or a duplicate.
 
 Return ONLY valid JSON (an array). No explanations.
 
