@@ -1331,7 +1331,7 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
           : '';
 
 
-        const showOverrideMatchAction = matchStatus === 'MATCHED';
+        const showOverrideMatchAction = matchStatus === 'MATCHED' || matchStatus === 'AUTO_MATCHED';
         return `
           <article class="admin-candidate-card" data-candidate-id="${candidateId}">
             ${(isEditing || isReadOnlyCandidate) ? '' : `
