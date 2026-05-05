@@ -10,7 +10,7 @@ STRICT RULES:
 
 For each special, return:
 - description (string; omit labels such as "happy hour" / "HH" and keep only the actual offer details)
-- type ("food", "drink",  or "unknown")
+- type ("food", "drink", "combo", or "unknown")
 - days_of_week (array of MON, TUE, WED, THU, FRI, SAT, SUN)
 - start_time (HH:MM 24-hour or null)
 - end_time (HH:MM 24-hour or null)
@@ -40,16 +40,24 @@ Normalization rules:
   - 0.40-0.69: Ambiguity of two of: (price or discount type, food or drink item, or day/time/recurrance, start or end time is missing on special that is not all-day)
   - 0.10-0.39: stale or weak evidence (old posts, indirect mentions, third-party reposts without confirmation).
 
-Final review:
+Final review (must do in order):
+1) Split pass:
+- Split text into one candidate per distinct offer clause. Distinct offer clauses are usually separated by commas, bullets, slashes, semicolons, line breaks, "and", or "&" when each clause has its own price/discount.
+- If a single description contains multiple different prices/discounts (example: "$7 ..., $9 ..., $27 ..."), this is invalid and MUST be split into multiple specials.
+2) Merge pass:
+- Merge ONLY candidates that have identical: (price/discount amount), (days_of_week), (all_day), (start_time), and (end_time).
+- Never merge candidates with different price/discount amounts.
+3) Output integrity checks:
+- Every special description must contain exactly one price/discount amount unless it is a same-price grouped list (example: "$7 House Margarita, Frozen Margarita, Skinny Margarita").
+- Reject merged descriptions that mix different prices.
+
+Final confidence guardrails:
 - If one of the following is true, score confidence .4 or less:
   - Price or discount amount missing from description field
   - Food or drink item missing from description field
   - days_of_week field is missing
   - all_day = N and start_time or end_time is missing
   - Source is not for correct location
-- Review the parsed specials and split based on the following grouping rules:
-  - Each item should be its own special (Ex: $2 off beers, $5 wings, $2 off appetizers should be three separate specials)
-  - BUT when multiple items share the same price or discount, day, and time range, group them into a single special by combining the item names into one description (e.g., "$2 Miller Lite, Bud Light, and White Claw").
 
 Only include items when a concrete source URL is available. Only include items that are an actual discount - don't just include events without a food or drink discount.
 Return ONLY valid JSON. No explanations.
