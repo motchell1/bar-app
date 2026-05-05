@@ -471,12 +471,6 @@ def insert_special_candidate(cursor, run: Dict, candidates: List[Dict]) -> Dict[
                     continue
                 if candidate_end != special_end:
                     continue
-                candidate_missing_end_time_filled_from_close = (
-                    _normalize_yn_flag(candidate.get('all_day')) == 'N'
-                    and not _normalize_time_value(candidate.get('end_time'))
-                    and bool(_normalize_time_value(open_hours_lookup.get(special_day, {}).get('close_time')))
-                    and candidate_end == _normalize_time_value(open_hours_lookup.get(special_day, {}).get('close_time'))
-                )
                 fuzzy_description_match_score = _description_match_score(
                     candidate.get('description'),
                     special.get('description'),
@@ -487,7 +481,6 @@ def insert_special_candidate(cursor, run: Dict, candidates: List[Dict]) -> Dict[
                     'special_id': special['special_id'],
                     'day_of_week': _normalize_day_of_week(special.get('day_of_week')),
                     'score': fuzzy_description_match_score,
-                    'missing_end_filled_from_close': candidate_missing_end_time_filled_from_close,
                 })
                 cursor.execute(
                     """
@@ -501,16 +494,7 @@ def insert_special_candidate(cursor, run: Dict, candidates: List[Dict]) -> Dict[
             match_status = 'MATCHED_REJECT'
         elif possible_matches:
             top_score = max(match.get('score', 0.0) for match in possible_matches)
-            single_match_missing_end_filled_from_close = (
-                len(possible_matches) == 1 and bool(possible_matches[0].get('missing_end_filled_from_close'))
-            )
-            can_auto_match = (
-                len(possible_matches) == 1
-                and (
-                    top_score >= SPECIAL_CANDIDATE_SPECIAL_MATCH_DESC_AUTO_MATCH_THRESHOLD
-                    or single_match_missing_end_filled_from_close
-                )
-            )
+            can_auto_match = len(possible_matches) == 1 and top_score >= SPECIAL_CANDIDATE_SPECIAL_MATCH_DESC_AUTO_MATCH_THRESHOLD
 
             if not can_auto_match and normalized_candidate_days:
                 matches_by_day = {day: [] for day in normalized_candidate_days}
