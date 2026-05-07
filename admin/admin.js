@@ -1318,7 +1318,7 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
                     <p><strong>Start Time:</strong> ${matched.start_time || '—'}</p>
                     <p><strong>End Time:</strong> ${matched.end_time || '—'}</p>
                     <p><strong>Type:</strong> ${matched.type || '—'}</p>
-                    <p><strong>Matched Candidates:</strong> ${special.matched_candidate_count ?? 0}</p>
+                    <p><strong>Matched Candidates:</strong> ${matched.matched_candidate_count ?? 0}</p>
                     <p><strong>Insert Date:</strong> ${formatDateTime(matched.insert_date)}</p>
                     <p><strong>Update Date:</strong> ${formatDateTime(matched.update_date)}</p>
                     ${(matchStatus === 'MATCH_PENDING')
