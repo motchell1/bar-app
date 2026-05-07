@@ -418,6 +418,20 @@ def get_unapproved_special_candidates(cursor):
             scr.run_id,
             scr.bar_id,
             b.name AS bar_name,
+            (
+                SELECT COUNT(*)
+                FROM (
+                    SELECT 1
+                    FROM special s_active
+                    WHERE s_active.bar_id = scr.bar_id
+                        AND s_active.is_active = 'Y'
+                    GROUP BY
+                        s_active.description,
+                        s_active.all_day,
+                        s_active.start_time,
+                        s_active.end_time
+                ) deduped_active_specials
+            ) AS active_special_count,
             scr.total_candidates,
             scr.auto_approved_candidates,
             scr.web_crawl_candidates,
@@ -476,6 +490,7 @@ def get_unapproved_special_candidates(cursor):
                 'run_id': run_id,
                 'bar_id': row.get('bar_id'),
                 'bar_name': row.get('bar_name'),
+                'active_special_count': row.get('active_special_count'),
                 'neighborhood': row.get('neighborhood'),
                 'total_candidates': row.get('total_candidates'),
                 'auto_approved_candidates': row.get('auto_approved_candidates'),
@@ -554,10 +569,42 @@ def get_unapproved_special_candidates(cursor):
                     'is_active': row.get('is_active'),
                 }
             )
+    matched_special_ids = sorted(
+        {
+            match.get('special_id')
+            for matches in match_lookup.values()
+            for match in matches
+            if match.get('special_id')
+        }
+    )
+    matched_candidate_count_by_special = {}
+    if matched_special_ids:
+        placeholders = ','.join(['%s'] * len(matched_special_ids))
+        cursor.execute(
+            f"""
+            SELECT
+                scsm.special_id,
+                COUNT(DISTINCT scsm.special_candidate_id) AS matched_candidate_count
+            FROM special_candidate_special_match scsm
+            WHERE scsm.special_id IN ({placeholders})
+            GROUP BY scsm.special_id
+            """,
+            matched_special_ids,
+        )
+        for row in cursor.fetchall():
+            special_id = row.get('special_id')
+            if not special_id:
+                continue
+            matched_candidate_count_by_special[special_id] = int(row.get('matched_candidate_count') or 0)
+
     for run in grouped_runs.values():
         for special in run.get('specials', []):
             candidate_id = special.get('special_candidate_id')
-            special['matched_specials'] = match_lookup.get(candidate_id, [])
+            matched_specials = match_lookup.get(candidate_id, [])
+            for matched_special in matched_specials:
+                special_id = matched_special.get('special_id')
+                matched_special['matched_candidate_count'] = matched_candidate_count_by_special.get(special_id, 0)
+            special['matched_specials'] = matched_specials
 
     runs = list(grouped_runs.values())
     not_approved_count = sum(
