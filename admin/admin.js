@@ -1318,6 +1318,7 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
                     <p><strong>Start Time:</strong> ${matched.start_time || '—'}</p>
                     <p><strong>End Time:</strong> ${matched.end_time || '—'}</p>
                     <p><strong>Type:</strong> ${matched.type || '—'}</p>
+                    <p><strong>Matched Candidates:</strong> ${special.matched_candidate_count ?? 0}</p>
                     <p><strong>Insert Date:</strong> ${formatDateTime(matched.insert_date)}</p>
                     <p><strong>Update Date:</strong> ${formatDateTime(matched.update_date)}</p>
                     ${(matchStatus === 'MATCH_PENDING')
@@ -1341,7 +1342,6 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
             `}
             <h4>${isEditing ? 'Editing Special Candidate' : (special.description || 'No description')}</h4>
             <p><strong>Special Candidate ID:</strong> ${special.special_candidate_id ?? '—'}</p>
-            <p><strong>Status:</strong> ${special.approval_status || 'NOT_APPROVED'}</p>
             <p><strong>Description:</strong> ${editableValue('description')}</p>
             <p><strong>Type:</strong> ${editableValue('type')}</p>
             <p><strong>Days:</strong> ${editableValue('days_of_week', '—')}</p>
@@ -1352,6 +1352,7 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
             <p><strong>Method:</strong> ${special.fetch_method || '—'}</p>
             <p><strong>Source:</strong> ${getSourceMarkup(special.source)}</p>
             <p><strong>Notes:</strong> ${special.notes || '—'}</p>
+            <p><strong>Approval Status:</strong> ${special.approval_status || 'NOT_APPROVED'}</p>
             <p><strong>Match Status:</strong> ${special.match_status || 'NOT_MATCHED'}</p>
             ${matchedSpecialsMarkup}
             ${isReadOnlyCandidate
@@ -1389,6 +1390,7 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
           </div>
           <p><strong>Neighborhood:</strong> ${run.neighborhood || '—'}</p>
           <p><strong>Bar ID:</strong> ${run.bar_id ?? '—'}</p>
+          <p><strong>Current Active Specials:</strong> ${run.active_special_count ?? 0}</p>
           <p><strong>Total candidates:</strong> ${run.total_candidates ?? '—'}</p>
           <p><strong>Auto Approved Candidates:</strong> ${run.auto_approved_candidates ?? '—'}</p>
           <p><strong>Started:</strong> ${formatDateTime(run.started_at)}</p>

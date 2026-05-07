@@ -418,6 +418,12 @@ def get_unapproved_special_candidates(cursor):
             scr.run_id,
             scr.bar_id,
             b.name AS bar_name,
+            (
+                SELECT COUNT(*)
+                FROM special s_active
+                WHERE s_active.bar_id = scr.bar_id
+                    AND s_active.is_active = 'Y'
+            ) AS active_special_count,
             scr.total_candidates,
             scr.auto_approved_candidates,
             scr.web_crawl_candidates,
@@ -476,6 +482,7 @@ def get_unapproved_special_candidates(cursor):
                 'run_id': run_id,
                 'bar_id': row.get('bar_id'),
                 'bar_name': row.get('bar_name'),
+                'active_special_count': row.get('active_special_count'),
                 'neighborhood': row.get('neighborhood'),
                 'total_candidates': row.get('total_candidates'),
                 'auto_approved_candidates': row.get('auto_approved_candidates'),
