@@ -20,7 +20,6 @@ WEB_SCRAPE_AUTO_APPROVAL_THRESHOLD = 1
 WEB_AI_SEARCH_AUTO_APPROVAL_THRESHOLD = 1
 SPECIAL_CANDIDATE_SPECIAL_MATCH_DESC_FLOOR_THRESHOLD = float(os.environ.get('SPECIAL_CANDIDATE_SPECIAL_MATCH_DESC_FLOOR_THRESHOLD', '0.78'))
 SPECIAL_CANDIDATE_SPECIAL_MATCH_DESC_AUTO_MATCH_THRESHOLD = float(os.environ.get('SPECIAL_CANDIDATE_SPECIAL_MATCH_DESC_AUTO_MATCH_THRESHOLD', '0.9'))
-SPECIAL_CANDIDATE_SPECIAL_MATCH_CONFIDENCE_AUTO_APPROVAL_THRESHOLD = float(os.environ.get('SPECIAL_CANDIDATE_SPECIAL_MATCH_CONFIDENCE_AUTO_APPROVAL_THRESHOLD', '0.9'))
 IGNORE_MANUAL_SPECIALS_ON_PUBLISH = 'Y'
 MISSED_RUN_DEACTIVATION_THRESHOLD = 3
 
@@ -389,15 +388,6 @@ def insert_special_candidate(cursor, run: Dict, candidates: List[Dict]) -> Dict[
                     if candidate_notes
                     else missing_day_notes_suffix.lstrip()
                 )
-        else:
-            fetch_method = (candidate.get('fetch_method') or '').strip()
-            auto_approval_threshold = WEB_AI_SEARCH_AUTO_APPROVAL_THRESHOLD if fetch_method == 'web_ai_search' else WEB_SCRAPE_AUTO_APPROVAL_THRESHOLD
-            if confidence >= auto_approval_threshold:
-                approval_status = 'AUTO_APPROVED'
-                approval_date = datetime.utcnow()
-                auto_approved_count += 1
-            else:
-                needs_approval_count += 1
 
         cursor.execute(
             """
@@ -517,14 +507,27 @@ def insert_special_candidate(cursor, run: Dict, candidates: List[Dict]) -> Dict[
             if can_auto_match:
                 matched_special_ids = [match['special_id'] for match in possible_matches]
                 match_status = 'AUTO_MATCHED'
-                if approval_status == 'NOT_APPROVED' and confidence >= SPECIAL_CANDIDATE_SPECIAL_MATCH_CONFIDENCE_AUTO_APPROVAL_THRESHOLD:
-                    approval_status = 'AUTO_APPROVED'
-                    approval_date = datetime.utcnow()
-                    auto_approved_count += 1
-                    needs_approval_count = max(0, needs_approval_count - 1)
             else:
                 match_status = 'MATCH_PENDING'
                 matched_special_ids = [match['special_id'] for match in possible_matches]
+
+        if not is_rejected_candidate and approval_status == 'NOT_APPROVED':
+            fetch_method = (candidate.get('fetch_method') or '').strip()
+            auto_approval_threshold = (
+                WEB_AI_SEARCH_AUTO_APPROVAL_THRESHOLD
+                if fetch_method == 'web_ai_search'
+                else WEB_SCRAPE_AUTO_APPROVAL_THRESHOLD
+            )
+            can_auto_approve = (
+                match_status in {'NOT_MATCHED', 'AUTO_MATCHED'}
+                and confidence >= auto_approval_threshold
+            )
+            if can_auto_approve:
+                approval_status = 'AUTO_APPROVED'
+                approval_date = datetime.utcnow()
+                auto_approved_count += 1
+            else:
+                needs_approval_count += 1
 
         cursor.execute(
             """

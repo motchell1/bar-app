@@ -16,6 +16,8 @@ RDS_HOST = os.environ['RDS_HOST']
 DB_USER = os.environ['DB_USER']
 DB_PASSWORD = os.environ['DB_PASSWORD']
 DB_NAME = os.environ['DB_NAME']
+WEB_SCRAPE_AUTO_APPROVAL_THRESHOLD = 1
+WEB_AI_SEARCH_AUTO_APPROVAL_THRESHOLD = 1
 IGNORE_MANUAL_SPECIALS_ON_PUBLISH = 'Y'
 MISSED_RUN_DEACTIVATION_THRESHOLD = 3
 
@@ -1709,7 +1711,7 @@ def confirm_special_candidate_match(cursor, special_candidate_id: int, special_i
 
     cursor.execute(
         """
-        SELECT special_candidate_id, approval_status
+        SELECT special_candidate_id, approval_status, confidence, fetch_method
         FROM special_candidate
         WHERE special_candidate_id = %s
         """,
@@ -1741,13 +1743,35 @@ def confirm_special_candidate_match(cursor, special_candidate_id: int, special_i
         [special_candidate_id, *normalized_special_ids],
     )
 
+    approval_status = candidate.get('approval_status')
+    approval_date_clause = ''
+    approval_update_params = []
+    if str(approval_status or '').upper() == 'NOT_APPROVED':
+        fetch_method = str(candidate.get('fetch_method') or '').strip().lower()
+        auto_approval_threshold = (
+            WEB_AI_SEARCH_AUTO_APPROVAL_THRESHOLD
+            if fetch_method == 'web_ai_search'
+            else WEB_SCRAPE_AUTO_APPROVAL_THRESHOLD
+        )
+        confidence_value = candidate.get('confidence')
+        confidence = float(confidence_value) if isinstance(confidence_value, (int, float, Decimal, str)) and str(confidence_value).strip() else 0.0
+        if confidence >= auto_approval_threshold:
+            approval_status = 'AUTO_APPROVED'
+            approval_date_clause = ", approval_date = NOW()"
+            approval_update_params.append(approval_status)
+
     cursor.execute(
         """
         UPDATE special_candidate
         SET match_status = 'MATCHED'
+            {approval_date_clause}
+            {approval_status_clause}
         WHERE special_candidate_id = %s
-        """,
-        (special_candidate_id,),
+        """.format(
+            approval_date_clause=approval_date_clause,
+            approval_status_clause=", approval_status = %s" if approval_update_params else "",
+        ),
+        [*approval_update_params, special_candidate_id],
     )
 
     cursor.execute(
@@ -1763,7 +1787,7 @@ def confirm_special_candidate_match(cursor, special_candidate_id: int, special_i
         'special_candidate_id': special_candidate_id,
         'special_ids': normalized_special_ids,
         'match_status': 'MATCHED',
-        'approval_status': candidate.get('approval_status'),
+        'approval_status': approval_status,
     }
 
 def _parse_event_payload(event):
