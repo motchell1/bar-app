@@ -602,6 +602,26 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
     }
   }
 
+  async function unmatchCandidate(specialCandidateId) {
+    state.updatingCandidateId = specialCandidateId;
+    state.errorMessage = '';
+    render();
+
+    try {
+      await callAdminSync({
+        mode: 'unmatch_special_candidate',
+        special_candidate_id: specialCandidateId
+      });
+      await loadUnapprovedSpecials();
+    } catch (err) {
+      console.error('Failed to unmatch candidate:', err);
+      state.errorMessage = err?.message || 'Failed to unmatch candidate.';
+    } finally {
+      state.updatingCandidateId = null;
+      render();
+    }
+  }
+
   async function saveCandidateUpdates(payload) {
     state.savingCandidate = true;
     state.errorMessage = '';
@@ -1323,7 +1343,9 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
                     <p><strong>Update Date:</strong> ${formatDateTime(matched.update_date)}</p>
                     ${(matchStatus === 'MATCH_PENDING')
                       ? `<button class="admin-secondary-btn" type="button" data-candidate-action="confirm-match" data-candidate-id="${candidateId}" data-special-ids="${escapeAttribute((matched.special_ids && matched.special_ids.length ? matched.special_ids : [matched.special_id]).filter((specialId) => specialId !== undefined && specialId !== null).join(','))}" ${isUpdating ? 'disabled' : ''}>Confirm Match</button>`
-                      : ''}
+                      : (matchStatus === 'MATCHED'
+                        ? `<button class="admin-secondary-btn" type="button" data-candidate-action="unmatch" data-candidate-id="${candidateId}" ${isUpdating ? 'disabled' : ''}>Unmatch</button>`
+                        : '')}
                   </article>
                 `).join('')}
               </div>
@@ -1598,6 +1620,11 @@ const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-e
             .filter(Boolean);
           if (!specialIds.length) return;
           await confirmCandidateMatch(candidateId, specialIds);
+          return;
+        }
+
+        if (action === 'unmatch') {
+          await unmatchCandidate(candidateId);
           return;
         }
 
