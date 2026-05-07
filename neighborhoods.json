@@ -22,17 +22,36 @@
     "neighborhood_name": "Bloomfield",
     "search_rectangles": [
       {
-        "low": { "lat": 40.450800, "lng": -79.9588622 },
+        "low": { "lat": 40.448800, "lng": -79.9588622 },
         "high": { "lat": 40.466682, "lng": -79.933446 }
       }
     ],
     "polygon": [
       { "lat": 40.465381, "lng": -79.958190 },
-      { "lat": 40.452653, "lng": -79.949633 },
+      { "lat": 40.448950, "lng": -79.951450 },
       { "lat": 40.456556, "lng": -79.936496 },
       { "lat": 40.464807, "lng": -79.935179 },
       { "lat": 40.466688, "lng": -79.952023 },
       { "lat": 40.465381, "lng": -79.958190 }
+    ]
+  },
+  "east liberty": {
+    "neighborhood_name": "East Liberty",
+    "search_rectangles": [
+      {
+        "low": { "lat": 40.4490, "lng": -79.9635 },
+        "high": { "lat": 40.4888, "lng": -79.9075 }
+      }
+    ],
+    "polygon": [
+      { "lat": 40.4542, "lng": -79.9628 },
+      { "lat": 40.4688, "lng": -79.9586 },
+      { "lat": 40.4883, "lng": -79.9325 },
+      { "lat": 40.4850, "lng": -79.9167 },
+      { "lat": 40.4726, "lng": -79.9078 },
+      { "lat": 40.4525, "lng": -79.9221 },
+      { "lat": 40.4514, "lng": -79.9496 },
+      { "lat": 40.4542, "lng": -79.9628 }
     ]
   },
   "downtown": {
@@ -131,6 +150,41 @@
       { "lat": 40.435042, "lng": -79.966763 }
     ]
   },
+  "mount washington": {
+    "neighborhood_name": "Mount Washington",
+    "search_rectangles": [
+      {
+        "low": { "lat": 40.4208, "lng": -80.0224 },
+        "high": { "lat": 40.4395, "lng": -79.9950 }
+      }
+    ],
+    "polygon": [
+      { "lat": 40.4389, "lng": -80.0199 },
+      { "lat": 40.4393, "lng": -80.0037 },
+      { "lat": 40.4324, "lng": -79.9952 },
+      { "lat": 40.4220, "lng": -80.0032 },
+      { "lat": 40.4234, "lng": -80.0198 },
+      { "lat": 40.4389, "lng": -80.0199 }
+    ]
+  },
+  "northside": {
+    "neighborhood_name": "Northside",
+    "search_rectangles": [
+      {
+        "low": { "lat": 40.4465, "lng": -80.0405 },
+        "high": { "lat": 40.4658, "lng": -79.9910 }
+      }
+    ],
+    "polygon": [
+      { "lat": 40.4480, "lng": -80.0390 },
+      { "lat": 40.4609, "lng": -80.0342 },
+      { "lat": 40.4653, "lng": -80.0174 },
+      { "lat": 40.4638, "lng": -80.0010 },
+      { "lat": 40.4529, "lng": -79.9920 },
+      { "lat": 40.4469, "lng": -80.0106 },
+      { "lat": 40.4480, "lng": -80.0390 }
+    ]
+  },
     "south side": {
       "neighborhood_name": "South Side",
       "search_rectangles": [
@@ -163,6 +217,41 @@
         { "lat": 40.460928, "lng": -79.96750 },
         { "lat": 40.443709, "lng": -79.99268 },
         { "lat": 40.446820, "lng": -79.99539 }
+      ]
+    },
+    "shadyside": {
+      "neighborhood_name": "Shadyside",
+      "search_rectangles": [
+        {
+          "low": { "lat": 40.4449, "lng": -79.9448 },
+          "high": { "lat": 40.4619, "lng": -79.9192 }
+        }
+      ],
+      "polygon": [
+        { "lat": 40.4605, "lng": -79.9440 },
+        { "lat": 40.4615, "lng": -79.9298 },
+        { "lat": 40.4545, "lng": -79.9198 },
+        { "lat": 40.4460, "lng": -79.9258 },
+        { "lat": 40.4456, "lng": -79.9399 },
+        { "lat": 40.4605, "lng": -79.9440 }
+      ]
+    },
+    "squirrel hill": {
+      "neighborhood_name": "Squirrel Hill",
+      "search_rectangles": [
+        {
+          "low": { "lat": 40.4188, "lng": -79.9495 },
+          "high": { "lat": 40.4518, "lng": -79.8898 }
+        }
+      ],
+      "polygon": [
+        { "lat": 40.4508, "lng": -79.9457 },
+        { "lat": 40.4512, "lng": -79.9159 },
+        { "lat": 40.4458, "lng": -79.8899 },
+        { "lat": 40.4268, "lng": -79.8958 },
+        { "lat": 40.4189, "lng": -79.9262 },
+        { "lat": 40.4258, "lng": -79.9449 },
+        { "lat": 40.4508, "lng": -79.9457 }
       ]
     }
 }
