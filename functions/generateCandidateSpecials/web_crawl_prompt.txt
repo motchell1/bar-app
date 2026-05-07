@@ -78,7 +78,8 @@ Final review (must do in order):
 - Split text into one candidate per distinct offer clause. Distinct offer clauses are usually separated by commas, bullets, slashes, semicolons, line breaks, "and", or "&" when each clause has its own price/discount.
 - If a single description contains multipel different prices/discounts (example: "$7 ..., $9 ..., $27 ..."), this is invalid and MUST be split into multiple specials.
 2. Merge pass:
-- Merge ONLY candidate that have identical: (type), (price/discount amount), (days_of_week), (all_day), (start_time), and (end_time).
+- Merge candidates when they are the same offer (identical type, price/discount amount, all_day, start_time, and end_time) even if listed for different days.
+- When merging day-variants of the same offer, combine them into one candidate and set days_of_week to the deduplicated union of all matched days.
 - Never merge candidates with different types or different price/discount amounts.
 3. Output integrity checks:
 - Every special description must contain exactly one price/discount amount unless it is a same-price grouped list (example: "$7 House Margarita, Wine Cooler, Tequila Sunrise").
