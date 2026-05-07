@@ -420,9 +420,17 @@ def get_unapproved_special_candidates(cursor):
             b.name AS bar_name,
             (
                 SELECT COUNT(*)
-                FROM special s_active
-                WHERE s_active.bar_id = scr.bar_id
-                    AND s_active.is_active = 'Y'
+                FROM (
+                    SELECT 1
+                    FROM special s_active
+                    WHERE s_active.bar_id = scr.bar_id
+                        AND s_active.is_active = 'Y'
+                    GROUP BY
+                        s_active.description,
+                        s_active.all_day,
+                        s_active.start_time,
+                        s_active.end_time
+                ) deduped_active_specials
             ) AS active_special_count,
             scr.total_candidates,
             scr.auto_approved_candidates,
