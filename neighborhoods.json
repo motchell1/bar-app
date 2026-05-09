@@ -43,8 +43,12 @@
     "search_label": "Downtown Pittsburgh",
     "search_rectangles": [
       {
-        "low": { "lat": 40.43459, "lng": -80.01506 },
-        "high": { "lat": 40.447582, "lng": -79.991779 }
+        "low": { "lat": 40.4351, "lng": -80.002 },
+        "high": { "lat": 40.4484, "lng": -79.9939 }
+      },
+      {
+        "low": { "lat": 40.4351, "lng": -80.0085 },
+        "high": { "lat": 40.4454, "lng": -80.0 }
       }
     ],
     "polygon": [
