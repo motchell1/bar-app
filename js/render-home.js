@@ -184,19 +184,17 @@ function renderBarsWeek() {
 
     if (renderedCardsForDay.length > 0) {
       if (dayIndex === 0) {
-        const withoutActiveOrUpcoming = renderedCardsForDay.filter((entry) => !entry.hasActiveOrUpcoming);
-        const withActiveOrUpcoming = renderedCardsForDay.filter((entry) => entry.hasActiveOrUpcoming);
-
-        withoutActiveOrUpcoming.forEach((entry) => container.appendChild(entry.card));
-
-        if (withoutActiveOrUpcoming.length > 0 && withActiveOrUpcoming.length > 0) {
-          const divider = document.createElement('div');
-          divider.className = 'active-upcoming-divider';
-          container.appendChild(divider);
-          scrollTargetCard = withActiveOrUpcoming[0].card;
-        }
-
-        withActiveOrUpcoming.forEach((entry) => container.appendChild(entry.card));
+        let dividerInserted = false;
+        renderedCardsForDay.forEach((entry) => {
+          if (!dividerInserted && entry.hasActiveOrUpcoming) {
+            const divider = document.createElement('div');
+            divider.className = 'active-upcoming-divider';
+            container.appendChild(divider);
+            scrollTargetCard = entry.card;
+            dividerInserted = true;
+          }
+          container.appendChild(entry.card);
+        });
       } else {
         renderedCardsForDay.forEach((entry) => container.appendChild(entry.card));
       }

@@ -212,6 +212,55 @@ def get_ordered_day_keys(start_day_key):
     start_index = DAY_INDEX[start_day_key]
     return DAY_KEYS[start_index:] + DAY_KEYS[:start_index]
 
+
+def classify_today_bar_order(entry, specials_lookup, bar_day_hours, current_minutes):
+    special_ids = [str(sid) for sid in (entry.get('specials') or [])]
+    specials = [specials_lookup.get(sid) for sid in special_ids]
+    specials = [row for row in specials if row]
+
+    timed = [s for s in specials if not s.get('all_day')]
+    all_day = [s for s in specials if s.get('all_day')]
+
+    has_active_timed = any(s.get('current_status') == 'active' for s in timed)
+    has_upcoming_timed = any(s.get('current_status') == 'upcoming' for s in timed)
+    has_past_timed = any(s.get('current_status') == 'past' for s in timed)
+
+    timed_end_minutes = [to_minutes(s.get('end_time')) for s in timed if to_minutes(s.get('end_time')) is not None]
+    timed_start_minutes = [to_minutes(s.get('start_time')) for s in timed if to_minutes(s.get('start_time')) is not None]
+
+    open_minutes = bar_day_hours.get('open_minutes') if bar_day_hours else None
+    close_minutes = bar_day_hours.get('close_minutes') if bar_day_hours else None
+    is_open_now = bool(bar_day_hours.get('is_open_now')) if bar_day_hours else False
+    not_yet_opened = open_minutes is not None and not is_open_now and current_minutes < open_minutes
+
+    # 0: only inactive timed specials, sorted by end time
+    if timed and not all_day and not has_active_timed and not has_upcoming_timed:
+        return (0, min(timed_end_minutes) if timed_end_minutes else 10 ** 9, 10 ** 9)
+
+    # 1: past timed + all-day, or only all-day while closed, sorted by closing time
+    if (has_past_timed and all_day) or (all_day and not timed and not is_open_now and not not_yet_opened):
+        return (1, close_minutes if close_minutes is not None else 10 ** 9, 10 ** 9)
+
+    # 2: at least one active timed special, sorted by start then end
+    if has_active_timed:
+        return (
+            2,
+            min(timed_start_minutes) if timed_start_minutes else 10 ** 9,
+            min(timed_end_minutes) if timed_end_minutes else 10 ** 9
+        )
+
+    # 3: at least one upcoming timed special, or only all-day and not yet opened
+    if has_upcoming_timed or (all_day and not timed and not_yet_opened):
+        sort_start = min(timed_start_minutes) if has_upcoming_timed and timed_start_minutes else (open_minutes if open_minutes is not None else 10 ** 9)
+        sort_end = min(timed_end_minutes) if has_upcoming_timed and timed_end_minutes else (close_minutes if close_minutes is not None else 10 ** 9)
+        return (3, sort_start, sort_end)
+
+    # 4: only all-day while currently open, sorted by closing time
+    if all_day and not timed and is_open_now:
+        return (4, close_minutes if close_minutes is not None else 10 ** 9, 10 ** 9)
+
+    return (5, 10 ** 9, 10 ** 9)
+
 #Payload builder
 def build_startup_payload(device_id=None):
     conn = get_connection()
@@ -266,6 +315,7 @@ def build_startup_payload(device_id=None):
         bars_with_specials = {row['bar_id'] for row in specials if row['bar_id'] in active_bar_ids}
 
         open_hours_lookup = {}
+        bar_today_hours_meta = {}
         for row in hours:
             if row['bar_id'] not in bars_with_specials:
                 continue
@@ -284,8 +334,15 @@ def build_startup_payload(device_id=None):
             }
 
             if day_key == current_day_key and row['is_closed'] != 'Y':
+                open_minutes = to_minutes(open_time)
+                close_minutes = to_minutes(close_time)
                 if is_open_for_day(open_time, close_time, current_minutes):
                     bars_lookup.get(bar_id, {})['is_open_now'] = True
+                bar_today_hours_meta[bar_id] = {
+                    'open_minutes': open_minutes,
+                    'close_minutes': close_minutes,
+                    'is_open_now': bars_lookup.get(bar_id, {}).get('is_open_now') is True
+                }
 
         specials_lookup = {}
         specials_by_day = {day: [] for day in ordered_day_keys}
@@ -338,13 +395,26 @@ def build_startup_payload(device_id=None):
                 meta['earliest_timed_start'] = min(meta['earliest_timed_start'], start_minutes)
 
         for day_key in ordered_day_keys:
-            specials_by_day[day_key].sort(
-                key=lambda entry: (
-                    0 if day_bar_sort_meta.get(day_key, {}).get(str(entry['bar_id']), {}).get('has_timed') else 1,
-                    day_bar_sort_meta.get(day_key, {}).get(str(entry['bar_id']), {}).get('earliest_timed_start', 10 ** 9),
-                    entry['bar_id']
+            if day_key == current_day_key:
+                specials_by_day[day_key].sort(
+                    key=lambda entry: (
+                        *classify_today_bar_order(
+                            entry,
+                            specials_lookup,
+                            bar_today_hours_meta.get(str(entry['bar_id']), {}),
+                            current_minutes
+                        ),
+                        entry['bar_id']
+                    )
                 )
-            )
+            else:
+                specials_by_day[day_key].sort(
+                    key=lambda entry: (
+                        0 if day_bar_sort_meta.get(day_key, {}).get(str(entry['bar_id']), {}).get('has_timed') else 1,
+                        day_bar_sort_meta.get(day_key, {}).get(str(entry['bar_id']), {}).get('earliest_timed_start', 10 ** 9),
+                        entry['bar_id']
+                    )
+                )
 
         payload = {
             'startup_payload': {
