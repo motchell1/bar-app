@@ -1,7 +1,30 @@
 const DB_ADMIN_SYNC_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaws.com/default/dbAdminSync';
 const GENERATE_CANDIDATE_SPECIALS_API_URL = 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaws.com/default/generateCandidateSpecials';
 
+function initZoomLock() {
+  let lastTouchEnd = 0;
+
+  document.addEventListener('gesturestart', (event) => {
+    event.preventDefault();
+  }, { passive: false });
+
+  document.addEventListener('touchmove', (event) => {
+    if (event.touches.length > 1) {
+      event.preventDefault();
+    }
+  }, { passive: false });
+
+  document.addEventListener('touchend', (event) => {
+    const now = Date.now();
+    if (now - lastTouchEnd <= 300) {
+      event.preventDefault();
+    }
+    lastTouchEnd = now;
+  }, { passive: false });
+}
+
 (function initAdminPage() {
+  initZoomLock();
   const backButton = document.getElementById('admin-back-button');
   const homeButton = document.getElementById('admin-home-button');
   const titleElement = document.getElementById('admin-title');
