@@ -389,6 +389,17 @@ def insert_special_candidate(cursor, run: Dict, candidates: List[Dict]) -> Dict[
                     else missing_day_notes_suffix.lstrip()
                 )
 
+        candidate_all_day = _normalize_yn_flag(candidate.get('all_day'))
+        candidate_start = _normalize_time_value(candidate.get('start_time'))
+        candidate_end = _normalize_time_value(candidate.get('end_time'))
+        if candidate_days_raw and all(
+            _should_convert_to_all_day(day, candidate_all_day, candidate_start, candidate_end, open_hours_lookup)
+            for day in candidate_days_raw
+        ):
+            candidate_all_day = 'Y'
+            candidate_start = None
+            candidate_end = None
+
         cursor.execute(
             """
             INSERT INTO special_candidate
@@ -403,9 +414,9 @@ def insert_special_candidate(cursor, run: Dict, candidates: List[Dict]) -> Dict[
                 candidate['description'],
                 candidate['type'],
                 json.dumps(candidate.get('days_of_week', [])),
-                candidate.get('start_time'),
-                candidate.get('end_time'),
-                candidate.get('all_day'),
+                candidate_start,
+                candidate_end,
+                candidate_all_day,
                 candidate.get('is_recurring'),
                 candidate.get('date'),
                 candidate.get('fetch_method'),
