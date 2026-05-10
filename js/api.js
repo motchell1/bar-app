@@ -122,7 +122,7 @@ async function persistFavoriteChangeInBackground({ specialId = null, barId = nul
       body: JSON.stringify(payload)
     });
 
-    if (!response.ok) {
+    if (response.ok === false) {
       console.error('Failed to persist favorite change:', response.status);
     }
   } catch (err) {
