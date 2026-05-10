@@ -254,8 +254,6 @@ def classify_today_bar_order(entry, specials_lookup, bar_day_hours, current_minu
     # 3: at least one upcoming timed special, or only all-day and not yet opened
     if has_upcoming_timed or (all_day and not timed and not_yet_opened):
         if has_upcoming_timed:
-            # Keep upcoming sorting anchored to upcoming specials only. Normalize starts/ends
-            # relative to now so overnight windows still sort by nearest upcoming relevance.
             upcoming_sort_windows = []
             for special in upcoming_timed:
                 start_minutes = to_minutes(special.get('start_time'))
@@ -266,25 +264,20 @@ def classify_today_bar_order(entry, specials_lookup, bar_day_hours, current_minu
                 normalized_end = end_minutes
                 if end_minutes < start_minutes:
                     normalized_end += 24 * 60
-                    if normalized_start <= current_minutes:
-                        normalized_start += 24 * 60
-                if normalized_start <= current_minutes:
-                    normalized_start += 24 * 60
-                    normalized_end += 24 * 60
                 upcoming_sort_windows.append((normalized_start, normalized_end))
 
             if upcoming_sort_windows:
                 sort_start, sort_end = min(upcoming_sort_windows, key=lambda window: (window[0], window[1]))
             else:
-                sort_start = min(upcoming_start_minutes) if upcoming_start_minutes else (open_minutes if open_minutes is not None else 10 ** 9)
-                sort_end = min(upcoming_end_minutes) if upcoming_end_minutes else (close_minutes if close_minutes is not None else 10 ** 9)
+                sort_start = open_minutes if open_minutes is not None else 10 ** 9
+                sort_end = close_minutes if close_minutes is not None else 10 ** 9
         else:
             sort_start = open_minutes if open_minutes is not None else 10 ** 9
             sort_end = close_minutes if close_minutes is not None else 10 ** 9
         return (3, sort_start, sort_end)
 
     # 1: past timed + all-day (with no active/upcoming timed), or only all-day while closed, sorted by closing time
-    if (has_past_timed and all_day) or (all_day and not timed and not is_open_now and not not_yet_opened):
+    if (has_past_timed and all_day and not has_active_timed and not has_upcoming_timed) or (all_day and not timed and not is_open_now and not not_yet_opened):
         return (1, close_minutes if close_minutes is not None else 10 ** 9, 10 ** 9)
 
     # 4: only all-day while currently open, sorted by closing time
