@@ -759,6 +759,45 @@ test('buildSpecialItem clickable rows stop parent click handling and navigate to
   assert.equal(onClickCalled, true, 'clickable specials still execute their own navigation handler');
 });
 
+test('renderBarsWeek does not render active/upcoming divider when there are no bar cards above it', async () => {
+  const document = new DocumentMock();
+  mountBaseNodes(document);
+  const ctx = loadAppWithoutBoot(document);
+
+  vm.runInContext(`
+    startupData = {
+      bars: {
+        '2': { id: 2, name: 'Upcoming Specials Bar', neighborhood: 'Downtown', image_url: null, currently_open: true, is_open_now: true, has_special_this_week: true }
+      },
+      open_hours: {
+        '2': { MON: { display_text: '4:00 PM - 2:00 AM' } }
+      },
+      specials: {
+        '22': { bar_id: 2, description: '$6 IPA', special_type: 'drink', all_day: false, start_time: '19:00', end_time: '21:00', current_status: 'upcoming' }
+      },
+      specials_by_day: {
+        MON: [{ bar_id: 2, specials: ['22'] }],
+        TUE: [],
+        WED: [],
+        THU: [],
+        FRI: [],
+        SAT: [],
+        SUN: []
+      }
+    };
+    currentTab = 'specials';
+    activeFilters.types = [];
+    activeFilters.neighborhoods = [];
+    activeFilters.favoritesOnly = false;
+  `, ctx);
+
+  ctx.renderBarsWeek();
+  await new Promise((resolve) => setTimeout(resolve, 1));
+
+  const divider = document.querySelector('.active-upcoming-divider');
+  assert.equal(divider, null, 'does not render divider with only active/upcoming cards');
+});
+
 test('combo specials render both icons and pass food/drink type filters', () => {
   const document = new DocumentMock();
   mountBaseNodes(document);
