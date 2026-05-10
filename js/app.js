@@ -263,7 +263,10 @@ function initToolbarSingleTapScroll() {
   const toolbar = document.querySelector('.home-toolbar');
   if (!toolbar) return;
 
-  toolbar.addEventListener('click', () => {
+  toolbar.addEventListener('click', (event) => {
+    const clickTarget = event.target;
+    if (!(clickTarget instanceof Element)) return;
+    if (clickTarget.closest('button, a, input, select, textarea, label')) return;
     smoothScrollHomeToTop();
   });
 }
