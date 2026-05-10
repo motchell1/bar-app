@@ -154,7 +154,7 @@ async function submitSpecialReport(event) {
 
   const commentText = commentInput?.value.trim() || '';
   try {
-    await Promise.allSettled(specialIdsToReport.map((id) => {
+    const responses = await Promise.allSettled(specialIdsToReport.map((id) => {
       const barId = currentSpecialContext?.bar?.bar_id ?? currentSpecialContext?.bar?.id ?? null;
       const payload = {
         report_type: 'special',
@@ -173,8 +173,17 @@ async function submitSpecialReport(event) {
         body: JSON.stringify(payload)
       });
     }));
+
+    const hasFailure = responses.some((result) => (
+      result.status !== 'fulfilled' || result.value?.ok === false
+    ));
+    if (hasFailure) {
+      console.error('Failed to submit one or more special reports.');
+      return;
+    }
   } catch (err) {
     console.error('Failed to submit special report:', err);
+    return;
   }
   resetSpecialReportForm();
   showReportSuccess();
@@ -202,15 +211,21 @@ async function submitBarReport(event) {
       user_identifier: userIdentifier
     };
 
-    await fetch(SPECIAL_REPORT_API_URL, {
+    const response = await fetch(SPECIAL_REPORT_API_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'text/plain'
       },
       body: JSON.stringify(payload)
     });
+
+    if (response.ok === false) {
+      console.error('Failed to submit bar report:', response.status);
+      return;
+    }
   } catch (err) {
     console.error('Failed to submit bar report:', err);
+    return;
   }
 
   resetBarReportForm();
