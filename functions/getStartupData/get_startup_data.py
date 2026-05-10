@@ -262,6 +262,8 @@ def classify_today_bar_order(entry, specials_lookup, bar_day_hours, current_minu
                     continue
                 normalized_start = start_minutes if start_minutes is not None else (open_minutes if open_minutes is not None else 10 ** 9)
                 normalized_end = end_minutes if end_minutes is not None else (close_minutes if close_minutes is not None else 10 ** 9)
+                if start_minutes is not None and end_minutes is not None and end_minutes < start_minutes:
+                    normalized_end += 24 * 60
                 upcoming_sort_windows.append((normalized_start, normalized_end))
 
             if upcoming_sort_windows:
