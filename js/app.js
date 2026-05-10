@@ -228,10 +228,14 @@ function initAdminTitleTapEntry() {
 
   if (!appTitle) return;
 
-  appTitle.addEventListener('click', () => {
+  const handleTitleTap = () => {
     tapCount += 1;
     if (tapTimer) clearTimeout(tapTimer);
     tapTimer = setTimeout(() => {
+      if (tapCount === 1 && currentTab === 'specials') {
+        const homeScreen = document.getElementById('home-screen');
+        if (homeScreen) homeScreen.scrollTop = 0;
+      }
       tapCount = 0;
     }, tapResetMs);
 
@@ -240,7 +244,9 @@ function initAdminTitleTapEntry() {
       if (tapTimer) clearTimeout(tapTimer);
       window.location.assign('/admin');
     }
-  });
+  };
+
+  appTitle.addEventListener('pointerup', handleTitleTap);
 }
 
 function initHomeScrollCapture() {
