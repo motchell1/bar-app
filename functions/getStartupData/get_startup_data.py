@@ -254,8 +254,21 @@ def classify_today_bar_order(entry, specials_lookup, bar_day_hours, current_minu
     # 3: at least one upcoming timed special, or only all-day and not yet opened
     if has_upcoming_timed or (all_day and not timed and not_yet_opened):
         if has_upcoming_timed:
-            sort_start = min(upcoming_start_minutes) if upcoming_start_minutes else (open_minutes if open_minutes is not None else 10 ** 9)
-            sort_end = min(upcoming_end_minutes) if upcoming_end_minutes else (close_minutes if close_minutes is not None else 10 ** 9)
+            upcoming_sort_windows = []
+            for special in upcoming_timed:
+                start_minutes = to_minutes(special.get('start_time'))
+                end_minutes = to_minutes(special.get('end_time'))
+                if start_minutes is None and end_minutes is None:
+                    continue
+                normalized_start = start_minutes if start_minutes is not None else (open_minutes if open_minutes is not None else 10 ** 9)
+                normalized_end = end_minutes if end_minutes is not None else (close_minutes if close_minutes is not None else 10 ** 9)
+                upcoming_sort_windows.append((normalized_start, normalized_end))
+
+            if upcoming_sort_windows:
+                sort_start, sort_end = min(upcoming_sort_windows, key=lambda window: (window[0], window[1]))
+            else:
+                sort_start = open_minutes if open_minutes is not None else 10 ** 9
+                sort_end = close_minutes if close_minutes is not None else 10 ** 9
         else:
             sort_start = open_minutes if open_minutes is not None else 10 ** 9
             sort_end = close_minutes if close_minutes is not None else 10 ** 9
