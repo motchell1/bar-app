@@ -201,11 +201,31 @@ function initTaskbar() {
   tabs.forEach((tab) => {
     tab.addEventListener('click', () => {
       const tabName = tab.dataset.tab;
-      document.getElementById('detail-screen').style.display = 'none';
-      document.getElementById('special-screen').style.display = 'none';
+      const isRepeatSpecialsTap = tabName === 'specials' && currentTab === 'specials';
+      const homeScreen = document.getElementById('home-screen');
+      const detailScreen = document.getElementById('detail-screen');
+      const specialScreen = document.getElementById('special-screen');
+      const isHomeScreenVisible = homeScreen ? homeScreen.style.display !== 'none' : false;
+      if (detailScreen) detailScreen.style.display = 'none';
+      if (specialScreen) specialScreen.style.display = 'none';
+      if (isRepeatSpecialsTap && isHomeScreenVisible) {
+        setScreenLayout(true);
+        smoothScrollHomeToTop();
+        return;
+      }
       showTab(tabName);
       setScreenLayout(true);
     });
+  });
+}
+
+function smoothScrollHomeToTop() {
+  const homeScreen = document.getElementById('home-screen');
+  if (!homeScreen) return;
+  if (currentTab !== 'specials') return;
+  homeScreen.scrollTo({
+    top: 0,
+    behavior: 'smooth'
   });
 }
 
@@ -232,10 +252,6 @@ function initAdminTitleTapEntry() {
     tapCount += 1;
     if (tapTimer) clearTimeout(tapTimer);
     tapTimer = setTimeout(() => {
-      if (tapCount === 1 && currentTab === 'specials') {
-        const homeScreen = document.getElementById('home-screen');
-        if (homeScreen) homeScreen.scrollTop = 0;
-      }
       tapCount = 0;
     }, tapResetMs);
 
@@ -247,6 +263,18 @@ function initAdminTitleTapEntry() {
   };
 
   appTitle.addEventListener('pointerup', handleTitleTap);
+}
+
+function initToolbarSingleTapScroll() {
+  const toolbar = document.querySelector('.home-toolbar');
+  if (!toolbar) return;
+
+  toolbar.addEventListener('click', (event) => {
+    const clickTarget = event.target;
+    if (!(clickTarget instanceof Element)) return;
+    if (clickTarget.closest('button, a, input, select, textarea, label')) return;
+    smoothScrollHomeToTop();
+  });
 }
 
 function initHomeScrollCapture() {
@@ -382,6 +410,7 @@ initSidebarFilters();
 initTaskbar();
 initBarsSearch();
 initAdminTitleTapEntry();
+initToolbarSingleTapScroll();
 initHomeScrollCapture();
 initZoomLock();
 if (typeof initMapDayController === 'function') {
