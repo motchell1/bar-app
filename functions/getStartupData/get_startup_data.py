@@ -243,6 +243,10 @@ def classify_today_bar_order(entry, specials_lookup, bar_day_hours, current_minu
     if timed and not all_day and not has_active_timed and not has_upcoming_timed:
         return (0, min(timed_end_minutes) if timed_end_minutes else 10 ** 9, 10 ** 9)
 
+    # 1: past timed + all-day (with no active/upcoming timed), or only all-day while closed, sorted by closing time
+    if (has_past_timed and all_day) or (all_day and not timed and not is_open_now and not not_yet_opened):
+        return (1, close_minutes if close_minutes is not None else 10 ** 9, 10 ** 9)
+
     # 2: at least one active timed special, sorted by start then end
     if has_active_timed:
         return (
@@ -275,10 +279,6 @@ def classify_today_bar_order(entry, specials_lookup, bar_day_hours, current_minu
             sort_start = open_minutes if open_minutes is not None else 10 ** 9
             sort_end = close_minutes if close_minutes is not None else 10 ** 9
         return (3, sort_start, sort_end)
-
-    # 1: past timed + all-day (with no active/upcoming timed), or only all-day while closed, sorted by closing time
-    if (has_past_timed and all_day) or (all_day and not timed and not is_open_now and not not_yet_opened):
-        return (1, close_minutes if close_minutes is not None else 10 ** 9, 10 ** 9)
 
     # 4: only all-day while currently open, sorted by closing time
     if all_day and not timed and is_open_now:
