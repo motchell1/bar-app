@@ -189,7 +189,8 @@ function renderBarsWeek() {
 
         withoutActiveOrUpcoming.forEach((entry) => container.appendChild(entry.card));
 
-        if (withoutActiveOrUpcoming.length > 0 && withActiveOrUpcoming.length > 0) {
+        const hasBarCardsAboveDivider = container.querySelector('.bar-card') !== null;
+        if (hasBarCardsAboveDivider && withoutActiveOrUpcoming.length > 0 && withActiveOrUpcoming.length > 0) {
           const divider = document.createElement('div');
           divider.className = 'active-upcoming-divider';
           container.appendChild(divider);
