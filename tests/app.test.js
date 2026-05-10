@@ -765,7 +765,7 @@ test('renderBarsWeek does not render active/upcoming divider when there are no b
   const ctx = loadAppWithoutBoot(document);
 
   vm.runInContext(`
-    startupData = {
+    startupPayload = {
       bars: {
         '2': { id: 2, name: 'Upcoming Specials Bar', neighborhood: 'Downtown', image_url: null, currently_open: true, is_open_now: true, has_special_this_week: true }
       },
