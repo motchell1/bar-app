@@ -202,11 +202,13 @@ function initTaskbar() {
     tab.addEventListener('click', () => {
       const tabName = tab.dataset.tab;
       const isRepeatSpecialsTap = tabName === 'specials' && currentTab === 'specials';
+      const homeScreen = document.getElementById('home-screen');
       const detailScreen = document.getElementById('detail-screen');
       const specialScreen = document.getElementById('special-screen');
+      const isHomeScreenVisible = homeScreen ? homeScreen.style.display !== 'none' : false;
       if (detailScreen) detailScreen.style.display = 'none';
       if (specialScreen) specialScreen.style.display = 'none';
-      if (isRepeatSpecialsTap) {
+      if (isRepeatSpecialsTap && isHomeScreenVisible) {
         setScreenLayout(true);
         smoothScrollHomeToTop();
         return;
