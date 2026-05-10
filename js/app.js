@@ -202,13 +202,15 @@ function initTaskbar() {
     tab.addEventListener('click', () => {
       const tabName = tab.dataset.tab;
       const isRepeatSpecialsTap = tabName === 'specials' && currentTab === 'specials';
+      const detailScreen = document.getElementById('detail-screen');
+      const specialScreen = document.getElementById('special-screen');
+      if (detailScreen) detailScreen.style.display = 'none';
+      if (specialScreen) specialScreen.style.display = 'none';
       if (isRepeatSpecialsTap) {
         setScreenLayout(true);
         smoothScrollHomeToTop();
         return;
       }
-      document.getElementById('detail-screen').style.display = 'none';
-      document.getElementById('special-screen').style.display = 'none';
       showTab(tabName);
       setScreenLayout(true);
     });
