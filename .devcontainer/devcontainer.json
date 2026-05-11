@@ -1,4 +1,0 @@
-{
- "name": "bar-app",
- "postCreateCommand": "cd mobile && npm install"
-}
