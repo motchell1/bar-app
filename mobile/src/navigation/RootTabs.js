@@ -1,5 +1,6 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { HomeScreen } from '../screens/HomeScreen';
 import { BarsScreen } from '../screens/BarsScreen';
 import { FavoritesScreen } from '../screens/FavoritesScreen';
@@ -8,10 +9,29 @@ import { colors } from '../constants/colors';
 
 const Tab = createBottomTabNavigator();
 
+export const TAB_CONFIG = {
+  Home: {
+    component: HomeScreen,
+    icon: 'cash-multiple'
+  },
+  Bars: {
+    component: BarsScreen,
+    icon: 'beer'
+  },
+  Favorites: {
+    component: FavoritesScreen,
+    icon: 'star'
+  },
+  Map: {
+    component: MapScreen,
+    icon: 'map-marker'
+  }
+};
+
 export function RootTabs() {
   return (
     <Tab.Navigator
-      screenOptions={{
+      screenOptions={({ route }) => ({
         headerShown: false,
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textSecondary,
@@ -25,13 +45,19 @@ export function RootTabs() {
         tabBarLabelStyle: {
           fontSize: 12,
           fontWeight: '600'
-        }
-      }}
+        },
+        tabBarIcon: ({ color, size }) => (
+          <MaterialCommunityIcons
+            name={TAB_CONFIG[route.name].icon}
+            color={color}
+            size={size}
+          />
+        )
+      })}
     >
-      <Tab.Screen name="Home" component={HomeScreen} />
-      <Tab.Screen name="Bars" component={BarsScreen} />
-      <Tab.Screen name="Favorites" component={FavoritesScreen} />
-      <Tab.Screen name="Map" component={MapScreen} />
+      {Object.entries(TAB_CONFIG).map(([name, config]) => (
+        <Tab.Screen key={name} name={name} component={config.component} />
+      ))}
     </Tab.Navigator>
   );
 }
