@@ -562,6 +562,51 @@ test('submitBarReport posts bar report payload and resets form', async () => {
   assert.equal(document.getElementById('bar-report-toggle').classList.contains('reported'), true, 'bar reported style applied');
 });
 
+test('submitSpecialReport does not show success state when API returns not ok', async () => {
+  const document = new DocumentMock();
+  mountBaseNodes(document);
+  mountSpecialReportNodes(document);
+
+  const ctx = loadAppWithoutBoot(document);
+  ctx.fetch = async () => ({ ok: false, status: 500, json: async () => ({}) });
+
+  const bar = { id: 12, name: 'Sample Bar' };
+  const special = { special_id: 'sp-123', day: 'MON', start_time: '16:00', end_time: '18:00', description: 'Half off', type: 'drink', all_day: false };
+  vm.runInContext(`currentSpecialContext = ${JSON.stringify({ bar, special, dayLabel: 'Monday' })};`, ctx);
+
+  document.getElementById('special-report-reason').value = 'Other';
+  document.getElementById('special-report-comment').value = 'Bad payload';
+
+  await ctx.submitSpecialReport({ preventDefault() {} });
+
+  const reportButton = document.getElementById('special-report-toggle');
+  assert.equal(reportButton.textContent, 'Mark for review');
+  assert.notEqual(reportButton.disabled, true);
+  assert.equal(reportButton.classList.contains('reported'), false);
+});
+
+test('submitBarReport does not show success state when API returns not ok', async () => {
+  const document = new DocumentMock();
+  mountBaseNodes(document);
+  mountBarReportNodes(document);
+
+  const ctx = loadAppWithoutBoot(document);
+  ctx.fetch = async () => ({ ok: false, status: 500, json: async () => ({}) });
+
+  const bar = { id: 23, name: 'Bar Report Target' };
+  vm.runInContext(`currentBarContext = ${JSON.stringify(bar)};`, ctx);
+
+  document.getElementById('bar-report-reason').value = 'Other';
+  document.getElementById('bar-report-comment').value = 'Bad payload';
+
+  await ctx.submitBarReport({ preventDefault() {} });
+
+  const reportButton = document.getElementById('bar-report-toggle');
+  assert.equal(reportButton.textContent, 'Mark for review');
+  assert.notEqual(reportButton.disabled, true);
+  assert.equal(reportButton.classList.contains('reported'), false);
+});
+
 
 test('renderBarsWeek shows today through next 6 days and open status only for today', () => {
   const document = new DocumentMock();
