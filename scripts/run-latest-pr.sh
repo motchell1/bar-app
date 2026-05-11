@@ -16,5 +16,7 @@ fi
 echo "Checking out PR #$PR_NUMBER..."
 gh pr checkout "$PR_NUMBER"
 
-echo "Starting mobile app..."
+echo "Cleaning mobile dependencies after branch switch..."
+rm -rf mobile/node_modules mobile/package-lock.json
+
 ./scripts/start-mobile.sh

@@ -3,12 +3,10 @@ set -e
 
 cd /workspaces/bar-app/mobile
 
-if [ ! -d "node_modules" ]; then
-  echo "Installing mobile dependencies..."
-  npm install
-fi
+echo "Installing dependencies..."
+npm install
 
-echo "Ensuring Expo ngrok is installed..."
+echo "Installing Expo tunnel dependency..."
 npx expo install @expo/ngrok
 
 echo "Starting Expo tunnel..."

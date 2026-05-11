@@ -15,10 +15,10 @@ echo "Switching to main..."
 git checkout main
 git pull origin main
 
-echo "Merging PR #$PR_NUMBER into main..."
+echo "Merging PR #$PR_NUMBER..."
 gh pr merge "$PR_NUMBER" --merge --delete-branch
 
-echo "Pulling updated main..."
+echo "Pulling latest main..."
 git pull origin main
 
 echo "Done."
