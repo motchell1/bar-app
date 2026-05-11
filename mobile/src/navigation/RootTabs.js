@@ -12,7 +12,7 @@ const Tab = createBottomTabNavigator();
 export const TAB_CONFIG = {
   Home: {
     component: HomeScreen,
-    icon: 'cash-multiple'
+    icon: 'cash'
   },
   Bars: {
     component: BarsScreen,
@@ -20,11 +20,11 @@ export const TAB_CONFIG = {
   },
   Favorites: {
     component: FavoritesScreen,
-    icon: 'star'
+    icon: 'star-outline'
   },
   Map: {
     component: MapScreen,
-    icon: 'map-marker'
+    icon: 'map-marker-outline'
   }
 };
 
@@ -38,9 +38,9 @@ export function RootTabs() {
         tabBarStyle: {
           backgroundColor: colors.surface,
           borderTopColor: colors.border,
-          height: 64,
-          paddingTop: 6,
-          paddingBottom: 10
+          height: 68,
+          paddingTop: 4,
+          paddingBottom: 8
         },
         tabBarLabelStyle: {
           fontSize: 12,
