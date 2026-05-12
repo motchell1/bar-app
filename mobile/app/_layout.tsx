@@ -25,9 +25,9 @@ export default function RootLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Home',
+          title: 'Specials',
           tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="home-variant" size={size} color={color} />
+            <MaterialCommunityIcons name="ticket-percent" size={size} color={color} />
           ),
         }}
       />
@@ -36,7 +36,7 @@ export default function RootLayout() {
         options={{
           title: 'Bars',
           tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="glass-cocktail" size={size} color={color} />
+            <MaterialCommunityIcons name="beer" size={size} color={color} />
           ),
         }}
       />
@@ -45,7 +45,7 @@ export default function RootLayout() {
         options={{
           title: 'Favorites',
           tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="heart" size={size} color={color} />
+            <MaterialCommunityIcons name="star" size={size} color={color} />
           ),
         }}
       />
@@ -54,7 +54,7 @@ export default function RootLayout() {
         options={{
           title: 'Map',
           tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="map-marker" size={size} color={color} />
+            <MaterialCommunityIcons name="map-marker-outline" size={size} color={color} />
           ),
         }}
       />
