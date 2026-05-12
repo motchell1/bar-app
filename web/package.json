@@ -4,6 +4,10 @@
   "version": "1.0.0",
   "description": "Bar app frontend and lambda functions",
   "scripts": {
-    "test": "node --test tests/*.test.js"
+    "test": "node --test tests/*.test.js",
+    "screenshot": "node scripts/screenshot.js"
+  },
+  "devDependencies": {
+    "playwright": "^1.60.0"
   }
 }

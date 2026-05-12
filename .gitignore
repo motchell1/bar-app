@@ -1,0 +1,10 @@
+screenshots/
+test-results/
+playwright-report/
+*.png
+*.jpg
+*.jpeg
+*.webm
+*.zip
+web/node_modules/
+/screenshots/
