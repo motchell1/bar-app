@@ -1,6 +1,6 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Image, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Animated, Easing, Image, StyleSheet, Text, View } from 'react-native';
 import { ScreenContainer } from '../components/ScreenContainer';
 import { theme } from '../constants/theme';
 import { fetchStartupPayload, StartupPayload } from '../services/api';
@@ -56,9 +56,27 @@ function groupSpecialsForUI(specials: SpecialItem[]) {
 function iconForType(type?: string) {
   const normalized = String(type || '').toLowerCase();
   if (normalized === 'food') return ['silverware-fork-knife'];
-  if (normalized === 'drink') return ['glass-cocktail'];
-  if (normalized === 'combo') return ['silverware-fork-knife', 'glass-cocktail'];
+  if (normalized === 'drink') return ['glass-cocktail-outline'];
+  if (normalized === 'combo') return ['silverware-fork-knife', 'glass-cocktail-outline'];
   return [];
+}
+
+
+function ActiveDot() {
+  const opacity = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(opacity, { toValue: 1, duration: 600, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        Animated.timing(opacity, { toValue: 0, duration: 600, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [opacity]);
+
+  return <Animated.View style={[styles.activeDot, { opacity }]} />;
 }
 
 export default function SpecialsScreen() {
@@ -116,8 +134,8 @@ export default function SpecialsScreen() {
                           {special.all_day ? 'ALL DAY' : `${format12Hour(special.start_time) || ''}\n${format12Hour(special.end_time) || ''}`.trim()}
                         </Text>
                         <Text style={styles.specialDescription}>{special.description}</Text>
-                        <View style={styles.typeIconWrap}>{iconForType(special.special_type || special.type).map((icon) => <MaterialCommunityIcons key={icon} name={icon as any} size={28} color="#8e8e93" />)}</View>
-                        {isLive ? <View style={styles.activeDot} /> : null}
+                        <View style={styles.typeIconWrap}>{iconForType(special.special_type || special.type).map((icon) => <MaterialCommunityIcons key={icon} name={icon as any} size={30} color="#8e8e93" />)}</View>
+                        {isLive ? <ActiveDot /> : null}
                       </View>;
                     })}
                   </View>
@@ -153,7 +171,7 @@ const styles = StyleSheet.create({
   timeBadge: { width: 72, minWidth: 72, height: 36, backgroundColor: '#007bff', color: '#fff', fontSize: 11, fontWeight: '700', textAlign: 'center', textAlignVertical: 'center', borderRadius: 6, lineHeight: 14, paddingTop: 4 },
   timeBadgePast: { backgroundColor: '#ccc', color: '#666' },
   specialDescription: { flex: 1, color: '#111827', fontSize: 13, lineHeight: 18 },
-  typeIconWrap: { minWidth: 46, height: 40, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 4 },
+  typeIconWrap: { minWidth: 50, height: 40, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 6 },
   hours: { color: '#333', fontSize: 13, marginTop: 10 },
   openText: { color: 'green', fontWeight: '700' },
   closedText: { color: 'red', fontWeight: '700' },
