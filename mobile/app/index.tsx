@@ -102,6 +102,12 @@ export default function SpecialsScreen() {
 
   return (
     <ScreenContainer>
+      <View style={styles.toolbar}>
+        <Text style={styles.toolbarTitle}>Bar Specials</Text>
+        <View style={styles.toolbarChip}>
+          <Text style={styles.toolbarChipText}>Filters</Text>
+        </View>
+      </View>
       {loading ? <ActivityIndicator color={theme.colors.accent} size="large" /> : null}
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
       {!loading && !error && weekDays.map(({ dayKey, dayLabel }) => {
@@ -155,6 +161,11 @@ export default function SpecialsScreen() {
 }
 
 const styles = StyleSheet.create({
+
+  toolbar: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  toolbarTitle: { color: '#111827', fontSize: 18, fontWeight: '700' },
+  toolbarChip: { backgroundColor: '#f3f4f6', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1, borderColor: '#e5e7eb' },
+  toolbarChipText: { color: '#6b7280', fontSize: 12, fontWeight: '600' },
   daySection: { gap: 12 },
   dayHeader: { color: '#636366', fontSize: 16, fontWeight: '700', borderBottomWidth: 1, borderBottomColor: '#ccc', paddingBottom: 10 },
   noSpecials: { color: '#555', fontStyle: 'italic', textAlign: 'center' },
