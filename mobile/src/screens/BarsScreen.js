@@ -1,11 +1,10 @@
-import React from 'react';
-import { PlaceholderScreen } from '../components/PlaceholderScreen';
+import PlaceholderScreen from '../components/PlaceholderScreen';
 
-export function BarsScreen() {
+export default function BarsScreen() {
   return (
     <PlaceholderScreen
       title="Bars"
-      subtitle="Browse bars by neighborhood, vibe, and what they are pouring tonight."
+      description="Discover bars by neighborhood, vibe, and hours. Add filters and sorting here in future iterations."
     />
   );
 }

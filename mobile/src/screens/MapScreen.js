@@ -1,11 +1,10 @@
-import React from 'react';
-import { PlaceholderScreen } from '../components/PlaceholderScreen';
+import PlaceholderScreen from '../components/PlaceholderScreen';
 
-export function MapScreen() {
+export default function MapScreen() {
   return (
     <PlaceholderScreen
       title="Map"
-      subtitle="See nearby bars and active specials on an interactive city map."
+      description="Interactive map view goes here. It will show nearby bars and active specials with location-aware filtering."
     />
   );
 }

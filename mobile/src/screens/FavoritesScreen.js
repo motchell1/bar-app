@@ -1,11 +1,10 @@
-import React from 'react';
-import { PlaceholderScreen } from '../components/PlaceholderScreen';
+import PlaceholderScreen from '../components/PlaceholderScreen';
 
-export function FavoritesScreen() {
+export default function FavoritesScreen() {
   return (
     <PlaceholderScreen
       title="Favorites"
-      subtitle="Your saved bars and specials will be easy to revisit here."
+      description="Save favorite bars and specials for quick access. This tab will sync with your account once auth is connected."
     />
   );
 }

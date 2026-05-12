@@ -1,11 +1,10 @@
-import React from 'react';
-import { PlaceholderScreen } from '../components/PlaceholderScreen';
+import PlaceholderScreen from '../components/PlaceholderScreen';
 
-export function HomeScreen() {
+export default function HomeScreen() {
   return (
     <PlaceholderScreen
       title="Tonight's Specials"
-      subtitle="Featured drink deals and happy hour picks will show here."
+      description="Browse nearby drink and food deals. This Home feed will mirror the web experience with a mobile-first dark layout."
     />
   );
 }

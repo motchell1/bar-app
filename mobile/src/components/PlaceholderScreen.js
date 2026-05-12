@@ -1,35 +1,34 @@
-import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { ScreenContainer } from './ScreenContainer';
-import { colors } from '../constants/colors';
+import ScreenContainer from './ScreenContainer';
+import { theme } from '../constants/theme';
 
-export function PlaceholderScreen({ title, subtitle }) {
+export default function PlaceholderScreen({ title, description }) {
   return (
     <ScreenContainer>
-      <View style={styles.wrapper}>
+      <View style={styles.card}>
         <Text style={styles.title}>{title}</Text>
-        <Text style={styles.subtitle}>{subtitle}</Text>
+        <Text style={styles.description}>{description}</Text>
       </View>
     </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  wrapper: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10
+  card: {
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.border,
+    borderWidth: 1,
+    borderRadius: theme.radius.lg,
+    padding: theme.spacing.xl,
+    gap: theme.spacing.md,
   },
   title: {
-    color: colors.textPrimary,
-    fontSize: 28,
-    fontWeight: '700'
+    ...theme.typography.title,
+    color: theme.colors.text,
   },
-  subtitle: {
-    color: colors.textSecondary,
-    textAlign: 'center',
+  description: {
+    ...theme.typography.body,
+    color: theme.colors.mutedText,
     lineHeight: 22,
-    maxWidth: 280
-  }
+  },
 });
