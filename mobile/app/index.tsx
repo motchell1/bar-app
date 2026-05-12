@@ -172,7 +172,7 @@ export default function SpecialsScreen() {
               return (
                 <>
                   {expiredOnly.map((card) => card.node)}
-                  {expiredOnly.length > 0 && activeOrUpcoming.length > 0 ? <View style={styles.activeUpcomingDivider} /> : null}
+                  {expiredOnly.length > 0 && activeOrUpcoming.length > 0 ? <View style={styles.activeUpcomingDivider}><View style={styles.dividerLine} /><Text style={styles.dividerLabel}>Upcoming Specials</Text><View style={styles.dividerLine} /></View> : null}
                   {activeOrUpcoming.map((card) => card.node)}
                 </>
               );
@@ -214,5 +214,7 @@ const styles = StyleSheet.create({
   closedText: { color: 'red', fontWeight: '700' },
   futureHours: { fontWeight: '400' },
   errorText: { color: '#ef4444', fontSize: 14 },
-  activeUpcomingDivider: { marginTop: -4, marginBottom: 6, borderTopWidth: 1, borderTopColor: '#d1d5db' },
+  activeUpcomingDivider: { marginTop: 8, marginBottom: 14, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  dividerLine: { flex: 1, height: 1, backgroundColor: '#d1d5db' },
+  dividerLabel: { color: '#6b7280', fontSize: 12, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.4 },
 });
