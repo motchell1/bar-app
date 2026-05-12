@@ -138,10 +138,13 @@ Use this snippet in pull request **Motivation** or **Description** when sharing 
 ```md
 ### Screenshot Preview
 
-Captured via `npm run screenshot` (Playwright).No standalone PNG files are committed.
+Captured via `npm run screenshot` (Playwright).\
+No standalone PNG files are committed.
 
 <img alt="Home screen" src="data:image/png;base64,PASTE_BASE64_HERE" />
 ```
 
 If your PR renderer blocks `data:` URIs, use an uploaded artifact or a committed image path instead.
 
+
+Some PR tools strip `data:` image URIs from descriptions; if the image does not render, use artifact upload support or a committed image path.
