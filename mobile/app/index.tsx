@@ -1,29 +1,162 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { Text, StyleSheet, View } from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, Image, StyleSheet, Text, View } from 'react-native';
 import { ScreenContainer } from '../components/ScreenContainer';
-import { SectionCard } from '../components/SectionCard';
 import { theme } from '../constants/theme';
+import { fetchStartupPayload, StartupPayload } from '../services/api';
 
-export default function HomeScreen() {
+const DAYS_FULL = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+type SpecialItem = NonNullable<StartupPayload['specials']>[string];
+
+function orderedDayKeys(currentDay?: string) {
+  const configuredStartIndex = DAYS_FULL.findIndex((day) => day.slice(0, 3).toUpperCase() === currentDay);
+  const startIndex = configuredStartIndex >= 0 ? configuredStartIndex : new Date().getDay();
+  return Array.from({ length: 7 }, (_, offset) => {
+    const dayName = DAYS_FULL[(startIndex + offset + 7) % 7];
+    return { dayKey: dayName.slice(0, 3).toUpperCase(), dayLabel: offset === 0 ? `${dayName} (Today)` : dayName };
+  });
+}
+
+function format12Hour(timeValue?: string | null) {
+  if (!timeValue) return null;
+  const [hourRaw, minuteRaw] = timeValue.split(':');
+  let hour = Number.parseInt(hourRaw, 10);
+  const minute = Number.parseInt(minuteRaw, 10);
+  if (Number.isNaN(hour) || Number.isNaN(minute)) return null;
+  if (hour === 24) hour = 0;
+  const suffix = hour >= 12 ? 'PM' : 'AM';
+  const normalizedHour = hour % 12 === 0 ? 12 : hour % 12;
+  return `${normalizedHour}:${String(minute).padStart(2, '0')} ${suffix}`;
+}
+
+function groupSpecialsForUI(specials: SpecialItem[]) {
+  const groups = new Map<string, SpecialItem[]>();
+  specials.forEach((special) => {
+    const specialType = special.special_type || special.type || '';
+    const key = [specialType, special.all_day ? 'all-day' : 'timed', special.start_time || '', special.end_time || ''].join('|');
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key)?.push(special);
+  });
+
+  return Array.from(groups.values()).map((group) => {
+    const base = { ...group[0] };
+    const uniqueDescriptions = Array.from(new Set(group.map((s) => (s.description || '').trim()).filter(Boolean)));
+    base.description = uniqueDescriptions.join(' • ');
+    const hasLive = group.some((s) => s.current_status === 'live' || s.current_status === 'active');
+    const hasUpcoming = group.some((s) => s.current_status === 'upcoming');
+    const hasPast = group.some((s) => s.current_status === 'past');
+    if (hasLive) base.current_status = 'live';
+    else if (hasUpcoming) base.current_status = 'upcoming';
+    else if (hasPast) base.current_status = 'past';
+    return base;
+  });
+}
+
+function iconForType(type?: string) {
+  const normalized = String(type || '').toLowerCase();
+  if (normalized === 'food') return ['silverware-fork-knife'];
+  if (normalized === 'drink') return ['beer-outline'];
+  if (normalized === 'combo') return ['silverware-fork-knife', 'beer-outline'];
+  return [];
+}
+
+export default function SpecialsScreen() {
+  const [payload, setPayload] = useState<StartupPayload | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        setPayload(await fetchStartupPayload());
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load specials.');
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  const weekDays = useMemo(() => orderedDayKeys(payload?.general_data?.current_day), [payload?.general_data?.current_day]);
+
   return (
     <ScreenContainer>
-      <View style={styles.header}>
-        <Text style={styles.title}>Tonight&apos;s Specials</Text>
-        <Text style={styles.subtitle}>Discover happy hours and late-night deals near you.</Text>
-      </View>
+      {loading ? <ActivityIndicator color={theme.colors.accent} size="large" /> : null}
+      {error ? <Text style={styles.errorText}>{error}</Text> : null}
+      {!loading && !error && weekDays.map(({ dayKey, dayLabel }) => {
+        const entries = payload?.specials_by_day?.[dayKey] ?? [];
+        return (
+          <View key={dayKey} style={styles.daySection}>
+            <Text style={styles.dayHeader}>{dayLabel}</Text>
+            {entries.length === 0 ? <Text style={styles.noSpecials}>No specials available.</Text> : null}
+            {entries.map((entry) => {
+              const bar = payload?.bars?.[String(entry.bar_id)];
+              if (!bar) return null;
+              const specialRows = (entry.specials ?? []).map((id) => payload?.specials?.[String(id)]).filter(Boolean) as SpecialItem[];
+              const specials = groupSpecialsForUI(specialRows).filter((s) => s.description);
+              if (specials.length === 0) return null;
 
-      <SectionCard
-        title="Featured Spot"
-        subtitle="A placeholder card for your top bar and its best specials."
-        ctaLabel="View Details"
-        icon={<MaterialCommunityIcons name="star-circle" color={theme.colors.accent} size={20} />}
-      />
+              const hourMeta = payload?.open_hours?.[String(entry.bar_id)]?.[dayKey];
+              const isToday = dayKey === payload?.general_data?.current_day;
+              const isOpen = bar.currently_open ?? bar.is_open_now;
+
+              return <View key={`${dayKey}-${entry.bar_id}`} style={styles.card}>
+                {bar.image_url ? <Image source={{ uri: bar.image_url }} style={styles.cardImage} /> : null}
+                <View style={styles.cardContent}>
+                  <View style={styles.headingRow}><Text style={styles.barName}>{bar.name}</Text><Text style={styles.neighborhood}>{bar.neighborhood}</Text></View>
+                  <View style={styles.specialsList}>
+                    {specials.map((special, index) => {
+                      const status = (special.current_status ?? '').toLowerCase();
+                      const isLive = status === 'active' || status === 'live';
+                      return <View key={`${index}-${special.description}`} style={[styles.specialItem, isLive ? styles.specialItemLive : null]}>
+                        <Text style={[styles.timeBadge, status === 'past' ? styles.timeBadgePast : null]}>
+                          {special.all_day ? 'ALL DAY' : `${format12Hour(special.start_time) || ''}\n${format12Hour(special.end_time) || ''}`.trim()}
+                        </Text>
+                        <Text style={styles.specialDescription}>{special.description}</Text>
+                        <View style={styles.typeIconWrap}>{iconForType(special.special_type || special.type).map((icon) => <MaterialCommunityIcons key={icon} name={icon as any} size={20} color="#8e8e93" />)}</View>
+                        {isLive ? <View style={styles.activeDot} /> : null}
+                      </View>;
+                    })}
+                  </View>
+                  {hourMeta?.display_text
+                    ? isToday
+                      ? <Text style={styles.hours}><Text style={isOpen ? styles.openText : styles.closedText}>{isOpen ? 'Open' : 'Closed'}</Text>{isOpen ? ` • Closes ${format12Hour(hourMeta.close_time) || ''}` : ` • Opens ${format12Hour(hourMeta.open_time) || ''}`}</Text>
+                      : <Text style={styles.hours}>Hours: {hourMeta.display_text}</Text>
+                    : <Text style={[styles.hours, styles.futureHours]}>Hours unavailable</Text>}
+                </View>
+              </View>;
+            })}
+          </View>
+        );
+      })}
     </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  header: { gap: 8 },
-  title: { color: theme.colors.text, fontSize: 28, fontWeight: '800' },
-  subtitle: { color: theme.colors.subtleText, fontSize: 15, lineHeight: 21 },
+  daySection: { gap: 12 },
+  dayHeader: { color: '#636366', fontSize: 16, fontWeight: '700', borderBottomWidth: 1, borderBottomColor: '#ccc', paddingBottom: 10 },
+  noSpecials: { color: '#555', fontStyle: 'italic', textAlign: 'center' },
+  card: { backgroundColor: '#fff', borderRadius: 14, overflow: 'hidden', shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 14, shadowOffset: { width: 0, height: 6 }, elevation: 5 },
+  cardImage: { width: '100%', height: 180 },
+  cardContent: { padding: 16 },
+  headingRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 10 },
+  barName: { color: '#111827', fontSize: 21, fontWeight: '700', flex: 1 },
+  neighborhood: { color: '#777', fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, maxWidth: '45%', textAlign: 'right' },
+  specialsList: { gap: 8, marginTop: 12 },
+  specialItem: { position: 'relative', backgroundColor: '#f7f9fc', borderWidth: 1, borderColor: '#e6ecf5', borderRadius: 10, paddingVertical: 8, paddingHorizontal: 8, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  specialItemLive: { shadowColor: '#ff4d4f', shadowOpacity: 0.55, shadowRadius: 10, shadowOffset: { width: 0, height: 0 }, elevation: 2 },
+  activeDot: { position: 'absolute', top: 6, right: 6, width: 6, height: 6, borderRadius: 999, backgroundColor: '#ff4d4f' },
+  timeBadge: { width: 72, minWidth: 72, backgroundColor: '#007bff', color: '#fff', fontSize: 11, fontWeight: '700', textAlign: 'center', borderRadius: 6, paddingVertical: 4 },
+  timeBadgePast: { backgroundColor: '#ccc', color: '#666' },
+  specialDescription: { flex: 1, color: '#111827', fontSize: 13, lineHeight: 18 },
+  typeIconWrap: { minWidth: 40, height: 40, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 3 },
+  hours: { color: '#333', fontSize: 13, marginTop: 10 },
+  openText: { color: 'green', fontWeight: '700' },
+  closedText: { color: 'red', fontWeight: '700' },
+  futureHours: { fontWeight: '400' },
+  errorText: { color: '#ef4444', fontSize: 14 },
 });
