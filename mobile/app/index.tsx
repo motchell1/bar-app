@@ -104,14 +104,17 @@ export default function SpecialsScreen() {
 
   const weekDays = useMemo(() => orderedDayKeys(payload?.general_data?.current_day), [payload?.general_data?.current_day]);
 
-  return (
-    <ScreenContainer scrollViewRef={scrollRef}>
-      <View style={styles.toolbar}>
-        <View style={styles.toolbarInner}>
-          <Text style={styles.toolbarTitle} onPress={() => scrollRef.current?.scrollTo?.({ top: 0, animated: true })}>BAR APP</Text>
-          <Text style={styles.hamburgerButton}>☰</Text>
-        </View>
+  const toolbar = (
+    <View style={styles.toolbar}>
+      <View style={styles.toolbarInner}>
+        <Text style={styles.toolbarTitle} onPress={() => scrollRef.current?.scrollTo?.({ top: 0, animated: true })}>BAR APP</Text>
+        <Text style={styles.hamburgerButton}>☰</Text>
       </View>
+    </View>
+  );
+
+  return (
+    <ScreenContainer scrollViewRef={scrollRef} stickyHeader={toolbar}>
       {loading ? <ActivityIndicator color={theme.colors.accent} size="large" /> : null}
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
       {!loading && !error && weekDays.map(({ dayKey, dayLabel }) => {
@@ -183,7 +186,7 @@ export default function SpecialsScreen() {
 
 const styles = StyleSheet.create({
 
-  toolbar: { backgroundColor: '#007bff', shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 3, marginHorizontal: -16, marginTop: -16 },
+  toolbar: { backgroundColor: '#007bff', shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 3 },
   toolbarInner: { height: 48, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center' },
   toolbarTitle: { color: '#fff', fontSize: 16, fontWeight: '700', textTransform: 'uppercase' },
   hamburgerButton: { position: 'absolute', right: 16, top: 10, color: '#fff', fontSize: 24, lineHeight: 28 },
