@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { ReactElement, useEffect, useMemo, useRef, useState } from 'react';
 import { useScrollToTop } from '@react-navigation/native';
-import { ActivityIndicator, Animated, Easing, Image, StyleSheet, Text, View } from 'react-native';
+import { Animated, Easing, Image, StyleSheet, Text, View } from 'react-native';
 import { ScreenContainer } from '../components/ScreenContainer';
 import { theme } from '../constants/theme';
 import { fetchStartupPayload, StartupPayload } from '../services/api';
@@ -63,6 +63,48 @@ function iconForType(type?: string) {
 }
 
 
+
+function LoadingSkeleton() {
+  const shimmer = useRef(new Animated.Value(-1)).current;
+
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.timing(shimmer, {
+        toValue: 1,
+        duration: 1300,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      })
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [shimmer]);
+
+  const translateX = shimmer.interpolate({
+    inputRange: [-1, 1],
+    outputRange: [-280, 280],
+  });
+
+  const skeletonCards = Array.from({ length: 3 });
+
+  return (
+    <View style={styles.skeletonList}>
+      {skeletonCards.map((_, index) => (
+        <View key={`skeleton-${index}`} style={styles.skeletonCard}>
+          <View style={styles.skeletonImage} />
+          <View style={styles.skeletonContent}>
+            <View style={[styles.skeletonLine, { width: '58%', height: 20 }]} />
+            <View style={[styles.skeletonLine, { width: '34%', height: 12, marginTop: 8 }]} />
+            <View style={[styles.skeletonLine, { width: '100%', height: 52, marginTop: 12 }]} />
+            <View style={[styles.skeletonLine, { width: '72%', height: 14, marginTop: 12 }]} />
+          </View>
+          <Animated.View style={[styles.skeletonShimmer, { transform: [{ translateX }] }]} />
+        </View>
+      ))}
+    </View>
+  );
+}
+
 function ActiveDot() {
   const opacity = useRef(new Animated.Value(0)).current;
 
@@ -115,7 +157,7 @@ export default function SpecialsScreen() {
 
   return (
     <ScreenContainer scrollViewRef={scrollRef} stickyHeader={toolbar}>
-      {loading ? <ActivityIndicator color={theme.colors.accent} size="large" /> : null}
+      {loading ? <LoadingSkeleton /> : null}
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
       {!loading && !error && weekDays.map(({ dayKey, dayLabel }) => {
         const entries = payload?.specials_by_day?.[dayKey] ?? [];
@@ -213,6 +255,13 @@ const styles = StyleSheet.create({
   openText: { color: 'green', fontWeight: '700' },
   closedText: { color: 'red', fontWeight: '700' },
   futureHours: { fontWeight: '400' },
+
+  skeletonList: { gap: 14 },
+  skeletonCard: { backgroundColor: '#fff', borderRadius: 14, overflow: 'hidden', borderWidth: 1, borderColor: '#e5e7eb', position: 'relative' },
+  skeletonImage: { height: 180, backgroundColor: '#eef2f7' },
+  skeletonContent: { padding: 16 },
+  skeletonLine: { backgroundColor: '#eef2f7', borderRadius: 8 },
+  skeletonShimmer: { position: 'absolute', top: -40, bottom: -40, width: 120, backgroundColor: 'rgba(255,255,255,0.45)', transform: [{ rotate: '18deg' }] },
   errorText: { color: '#ef4444', fontSize: 14 },
   activeUpcomingDivider: { marginTop: 12, marginBottom: 12, flexDirection: 'row', alignItems: 'center', gap: 10 },
   dividerLine: { flex: 1, height: 1, backgroundColor: '#d1d5db' },
