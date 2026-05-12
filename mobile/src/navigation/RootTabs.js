@@ -12,7 +12,7 @@ const Tab = createBottomTabNavigator();
 export const TAB_CONFIG = {
   Home: {
     component: HomeScreen,
-    icon: 'cash-multiple'
+    icon: 'cash'
   },
   Bars: {
     component: BarsScreen,
@@ -20,11 +20,11 @@ export const TAB_CONFIG = {
   },
   Favorites: {
     component: FavoritesScreen,
-    icon: 'star'
+    icon: 'star-outline'
   },
   Map: {
     component: MapScreen,
-    icon: 'map-marker'
+    icon: 'map-marker-outline'
   }
 };
 
