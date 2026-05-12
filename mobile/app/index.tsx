@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { ReactElement, useEffect, useMemo, useRef, useState } from 'react';
 import { useScrollToTop } from '@react-navigation/native';
 import { ActivityIndicator, Animated, Easing, Image, StyleSheet, Text, View } from 'react-native';
 import { ScreenContainer } from '../components/ScreenContainer';
@@ -161,7 +161,7 @@ export default function SpecialsScreen() {
                     : <Text style={[styles.hours, styles.futureHours]}>Hours unavailable</Text>}
                 </View>
               </View> };
-              }).filter(Boolean) as Array<{ key: string; hasActiveOrUpcoming: boolean; node: JSX.Element }>;
+              }).filter(Boolean) as Array<{ key: string; hasActiveOrUpcoming: boolean; node: ReactElement }>;
 
               const isFirstDay = dayKey === (weekDays[0]?.dayKey || '');
               if (!isFirstDay) return cards.map((card) => card.node);
