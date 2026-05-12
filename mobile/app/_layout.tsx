@@ -27,7 +27,7 @@ export default function RootLayout() {
         options={{
           title: 'Home',
           tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="home-variant" size={size} color={color} />
+            <MaterialCommunityIcons name="tag" size={size} color={color} />
           ),
         }}
       />
@@ -36,7 +36,7 @@ export default function RootLayout() {
         options={{
           title: 'Bars',
           tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="glass-cocktail" size={size} color={color} />
+            <MaterialCommunityIcons name="storefront-outline" size={size} color={color} />
           ),
         }}
       />
