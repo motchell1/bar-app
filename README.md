@@ -107,14 +107,6 @@ The folders inside `functions/` each correspond to an AWS Lambda function.
 - **`generateCandidateSpecials`**  
   Generates and stores candidate specials for all bars in a neighborhood. It accepts `neighborhood`, invokes `dbBarSync` (`get_bars_by_neighborhood`) to fetch bars (`bar_id`, `bar_name`, `neighborhood`, `website_url`), runs crawl-first + OpenAI fallback extraction per bar, and invokes `dbSpecialSync` to insert/publish candidate results.
 
-## Front-end integration
-
-- Favorites are now persisted in the background whenever a user favorites/unfavorites a special or bar.
-- `getStartupData` reads `device_special_favorite` and `device_bar_favorite` (when `device_id` is provided) and marks payload items with `favorite`.
-- Endpoint used by the web app:
-  - `https://qz5rs9i9ya.execute-api.us-east-2.amazonaws.com/default/updateDeviceFavorite`
-
-
 ## Two-Lambda bar sync flow
 
 1. Invoke `googleBarSync` with:
