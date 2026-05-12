@@ -1,4 +1,4 @@
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Animated, Easing, Image, StyleSheet, Text, View } from 'react-native';
 import { ScreenContainer } from '../components/ScreenContainer';
@@ -55,9 +55,9 @@ function groupSpecialsForUI(specials: SpecialItem[]) {
 
 function iconForType(type?: string) {
   const normalized = String(type || '').toLowerCase();
-  if (normalized === 'food') return ['silverware-fork-knife'];
-  if (normalized === 'drink') return ['glass-cocktail-outline'];
-  if (normalized === 'combo') return ['silverware-fork-knife', 'glass-cocktail-outline'];
+  if (normalized === 'food') return ['restaurant-outline'];
+  if (normalized === 'drink') return ['wine-outline'];
+  if (normalized === 'combo') return ['restaurant-outline', 'wine-outline'];
   return [];
 }
 
@@ -130,11 +130,11 @@ export default function SpecialsScreen() {
                       const status = (special.current_status ?? '').toLowerCase();
                       const isLive = status === 'active' || status === 'live';
                       return <View key={`${index}-${special.description}`} style={[styles.specialItem, isLive ? styles.specialItemLive : null]}>
-                        <Text style={[styles.timeBadge, status === 'past' ? styles.timeBadgePast : null]}>
-                          {special.all_day ? 'ALL DAY' : `${format12Hour(special.start_time) || ''}\n${format12Hour(special.end_time) || ''}`.trim()}
-                        </Text>
+                        <View style={[styles.timeBadge, status === 'past' ? styles.timeBadgePast : null]}>
+                          <Text style={[styles.timeBadgeText, status === 'past' ? styles.timeBadgeTextPast : null]}>{special.all_day ? 'ALL DAY' : `${format12Hour(special.start_time) || ''}\n${format12Hour(special.end_time) || ''}`.trim()}</Text>
+                        </View>
                         <Text style={styles.specialDescription}>{special.description}</Text>
-                        <View style={styles.typeIconWrap}>{iconForType(special.special_type || special.type).map((icon) => <MaterialCommunityIcons key={icon} name={icon as any} size={30} color="#8e8e93" />)}</View>
+                        <View style={styles.typeIconWrap}>{iconForType(special.special_type || special.type).map((icon) => <Ionicons key={icon} name={icon as any} size={24} color="#8e8e93" />)}</View>
                         {isLive ? <ActiveDot /> : null}
                       </View>;
                     })}
@@ -168,8 +168,10 @@ const styles = StyleSheet.create({
   specialItem: { position: 'relative', backgroundColor: '#f7f9fc', borderWidth: 1, borderColor: '#e6ecf5', borderRadius: 10, paddingVertical: 8, paddingHorizontal: 8, flexDirection: 'row', alignItems: 'center', gap: 8 },
   specialItemLive: { shadowColor: '#ff4d4f', shadowOpacity: 0.55, shadowRadius: 10, shadowOffset: { width: 0, height: 0 }, elevation: 2 },
   activeDot: { position: 'absolute', top: 6, right: 6, width: 6, height: 6, borderRadius: 999, backgroundColor: '#ff4d4f' },
-  timeBadge: { width: 72, minWidth: 72, height: 36, backgroundColor: '#007bff', color: '#fff', fontSize: 11, fontWeight: '700', textAlign: 'center', textAlignVertical: 'center', borderRadius: 6, lineHeight: 14, paddingTop: 4 },
-  timeBadgePast: { backgroundColor: '#ccc', color: '#666' },
+  timeBadge: { width: 72, minWidth: 72, height: 36, backgroundColor: '#007bff', borderRadius: 6, alignItems: 'center', justifyContent: 'center' },
+  timeBadgeText: { color: '#fff', fontSize: 11, fontWeight: '700', textAlign: 'center', lineHeight: 12, includeFontPadding: false },
+  timeBadgePast: { backgroundColor: '#ccc' },
+  timeBadgeTextPast: { color: '#666' },
   specialDescription: { flex: 1, color: '#111827', fontSize: 13, lineHeight: 18 },
   typeIconWrap: { minWidth: 50, height: 40, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 6 },
   hours: { color: '#333', fontSize: 13, marginTop: 10 },
