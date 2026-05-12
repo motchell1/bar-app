@@ -51,13 +51,18 @@ export async function fetchBars() {
   return getJson<BarSummary[]>('/bars');
 }
 
-export async function fetchStartupPayload(deviceId?: string): Promise<StartupPayload | null> {
-  const url = new URL(STARTUP_API_URL);
+
+function buildStartupUrl(deviceId?: string) {
+  const base = API_BASE_URL.endsWith('/') ? API_BASE_URL : `${API_BASE_URL}/`;
+  const url = new URL(STARTUP_API_URL, base);
   if (deviceId) {
     url.searchParams.set('device_id', deviceId);
   }
+  return url.toString();
+}
 
-  const response = await fetch(url.toString());
+export async function fetchStartupPayload(deviceId?: string): Promise<StartupPayload | null> {
+  const response = await fetch(buildStartupUrl(deviceId));
   if (!response.ok) {
     throw new Error(`Startup request failed: ${response.status}`);
   }
