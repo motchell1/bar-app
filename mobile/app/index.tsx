@@ -56,8 +56,8 @@ function groupSpecialsForUI(specials: SpecialItem[]) {
 function iconForType(type?: string) {
   const normalized = String(type || '').toLowerCase();
   if (normalized === 'food') return ['silverware-fork-knife'];
-  if (normalized === 'drink') return ['beer-outline'];
-  if (normalized === 'combo') return ['silverware-fork-knife', 'beer-outline'];
+  if (normalized === 'drink') return ['glass-cocktail'];
+  if (normalized === 'combo') return ['silverware-fork-knife', 'glass-cocktail'];
   return [];
 }
 
@@ -116,7 +116,7 @@ export default function SpecialsScreen() {
                           {special.all_day ? 'ALL DAY' : `${format12Hour(special.start_time) || ''}\n${format12Hour(special.end_time) || ''}`.trim()}
                         </Text>
                         <Text style={styles.specialDescription}>{special.description}</Text>
-                        <View style={styles.typeIconWrap}>{iconForType(special.special_type || special.type).map((icon) => <MaterialCommunityIcons key={icon} name={icon as any} size={20} color="#8e8e93" />)}</View>
+                        <View style={styles.typeIconWrap}>{iconForType(special.special_type || special.type).map((icon) => <MaterialCommunityIcons key={icon} name={icon as any} size={28} color="#8e8e93" />)}</View>
                         {isLive ? <View style={styles.activeDot} /> : null}
                       </View>;
                     })}
@@ -150,10 +150,10 @@ const styles = StyleSheet.create({
   specialItem: { position: 'relative', backgroundColor: '#f7f9fc', borderWidth: 1, borderColor: '#e6ecf5', borderRadius: 10, paddingVertical: 8, paddingHorizontal: 8, flexDirection: 'row', alignItems: 'center', gap: 8 },
   specialItemLive: { shadowColor: '#ff4d4f', shadowOpacity: 0.55, shadowRadius: 10, shadowOffset: { width: 0, height: 0 }, elevation: 2 },
   activeDot: { position: 'absolute', top: 6, right: 6, width: 6, height: 6, borderRadius: 999, backgroundColor: '#ff4d4f' },
-  timeBadge: { width: 72, minWidth: 72, backgroundColor: '#007bff', color: '#fff', fontSize: 11, fontWeight: '700', textAlign: 'center', borderRadius: 6, paddingVertical: 4 },
+  timeBadge: { width: 72, minWidth: 72, height: 36, backgroundColor: '#007bff', color: '#fff', fontSize: 11, fontWeight: '700', textAlign: 'center', textAlignVertical: 'center', borderRadius: 6, lineHeight: 14, paddingTop: 4 },
   timeBadgePast: { backgroundColor: '#ccc', color: '#666' },
   specialDescription: { flex: 1, color: '#111827', fontSize: 13, lineHeight: 18 },
-  typeIconWrap: { minWidth: 40, height: 40, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 3 },
+  typeIconWrap: { minWidth: 46, height: 40, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 4 },
   hours: { color: '#333', fontSize: 13, marginTop: 10 },
   openText: { color: 'green', fontWeight: '700' },
   closedText: { color: 'red', fontWeight: '700' },
