@@ -103,9 +103,9 @@ export default function SpecialsScreen() {
   return (
     <ScreenContainer>
       <View style={styles.toolbar}>
-        <Text style={styles.toolbarTitle}>Bar Specials</Text>
-        <View style={styles.toolbarChip}>
-          <Text style={styles.toolbarChipText}>Filters</Text>
+        <View style={styles.toolbarInner}>
+          <Text style={styles.toolbarTitle}>BAR APP</Text>
+          <Text style={styles.hamburgerButton}>☰</Text>
         </View>
       </View>
       {loading ? <ActivityIndicator color={theme.colors.accent} size="large" /> : null}
@@ -162,10 +162,10 @@ export default function SpecialsScreen() {
 
 const styles = StyleSheet.create({
 
-  toolbar: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  toolbarTitle: { color: '#111827', fontSize: 18, fontWeight: '700' },
-  toolbarChip: { backgroundColor: '#f3f4f6', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1, borderColor: '#e5e7eb' },
-  toolbarChipText: { color: '#6b7280', fontSize: 12, fontWeight: '600' },
+  toolbar: { backgroundColor: '#007bff', shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 3, marginHorizontal: -16, marginTop: -16 },
+  toolbarInner: { height: 48, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center' },
+  toolbarTitle: { color: '#fff', fontSize: 16, fontWeight: '700', textTransform: 'uppercase' },
+  hamburgerButton: { position: 'absolute', right: 16, top: 10, color: '#fff', fontSize: 24, lineHeight: 28 },
   daySection: { gap: 12 },
   dayHeader: { color: '#636366', fontSize: 16, fontWeight: '700', borderBottomWidth: 1, borderBottomColor: '#ccc', paddingBottom: 10 },
   noSpecials: { color: '#555', fontStyle: 'italic', textAlign: 'center' },
