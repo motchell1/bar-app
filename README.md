@@ -130,3 +130,18 @@ The folders inside `functions/` each correspond to an AWS Lambda function.
 4. `googleBarSync` leaves `existing_bars` alone, fetches and uploads images only for `new_bars`, and assigns each one an `image_file`.
 5. `googleBarSync` invokes `dbBarSync` mode `apply_bar_upsert` a second time.
 6. `dbBarSync` inserts new bars and updates open hours for both new and existing bars.
+
+## Screenshot PR Description Template
+
+Use this snippet in pull request **Motivation** or **Description** when sharing screenshot context without committing binary PNG files:
+
+```md
+### Screenshot Preview
+
+Captured via `npm run screenshot` (Playwright).No standalone PNG files are committed.
+
+<img alt="Home screen" src="data:image/png;base64,PASTE_BASE64_HERE" />
+```
+
+If your PR renderer blocks `data:` URIs, use an uploaded artifact or a committed image path instead.
+
