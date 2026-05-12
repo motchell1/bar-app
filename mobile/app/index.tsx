@@ -214,7 +214,7 @@ const styles = StyleSheet.create({
   closedText: { color: 'red', fontWeight: '700' },
   futureHours: { fontWeight: '400' },
   errorText: { color: '#ef4444', fontSize: 14 },
-  activeUpcomingDivider: { marginTop: 8, marginBottom: 14, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  activeUpcomingDivider: { marginTop: 12, marginBottom: 12, flexDirection: 'row', alignItems: 'center', gap: 10 },
   dividerLine: { flex: 1, height: 1, backgroundColor: '#d1d5db' },
   dividerLabel: { color: '#6b7280', fontSize: 12, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.4 },
 });
