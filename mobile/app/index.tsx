@@ -84,6 +84,10 @@ function LoadingSkeleton() {
     inputRange: [-1, 1],
     outputRange: [-280, 280],
   });
+  const translateY = shimmer.interpolate({
+    inputRange: [-1, 1],
+    outputRange: [140, -140],
+  });
 
   const skeletonCards = Array.from({ length: 3 });
 
@@ -98,7 +102,7 @@ function LoadingSkeleton() {
             <View style={[styles.skeletonLine, { width: '100%', height: 52, marginTop: 12 }]} />
             <View style={[styles.skeletonLine, { width: '72%', height: 14, marginTop: 12 }]} />
           </View>
-          <Animated.View style={[styles.skeletonShimmer, { transform: [{ translateX }] }]} />
+          <Animated.View style={[styles.skeletonShimmer, { transform: [{ translateX }, { translateY }, { rotate: '18deg' }] }]} />
         </View>
       ))}
     </View>
@@ -129,6 +133,7 @@ export default function SpecialsScreen() {
   const [payload, setPayload] = useState<StartupPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const contentOpacity = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     (async () => {
@@ -143,6 +148,19 @@ export default function SpecialsScreen() {
       }
     })();
   }, []);
+
+
+  useEffect(() => {
+    if (!loading) {
+      contentOpacity.setValue(0);
+      Animated.timing(contentOpacity, {
+        toValue: 1,
+        duration: 260,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [loading, contentOpacity]);
 
   const weekDays = useMemo(() => orderedDayKeys(payload?.general_data?.current_day), [payload?.general_data?.current_day]);
 
@@ -159,69 +177,81 @@ export default function SpecialsScreen() {
     <ScreenContainer scrollViewRef={scrollRef} stickyHeader={toolbar}>
       {loading ? <LoadingSkeleton /> : null}
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
-      {!loading && !error && weekDays.map(({ dayKey, dayLabel }) => {
-        const entries = payload?.specials_by_day?.[dayKey] ?? [];
-        return (
-          <View key={dayKey} style={styles.daySection}>
-            <Text style={styles.dayHeader}>{dayLabel}</Text>
-            {entries.length === 0 ? <Text style={styles.noSpecials}>No specials available.</Text> : null}
-            {(() => {
-              const cards = entries.map((entry) => {
-                const bar = payload?.bars?.[String(entry.bar_id)];
-                if (!bar) return null;
-                const specialRows = (entry.specials ?? []).map((id) => payload?.specials?.[String(id)]).filter(Boolean) as SpecialItem[];
-                const specials = groupSpecialsForUI(specialRows).filter((s) => s.description);
-                if (specials.length === 0) return null;
+      {!loading && !error ? (
+        <Animated.View style={{ opacity: contentOpacity }}>
+          {weekDays.map(({ dayKey, dayLabel }) => {
+            const entries = payload?.specials_by_day?.[dayKey] ?? [];
+            return (
+              <View key={dayKey} style={styles.daySection}>
+                <Text style={styles.dayHeader}>{dayLabel}</Text>
+                {entries.length === 0 ? <Text style={styles.noSpecials}>No specials available.</Text> : null}
+                {(() => {
+                  const cards = entries.map((entry) => {
+                    const bar = payload?.bars?.[String(entry.bar_id)];
+                    if (!bar) return null;
+                    const specialRows = (entry.specials ?? []).map((id) => payload?.specials?.[String(id)]).filter(Boolean) as SpecialItem[];
+                    const specials = groupSpecialsForUI(specialRows).filter((special) => special.description);
+                    if (specials.length === 0) return null;
 
-                const hourMeta = payload?.open_hours?.[String(entry.bar_id)]?.[dayKey];
-                const isToday = dayKey === payload?.general_data?.current_day;
-                const isOpen = bar.currently_open ?? bar.is_open_now;
-                const hasActiveOrUpcoming = specials.some((s) => ['active', 'live', 'upcoming'].includes(String(s.current_status || '').toLowerCase()));
+                    const hourMeta = payload?.open_hours?.[String(entry.bar_id)]?.[dayKey];
+                    const isToday = dayKey === payload?.general_data?.current_day;
+                    const isOpen = bar.currently_open ?? bar.is_open_now;
+                    const hasActiveOrUpcoming = specials.some((special) => ['active', 'live', 'upcoming'].includes(String(special.current_status || '').toLowerCase()));
 
-                return { key: `${dayKey}-${entry.bar_id}`, hasActiveOrUpcoming, node: <View key={`${dayKey}-${entry.bar_id}`} style={styles.card}>
-                {bar.image_url ? <Image source={{ uri: bar.image_url }} style={styles.cardImage} /> : null}
-                <View style={styles.cardContent}>
-                  <View style={styles.headingRow}><Text style={styles.barName}>{bar.name}</Text><Text style={styles.neighborhood}>{bar.neighborhood}</Text></View>
-                  <View style={styles.specialsList}>
-                    {specials.map((special, index) => {
-                      const status = (special.current_status ?? '').toLowerCase();
-                      const isLive = status === 'active' || status === 'live';
-                      return <View key={`${index}-${special.description}`} style={[styles.specialItem, isLive ? styles.specialItemLive : null]}>
-                        <View style={[styles.timeBadge, status === 'past' ? styles.timeBadgePast : null]}>
-                          <Text style={[styles.timeBadgeText, status === 'past' ? styles.timeBadgeTextPast : null]}>{special.all_day ? 'ALL DAY' : `${format12Hour(special.start_time) || ''}\n${format12Hour(special.end_time) || ''}`.trim()}</Text>
+                    return {
+                      key: `${dayKey}-${entry.bar_id}`,
+                      hasActiveOrUpcoming,
+                      node: (
+                        <View key={`${dayKey}-${entry.bar_id}`} style={styles.card}>
+                          {bar.image_url ? <Image source={{ uri: bar.image_url }} style={styles.cardImage} /> : null}
+                          <View style={styles.cardContent}>
+                            <View style={styles.headingRow}><Text style={styles.barName}>{bar.name}</Text><Text style={styles.neighborhood}>{bar.neighborhood}</Text></View>
+                            <View style={styles.specialsList}>
+                              {specials.map((special, index) => {
+                                const status = (special.current_status ?? '').toLowerCase();
+                                const isLive = status === 'active' || status === 'live';
+                                return (
+                                  <View key={`${index}-${special.description}`} style={[styles.specialItem, isLive ? styles.specialItemLive : null]}>
+                                    <View style={[styles.timeBadge, status === 'past' ? styles.timeBadgePast : null]}>
+                                      <Text style={[styles.timeBadgeText, status === 'past' ? styles.timeBadgeTextPast : null]}>{special.all_day ? 'ALL DAY' : `${format12Hour(special.start_time) || ''}\n${format12Hour(special.end_time) || ''}`.trim()}</Text>
+                                    </View>
+                                    <Text style={styles.specialDescription}>{special.description}</Text>
+                                    <View style={styles.typeIconWrap}>{iconForType(special.special_type || special.type).map((icon) => <Ionicons key={icon} name={icon as any} size={24} color="#8e8e93" />)}</View>
+                                    {isLive ? <ActiveDot /> : null}
+                                  </View>
+                                );
+                              })}
+                            </View>
+                            {hourMeta?.display_text
+                              ? isToday
+                                ? <Text style={styles.hours}><Text style={isOpen ? styles.openText : styles.closedText}>{isOpen ? 'Open' : 'Closed'}</Text>{isOpen ? ` • Closes ${format12Hour(hourMeta.close_time) || ''}` : ` • Opens ${format12Hour(hourMeta.open_time) || ''}`}</Text>
+                                : <Text style={styles.hours}>Hours: {hourMeta.display_text}</Text>
+                              : <Text style={[styles.hours, styles.futureHours]}>Hours unavailable</Text>}
+                          </View>
                         </View>
-                        <Text style={styles.specialDescription}>{special.description}</Text>
-                        <View style={styles.typeIconWrap}>{iconForType(special.special_type || special.type).map((icon) => <Ionicons key={icon} name={icon as any} size={24} color="#8e8e93" />)}</View>
-                        {isLive ? <ActiveDot /> : null}
-                      </View>;
-                    })}
-                  </View>
-                  {hourMeta?.display_text
-                    ? isToday
-                      ? <Text style={styles.hours}><Text style={isOpen ? styles.openText : styles.closedText}>{isOpen ? 'Open' : 'Closed'}</Text>{isOpen ? ` • Closes ${format12Hour(hourMeta.close_time) || ''}` : ` • Opens ${format12Hour(hourMeta.open_time) || ''}`}</Text>
-                      : <Text style={styles.hours}>Hours: {hourMeta.display_text}</Text>
-                    : <Text style={[styles.hours, styles.futureHours]}>Hours unavailable</Text>}
-                </View>
-              </View> };
-              }).filter(Boolean) as Array<{ key: string; hasActiveOrUpcoming: boolean; node: ReactElement }>;
+                      )
+                    };
+                  }).filter(Boolean) as Array<{ key: string; hasActiveOrUpcoming: boolean; node: ReactElement }>;
 
-              const isFirstDay = dayKey === (weekDays[0]?.dayKey || '');
-              if (!isFirstDay) return cards.map((card) => card.node);
+                  const isFirstDay = dayKey === (weekDays[0]?.dayKey || '');
+                  if (!isFirstDay) return cards.map((card) => card.node);
 
-              const expiredOnly = cards.filter((card) => !card.hasActiveOrUpcoming);
-              const activeOrUpcoming = cards.filter((card) => card.hasActiveOrUpcoming);
+                  const expiredOnly = cards.filter((card) => !card.hasActiveOrUpcoming);
+                  const activeOrUpcoming = cards.filter((card) => card.hasActiveOrUpcoming);
 
-              return (
-                <>
-                  {expiredOnly.map((card) => card.node)}
-                  {expiredOnly.length > 0 && activeOrUpcoming.length > 0 ? <View style={styles.activeUpcomingDivider}><View style={styles.dividerLine} /><Text style={styles.dividerLabel}>Upcoming Specials</Text><View style={styles.dividerLine} /></View> : null}
-                  {activeOrUpcoming.map((card) => card.node)}
-                </>
-              );
-            })()}
-          </View>
-        );
-      })}
+                  return (
+                    <>
+                      {expiredOnly.map((card) => card.node)}
+                      {expiredOnly.length > 0 && activeOrUpcoming.length > 0 ? <View style={styles.activeUpcomingDivider}><View style={styles.dividerLine} /><Text style={styles.dividerLabel}>Upcoming Specials</Text><View style={styles.dividerLine} /></View> : null}
+                      {activeOrUpcoming.map((card) => card.node)}
+                    </>
+                  );
+                })()}
+              </View>
+            );
+          })}
+        </Animated.View>
+      ) : null}
     </ScreenContainer>
   );
 }
@@ -261,7 +291,7 @@ const styles = StyleSheet.create({
   skeletonImage: { height: 180, backgroundColor: '#eef2f7' },
   skeletonContent: { padding: 16 },
   skeletonLine: { backgroundColor: '#eef2f7', borderRadius: 8 },
-  skeletonShimmer: { position: 'absolute', top: -40, bottom: -40, width: 120, backgroundColor: 'rgba(255,255,255,0.45)', transform: [{ rotate: '18deg' }] },
+  skeletonShimmer: { position: 'absolute', top: -80, bottom: -80, width: 120, backgroundColor: 'rgba(255,255,255,0.45)' },
   errorText: { color: '#ef4444', fontSize: 14 },
   activeUpcomingDivider: { marginTop: 12, marginBottom: 12, flexDirection: 'row', alignItems: 'center', gap: 10 },
   dividerLine: { flex: 1, height: 1, backgroundColor: '#d1d5db' },
