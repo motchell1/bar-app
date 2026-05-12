@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useScrollToTop } from '@react-navigation/native';
 import { ActivityIndicator, Animated, Easing, Image, StyleSheet, Text, View } from 'react-native';
 import { ScreenContainer } from '../components/ScreenContainer';
 import { theme } from '../constants/theme';
@@ -80,6 +81,9 @@ function ActiveDot() {
 }
 
 export default function SpecialsScreen() {
+  const scrollRef = useRef<any>(null);
+  useScrollToTop(scrollRef);
+
   const [payload, setPayload] = useState<StartupPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -101,10 +105,10 @@ export default function SpecialsScreen() {
   const weekDays = useMemo(() => orderedDayKeys(payload?.general_data?.current_day), [payload?.general_data?.current_day]);
 
   return (
-    <ScreenContainer>
+    <ScreenContainer scrollViewRef={scrollRef}>
       <View style={styles.toolbar}>
         <View style={styles.toolbarInner}>
-          <Text style={styles.toolbarTitle}>BAR APP</Text>
+          <Text style={styles.toolbarTitle} onPress={() => scrollRef.current?.scrollTo?.({ top: 0, animated: true })}>BAR APP</Text>
           <Text style={styles.hamburgerButton}>☰</Text>
         </View>
       </View>
@@ -116,18 +120,20 @@ export default function SpecialsScreen() {
           <View key={dayKey} style={styles.daySection}>
             <Text style={styles.dayHeader}>{dayLabel}</Text>
             {entries.length === 0 ? <Text style={styles.noSpecials}>No specials available.</Text> : null}
-            {entries.map((entry) => {
-              const bar = payload?.bars?.[String(entry.bar_id)];
-              if (!bar) return null;
-              const specialRows = (entry.specials ?? []).map((id) => payload?.specials?.[String(id)]).filter(Boolean) as SpecialItem[];
-              const specials = groupSpecialsForUI(specialRows).filter((s) => s.description);
-              if (specials.length === 0) return null;
+            {(() => {
+              const cards = entries.map((entry) => {
+                const bar = payload?.bars?.[String(entry.bar_id)];
+                if (!bar) return null;
+                const specialRows = (entry.specials ?? []).map((id) => payload?.specials?.[String(id)]).filter(Boolean) as SpecialItem[];
+                const specials = groupSpecialsForUI(specialRows).filter((s) => s.description);
+                if (specials.length === 0) return null;
 
-              const hourMeta = payload?.open_hours?.[String(entry.bar_id)]?.[dayKey];
-              const isToday = dayKey === payload?.general_data?.current_day;
-              const isOpen = bar.currently_open ?? bar.is_open_now;
+                const hourMeta = payload?.open_hours?.[String(entry.bar_id)]?.[dayKey];
+                const isToday = dayKey === payload?.general_data?.current_day;
+                const isOpen = bar.currently_open ?? bar.is_open_now;
+                const hasActiveOrUpcoming = specials.some((s) => ['active', 'live', 'upcoming'].includes(String(s.current_status || '').toLowerCase()));
 
-              return <View key={`${dayKey}-${entry.bar_id}`} style={styles.card}>
+                return { key: `${dayKey}-${entry.bar_id}`, hasActiveOrUpcoming, node: <View key={`${dayKey}-${entry.bar_id}`} style={styles.card}>
                 {bar.image_url ? <Image source={{ uri: bar.image_url }} style={styles.cardImage} /> : null}
                 <View style={styles.cardContent}>
                   <View style={styles.headingRow}><Text style={styles.barName}>{bar.name}</Text><Text style={styles.neighborhood}>{bar.neighborhood}</Text></View>
@@ -151,8 +157,23 @@ export default function SpecialsScreen() {
                       : <Text style={styles.hours}>Hours: {hourMeta.display_text}</Text>
                     : <Text style={[styles.hours, styles.futureHours]}>Hours unavailable</Text>}
                 </View>
-              </View>;
-            })}
+              </View> };
+              }).filter(Boolean) as Array<{ key: string; hasActiveOrUpcoming: boolean; node: JSX.Element }>;
+
+              const isFirstDay = dayKey === (weekDays[0]?.dayKey || '');
+              if (!isFirstDay) return cards.map((card) => card.node);
+
+              const expiredOnly = cards.filter((card) => !card.hasActiveOrUpcoming);
+              const activeOrUpcoming = cards.filter((card) => card.hasActiveOrUpcoming);
+
+              return (
+                <>
+                  {expiredOnly.map((card) => card.node)}
+                  {expiredOnly.length > 0 && activeOrUpcoming.length > 0 ? <View style={styles.activeUpcomingDivider} /> : null}
+                  {activeOrUpcoming.map((card) => card.node)}
+                </>
+              );
+            })()}
           </View>
         );
       })}
@@ -190,4 +211,5 @@ const styles = StyleSheet.create({
   closedText: { color: 'red', fontWeight: '700' },
   futureHours: { fontWeight: '400' },
   errorText: { color: '#ef4444', fontSize: 14 },
+  activeUpcomingDivider: { marginTop: -4, marginBottom: 6, borderTopWidth: 1, borderTopColor: '#d1d5db' },
 });
