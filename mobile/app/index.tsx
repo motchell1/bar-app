@@ -191,7 +191,7 @@ export default function SpecialsScreen() {
   useEffect(() => {
     if (!showContent || dividerY === null || hasScrolledToDivider.current) return;
     requestAnimationFrame(() => {
-      scrollRef.current?.scrollTo?.({ y: Math.max(0, dividerY - 8), animated: false });
+      scrollRef.current?.scrollTo?.({ y: Math.max(0, dividerY + 6), animated: false });
       hasScrolledToDivider.current = true;
     });
   }, [showContent, dividerY, scrollRef]);
@@ -297,7 +297,7 @@ const styles = StyleSheet.create({
   daySection: { gap: 12 },
   dayHeader: { color: '#636366', fontSize: 16, fontWeight: '700', borderBottomWidth: 1, borderBottomColor: '#ccc', paddingBottom: 10 },
   noSpecials: { color: '#555', fontStyle: 'italic', textAlign: 'center' },
-  card: { backgroundColor: '#fff', borderRadius: 14, overflow: 'hidden', shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 14, shadowOffset: { width: 0, height: 6 }, elevation: 5 },
+  card: { backgroundColor: '#fff', borderRadius: 14, overflow: 'hidden', shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 14, shadowOffset: { width: 0, height: 6 }, elevation: 5, marginBottom: 6 },
   cardImage: { width: '100%', height: 180 },
   cardContent: { padding: 16 },
   headingRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 10 },
