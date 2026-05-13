@@ -69,12 +69,19 @@ function LoadingSkeleton() {
 
   useEffect(() => {
     const loop = Animated.loop(
-      Animated.timing(shimmer, {
-        toValue: 1,
-        duration: 1300,
-        easing: Easing.linear,
-        useNativeDriver: true,
-      })
+      Animated.sequence([
+        Animated.timing(shimmer, {
+          toValue: 1,
+          duration: 1600,
+          easing: Easing.linear,
+          useNativeDriver: true,
+        }),
+        Animated.timing(shimmer, {
+          toValue: -1,
+          duration: 0,
+          useNativeDriver: true,
+        }),
+      ])
     );
     loop.start();
     return () => loop.stop();
@@ -82,11 +89,11 @@ function LoadingSkeleton() {
 
   const translateX = shimmer.interpolate({
     inputRange: [-1, 1],
-    outputRange: [-280, 280],
+    outputRange: [-420, 420],
   });
   const translateY = shimmer.interpolate({
     inputRange: [-1, 1],
-    outputRange: [140, -140],
+    outputRange: [220, -220],
   });
 
   const skeletonCards = Array.from({ length: 3 });
@@ -134,6 +141,7 @@ export default function SpecialsScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const contentOpacity = useRef(new Animated.Value(0)).current;
+  const contentTranslateY = useRef(new Animated.Value(14)).current;
 
   useEffect(() => {
     (async () => {
@@ -153,14 +161,23 @@ export default function SpecialsScreen() {
   useEffect(() => {
     if (!loading) {
       contentOpacity.setValue(0);
-      Animated.timing(contentOpacity, {
-        toValue: 1,
-        duration: 260,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }).start();
+      contentTranslateY.setValue(14);
+      Animated.parallel([
+        Animated.timing(contentOpacity, {
+          toValue: 1,
+          duration: 520,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.timing(contentTranslateY, {
+          toValue: 0,
+          duration: 520,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+      ]).start();
     }
-  }, [loading, contentOpacity]);
+  }, [loading, contentOpacity, contentTranslateY]);
 
   const weekDays = useMemo(() => orderedDayKeys(payload?.general_data?.current_day), [payload?.general_data?.current_day]);
 
@@ -178,7 +195,7 @@ export default function SpecialsScreen() {
       {loading ? <LoadingSkeleton /> : null}
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
       {!loading && !error ? (
-        <Animated.View style={{ opacity: contentOpacity }}>
+        <Animated.View style={{ opacity: contentOpacity, transform: [{ translateY: contentTranslateY }] }}>
           {weekDays.map(({ dayKey, dayLabel }) => {
             const entries = payload?.specials_by_day?.[dayKey] ?? [];
             return (
@@ -291,7 +308,7 @@ const styles = StyleSheet.create({
   skeletonImage: { height: 180, backgroundColor: '#eef2f7' },
   skeletonContent: { padding: 16 },
   skeletonLine: { backgroundColor: '#eef2f7', borderRadius: 8 },
-  skeletonShimmer: { position: 'absolute', top: -80, bottom: -80, width: 120, backgroundColor: 'rgba(255,255,255,0.45)' },
+  skeletonShimmer: { position: 'absolute', top: -140, bottom: -140, width: 220, backgroundColor: 'rgba(255,255,255,0.32)' },
   errorText: { color: '#ef4444', fontSize: 14 },
   activeUpcomingDivider: { marginTop: 12, marginBottom: 12, flexDirection: 'row', alignItems: 'center', gap: 10 },
   dividerLine: { flex: 1, height: 1, backgroundColor: '#d1d5db' },
