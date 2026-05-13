@@ -227,7 +227,7 @@ export default function SpecialsScreen() {
 
                     const hourMeta = payload?.open_hours?.[String(entry.bar_id)]?.[dayKey];
                     const isToday = dayKey === payload?.general_data?.current_day;
-                    const isOpen = bar.currently_open ?? bar.is_open_now;
+                    const isOpen = bar.is_open_now;
                     const hasActiveOrUpcoming = specials.some((special) => ['active', 'live', 'upcoming'].includes(String(special.current_status || '').toLowerCase()));
 
                     return {
