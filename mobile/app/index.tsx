@@ -89,7 +89,7 @@ function LoadingSkeleton() {
 
   const translateX = shimmer.interpolate({
     inputRange: [-1, 1],
-    outputRange: [-420, 420],
+    outputRange: [-620, 760],
   });
 
   const skeletonCards = Array.from({ length: 3 });
