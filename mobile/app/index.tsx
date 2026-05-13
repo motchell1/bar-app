@@ -165,7 +165,7 @@ export default function SpecialsScreen() {
 
       Animated.timing(skeletonOpacity, {
         toValue: 0,
-        duration: 900,
+        duration: 500,
         easing: Easing.inOut(Easing.cubic),
         useNativeDriver: true,
       }).start(() => {
@@ -173,7 +173,7 @@ export default function SpecialsScreen() {
         setShowContent(true);
         Animated.timing(contentOpacity, {
           toValue: 1,
-          duration: 1300,
+          duration: 700,
           easing: Easing.inOut(Easing.cubic),
           useNativeDriver: true,
         }).start();
