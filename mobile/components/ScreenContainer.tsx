@@ -1,12 +1,20 @@
-import { PropsWithChildren } from 'react';
+import { PropsWithChildren, ReactNode, RefObject } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ScrollView, StyleSheet } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import { theme } from '../constants/theme';
 
-export function ScreenContainer({ children }: PropsWithChildren) {
+type ScreenContainerProps = PropsWithChildren<{
+  scrollViewRef?: RefObject<ScrollView | null>;
+  stickyHeader?: ReactNode;
+}>;
+
+export function ScreenContainer({ children, scrollViewRef, stickyHeader }: ScreenContainerProps) {
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScrollView contentContainerStyle={styles.content}>{children}</ScrollView>
+      {stickyHeader ? <View style={styles.stickyHeader}>{stickyHeader}</View> : null}
+      <ScrollView ref={scrollViewRef} contentContainerStyle={styles.scrollContent}>
+        <View style={styles.content}>{children}</View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -16,10 +24,20 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: theme.colors.background,
   },
+  stickyHeader: {
+    width: '100%',
+    alignSelf: 'stretch',
+    zIndex: 10,
+  },
+  scrollContent: {
+    paddingBottom: 32,
+  },
   content: {
+    width: '100%',
+    maxWidth: 520,
+    alignSelf: 'center',
     paddingHorizontal: 16,
     paddingTop: 16,
-    paddingBottom: 32,
     gap: 16,
   },
 });

@@ -13,6 +13,9 @@ export default function RootLayout() {
           height: 74,
           paddingBottom: 8,
           paddingTop: 8,
+          width: '100%',
+          maxWidth: 520,
+          alignSelf: 'center',
         },
         tabBarActiveTintColor: theme.colors.accent,
         tabBarInactiveTintColor: theme.colors.muted,
@@ -25,7 +28,7 @@ export default function RootLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Home',
+          title: 'Specials',
           tabBarIcon: ({ color, size }) => (
             <MaterialCommunityIcons name="tag" size={size} color={color} />
           ),
