@@ -191,7 +191,7 @@ export default function SpecialsScreen() {
   useEffect(() => {
     if (!showContent || dividerY === null || hasScrolledToDivider.current) return;
     requestAnimationFrame(() => {
-      scrollRef.current?.scrollTo?.({ y: Math.max(0, dividerY - 12), animated: false });
+      scrollRef.current?.scrollTo?.({ y: Math.max(0, dividerY - 8), animated: false });
       hasScrolledToDivider.current = true;
     });
   }, [showContent, dividerY, scrollRef]);
@@ -274,7 +274,7 @@ export default function SpecialsScreen() {
                   return (
                     <>
                       {expiredOnly.map((card) => card.node)}
-                      {expiredOnly.length > 0 && activeOrUpcoming.length > 0 ? <View style={styles.activeUpcomingDivider} onLayout={(event) => setDividerY(event.nativeEvent.layout.y)}><View style={styles.dividerLine} /><Text style={styles.dividerLabel}>Active + Upcoming</Text><View style={styles.dividerLine} /></View> : null}
+                      {expiredOnly.length > 0 && activeOrUpcoming.length > 0 ? <View style={styles.activeUpcomingDivider} onLayout={(event) => setDividerY(event.nativeEvent.layout.y)}><View style={styles.dividerLine} /><Text style={styles.dividerLabel}>Active + Upcoming Today</Text><View style={styles.dividerLine} /></View> : null}
                       {activeOrUpcoming.map((card) => card.node)}
                     </>
                   );
