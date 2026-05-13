@@ -31,6 +31,25 @@ function format12Hour(timeValue?: string | null) {
   return `${normalizedHour}:${String(minute).padStart(2, '0')} ${suffix}`;
 }
 
+
+function shouldUsePastBadge(status: string, special: SpecialItem, isToday: boolean) {
+  if (status !== 'past') return false;
+  if (!isToday || special.all_day || !special.start_time || !special.end_time) return true;
+
+  const [startHour, startMinute] = special.start_time.split(':').map(Number);
+  const [endHour, endMinute] = special.end_time.split(':').map(Number);
+  const startTotal = (startHour * 60) + startMinute;
+  const endTotal = (endHour * 60) + endMinute;
+  const crossesMidnight = endTotal < startTotal;
+  if (!crossesMidnight) return true;
+
+  const now = new Date();
+  const nowMinutes = (now.getHours() * 60) + now.getMinutes();
+  if (nowMinutes < 120) return false;
+  if (nowMinutes < endTotal) return false;
+  return true;
+}
+
 function groupSpecialsForUI(specials: SpecialItem[]) {
   const groups = new Map<string, SpecialItem[]>();
   specials.forEach((special) => {
@@ -136,6 +155,8 @@ export default function SpecialsScreen() {
   const [payload, setPayload] = useState<StartupPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [dividerY, setDividerY] = useState<number | null>(null);
+  const hasScrolledToDivider = useRef(false);
   const [showSkeleton, setShowSkeleton] = useState(true);
   const [showContent, setShowContent] = useState(false);
   const contentOpacity = useRef(new Animated.Value(0)).current;
@@ -145,6 +166,7 @@ export default function SpecialsScreen() {
     (async () => {
       try {
         setLoading(true);
+        hasScrolledToDivider.current = false;
         setError(null);
         setPayload(await fetchStartupPayload());
       } catch (err) {
@@ -182,6 +204,13 @@ export default function SpecialsScreen() {
   }, [loading, contentOpacity, skeletonOpacity]);
 
   const weekDays = useMemo(() => orderedDayKeys(payload?.general_data?.current_day), [payload?.general_data?.current_day]);
+
+
+  useEffect(() => {
+    if (!showContent || dividerY === null || hasScrolledToDivider.current) return;
+    scrollRef.current?.scrollTo?.({ top: Math.max(0, dividerY - 12), animated: false });
+    hasScrolledToDivider.current = true;
+  }, [showContent, dividerY, scrollRef]);
 
   const toolbar = (
     <View style={styles.toolbar}>
@@ -229,10 +258,11 @@ export default function SpecialsScreen() {
                               {specials.map((special, index) => {
                                 const status = (special.current_status ?? '').toLowerCase();
                                 const isLive = status === 'active' || status === 'live';
+                                const isPastBadge = shouldUsePastBadge(status, special, isToday);
                                 return (
                                   <View key={`${index}-${special.description}`} style={[styles.specialItem, isLive ? styles.specialItemLive : null]}>
-                                    <View style={[styles.timeBadge, status === 'past' ? styles.timeBadgePast : null]}>
-                                      <Text style={[styles.timeBadgeText, status === 'past' ? styles.timeBadgeTextPast : null]}>{special.all_day ? 'ALL DAY' : `${format12Hour(special.start_time) || ''}\n${format12Hour(special.end_time) || ''}`.trim()}</Text>
+                                    <View style={[styles.timeBadge, isPastBadge ? styles.timeBadgePast : null]}>
+                                      <Text style={[styles.timeBadgeText, isPastBadge ? styles.timeBadgeTextPast : null]}>{special.all_day ? 'ALL DAY' : `${format12Hour(special.start_time) || ''}\n${format12Hour(special.end_time) || ''}`.trim()}</Text>
                                     </View>
                                     <Text style={styles.specialDescription}>{special.description}</Text>
                                     <View style={styles.typeIconWrap}>{iconForType(special.special_type || special.type).map((icon) => <Ionicons key={icon} name={icon as any} size={24} color="#8e8e93" />)}</View>
@@ -261,7 +291,7 @@ export default function SpecialsScreen() {
                   return (
                     <>
                       {expiredOnly.map((card) => card.node)}
-                      {expiredOnly.length > 0 && activeOrUpcoming.length > 0 ? <View style={styles.activeUpcomingDivider}><View style={styles.dividerLine} /><Text style={styles.dividerLabel}>Upcoming Specials</Text><View style={styles.dividerLine} /></View> : null}
+                      {expiredOnly.length > 0 && activeOrUpcoming.length > 0 ? <View style={styles.activeUpcomingDivider} onLayout={(event) => setDividerY(event.nativeEvent.layout.y)}><View style={styles.dividerLine} /><Text style={styles.dividerLabel}>Active + Upcoming</Text><View style={styles.dividerLine} /></View> : null}
                       {activeOrUpcoming.map((card) => card.node)}
                     </>
                   );
