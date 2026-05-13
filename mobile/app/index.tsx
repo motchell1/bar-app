@@ -137,7 +137,8 @@ export default function SpecialsScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showSkeleton, setShowSkeleton] = useState(true);
-  const contentOpacity = useRef(new Animated.Value(0.05)).current;
+  const [showContent, setShowContent] = useState(false);
+  const contentOpacity = useRef(new Animated.Value(0)).current;
   const skeletonOpacity = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
@@ -160,21 +161,22 @@ export default function SpecialsScreen() {
       contentOpacity.setValue(0);
       skeletonOpacity.setValue(1);
       setShowSkeleton(true);
-      Animated.sequence([
-        Animated.timing(skeletonOpacity, {
-          toValue: 0,
-          duration: 900,
-          easing: Easing.inOut(Easing.cubic),
-          useNativeDriver: true,
-        }),
+      setShowContent(false);
+
+      Animated.timing(skeletonOpacity, {
+        toValue: 0,
+        duration: 900,
+        easing: Easing.inOut(Easing.cubic),
+        useNativeDriver: true,
+      }).start(() => {
+        setShowSkeleton(false);
+        setShowContent(true);
         Animated.timing(contentOpacity, {
           toValue: 1,
-          duration: 1200,
+          duration: 1300,
           easing: Easing.inOut(Easing.cubic),
           useNativeDriver: true,
-        }),
-      ]).start(() => {
-        setShowSkeleton(false);
+        }).start();
       });
     }
   }, [loading, contentOpacity, skeletonOpacity]);
@@ -194,7 +196,7 @@ export default function SpecialsScreen() {
     <ScreenContainer scrollViewRef={scrollRef} stickyHeader={toolbar}>
       {showSkeleton ? <Animated.View style={{ opacity: skeletonOpacity }}><LoadingSkeleton /></Animated.View> : null}
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
-      {!loading && !error ? (
+      {!loading && !error && showContent ? (
         <Animated.View style={{ opacity: contentOpacity }}>
           {weekDays.map(({ dayKey, dayLabel }) => {
             const entries = payload?.specials_by_day?.[dayKey] ?? [];
