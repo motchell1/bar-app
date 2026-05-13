@@ -190,8 +190,10 @@ export default function SpecialsScreen() {
 
   useEffect(() => {
     if (!showContent || dividerY === null || hasScrolledToDivider.current) return;
-    scrollRef.current?.scrollTo?.({ top: Math.max(0, dividerY - 12), animated: false });
-    hasScrolledToDivider.current = true;
+    requestAnimationFrame(() => {
+      scrollRef.current?.scrollTo?.({ y: Math.max(0, dividerY - 12), animated: false });
+      hasScrolledToDivider.current = true;
+    });
   }, [showContent, dividerY, scrollRef]);
 
   const toolbar = (
