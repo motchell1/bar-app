@@ -31,18 +31,6 @@ function format12Hour(timeValue?: string | null) {
   return `${normalizedHour}:${String(minute).padStart(2, '0')} ${suffix}`;
 }
 
-
-function shouldUsePastBadge(status: string, special: SpecialItem, isToday: boolean) {
-  if (status !== 'past' || !isToday || special.all_day) return status === 'past';
-  if (!special.start_time || !special.end_time) return true;
-  const [startHour, startMinute] = special.start_time.split(':').map(Number);
-  const [endHour, endMinute] = special.end_time.split(':').map(Number);
-  const startTotal = (startHour * 60) + startMinute;
-  const endTotal = (endHour * 60) + endMinute;
-  const crossesMidnight = endTotal < startTotal;
-  return !crossesMidnight;
-}
-
 function groupSpecialsForUI(specials: SpecialItem[]) {
   const groups = new Map<string, SpecialItem[]>();
   specials.forEach((special) => {
@@ -101,11 +89,11 @@ function LoadingSkeleton() {
 
   const translateX = shimmer.interpolate({
     inputRange: [-1, 1],
-    outputRange: [-520, 520],
+    outputRange: [-420, 420],
   });
   const translateY = shimmer.interpolate({
     inputRange: [-1, 1],
-    outputRange: [280, -280],
+    outputRange: [220, -220],
   });
 
   const skeletonCards = Array.from({ length: 3 });
@@ -239,11 +227,10 @@ export default function SpecialsScreen() {
                               {specials.map((special, index) => {
                                 const status = (special.current_status ?? '').toLowerCase();
                                 const isLive = status === 'active' || status === 'live';
-                                const isPastBadge = shouldUsePastBadge(status, special, isToday);
                                 return (
                                   <View key={`${index}-${special.description}`} style={[styles.specialItem, isLive ? styles.specialItemLive : null]}>
-                                    <View style={[styles.timeBadge, isPastBadge ? styles.timeBadgePast : null]}>
-                                      <Text style={[styles.timeBadgeText, isPastBadge ? styles.timeBadgeTextPast : null]}>{special.all_day ? 'ALL DAY' : `${format12Hour(special.start_time) || ''}\n${format12Hour(special.end_time) || ''}`.trim()}</Text>
+                                    <View style={[styles.timeBadge, status === 'past' ? styles.timeBadgePast : null]}>
+                                      <Text style={[styles.timeBadgeText, status === 'past' ? styles.timeBadgeTextPast : null]}>{special.all_day ? 'ALL DAY' : `${format12Hour(special.start_time) || ''}\n${format12Hour(special.end_time) || ''}`.trim()}</Text>
                                     </View>
                                     <Text style={styles.specialDescription}>{special.description}</Text>
                                     <View style={styles.typeIconWrap}>{iconForType(special.special_type || special.type).map((icon) => <Ionicons key={icon} name={icon as any} size={24} color="#8e8e93" />)}</View>
@@ -321,7 +308,7 @@ const styles = StyleSheet.create({
   skeletonImage: { height: 180, backgroundColor: '#eef2f7' },
   skeletonContent: { padding: 16 },
   skeletonLine: { backgroundColor: '#eef2f7', borderRadius: 8 },
-  skeletonShimmer: { position: 'absolute', top: -180, bottom: -180, width: 300, backgroundColor: 'rgba(255,255,255,0.3)' },
+  skeletonShimmer: { position: 'absolute', top: -140, bottom: -140, width: 220, backgroundColor: 'rgba(255,255,255,0.32)' },
   errorText: { color: '#ef4444', fontSize: 14 },
   activeUpcomingDivider: { marginTop: 12, marginBottom: 12, flexDirection: 'row', alignItems: 'center', gap: 10 },
   dividerLine: { flex: 1, height: 1, backgroundColor: '#d1d5db' },
