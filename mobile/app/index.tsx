@@ -91,10 +91,6 @@ function LoadingSkeleton() {
     inputRange: [-1, 1],
     outputRange: [-420, 420],
   });
-  const translateY = shimmer.interpolate({
-    inputRange: [-1, 1],
-    outputRange: [220, -220],
-  });
 
   const skeletonCards = Array.from({ length: 3 });
 
@@ -109,7 +105,7 @@ function LoadingSkeleton() {
             <View style={[styles.skeletonLine, { width: '100%', height: 52, marginTop: 12 }]} />
             <View style={[styles.skeletonLine, { width: '72%', height: 14, marginTop: 12 }]} />
           </View>
-          <Animated.View style={[styles.skeletonShimmer, { transform: [{ translateX }, { translateY }, { rotate: '18deg' }] }]} />
+          <Animated.View style={[styles.skeletonShimmer, { transform: [{ translateX }, { rotate: '18deg' }] }]} />
         </View>
       ))}
     </View>
@@ -140,8 +136,9 @@ export default function SpecialsScreen() {
   const [payload, setPayload] = useState<StartupPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showSkeleton, setShowSkeleton] = useState(true);
   const contentOpacity = useRef(new Animated.Value(0)).current;
-  const contentTranslateY = useRef(new Animated.Value(14)).current;
+  const skeletonOpacity = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     (async () => {
@@ -161,23 +158,26 @@ export default function SpecialsScreen() {
   useEffect(() => {
     if (!loading) {
       contentOpacity.setValue(0);
-      contentTranslateY.setValue(14);
-      Animated.parallel([
+      skeletonOpacity.setValue(1);
+      setShowSkeleton(true);
+      Animated.sequence([
+        Animated.timing(skeletonOpacity, {
+          toValue: 0,
+          duration: 420,
+          easing: Easing.inOut(Easing.cubic),
+          useNativeDriver: true,
+        }),
         Animated.timing(contentOpacity, {
           toValue: 1,
-          duration: 520,
-          easing: Easing.out(Easing.cubic),
+          duration: 620,
+          easing: Easing.inOut(Easing.cubic),
           useNativeDriver: true,
         }),
-        Animated.timing(contentTranslateY, {
-          toValue: 0,
-          duration: 520,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
-        }),
-      ]).start();
+      ]).start(() => {
+        setShowSkeleton(false);
+      });
     }
-  }, [loading, contentOpacity, contentTranslateY]);
+  }, [loading, contentOpacity, skeletonOpacity]);
 
   const weekDays = useMemo(() => orderedDayKeys(payload?.general_data?.current_day), [payload?.general_data?.current_day]);
 
@@ -192,10 +192,10 @@ export default function SpecialsScreen() {
 
   return (
     <ScreenContainer scrollViewRef={scrollRef} stickyHeader={toolbar}>
-      {loading ? <LoadingSkeleton /> : null}
+      {showSkeleton ? <Animated.View style={{ opacity: skeletonOpacity }}><LoadingSkeleton /></Animated.View> : null}
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
       {!loading && !error ? (
-        <Animated.View style={{ opacity: contentOpacity, transform: [{ translateY: contentTranslateY }] }}>
+        <Animated.View style={{ opacity: contentOpacity }}>
           {weekDays.map(({ dayKey, dayLabel }) => {
             const entries = payload?.specials_by_day?.[dayKey] ?? [];
             return (
