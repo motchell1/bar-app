@@ -72,7 +72,7 @@ function LoadingSkeleton() {
       Animated.sequence([
         Animated.timing(shimmer, {
           toValue: 1,
-          duration: 1600,
+          duration: 950,
           easing: Easing.linear,
           useNativeDriver: true,
         }),
@@ -160,16 +160,16 @@ export default function SpecialsScreen() {
       contentOpacity.setValue(0);
       skeletonOpacity.setValue(1);
       setShowSkeleton(true);
-      Animated.sequence([
+      Animated.parallel([
         Animated.timing(skeletonOpacity, {
           toValue: 0,
-          duration: 420,
+          duration: 700,
           easing: Easing.inOut(Easing.cubic),
           useNativeDriver: true,
         }),
         Animated.timing(contentOpacity, {
           toValue: 1,
-          duration: 620,
+          duration: 900,
           easing: Easing.inOut(Easing.cubic),
           useNativeDriver: true,
         }),
