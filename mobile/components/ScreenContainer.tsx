@@ -26,8 +26,7 @@ const styles = StyleSheet.create({
   },
   stickyHeader: {
     width: '100%',
-    maxWidth: 520,
-    alignSelf: 'center',
+    alignSelf: 'stretch',
     zIndex: 10,
   },
   scrollContent: {
