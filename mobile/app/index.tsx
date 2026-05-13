@@ -137,7 +137,7 @@ export default function SpecialsScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showSkeleton, setShowSkeleton] = useState(true);
-  const contentOpacity = useRef(new Animated.Value(0)).current;
+  const contentOpacity = useRef(new Animated.Value(0.05)).current;
   const skeletonOpacity = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
@@ -163,16 +163,19 @@ export default function SpecialsScreen() {
       Animated.parallel([
         Animated.timing(skeletonOpacity, {
           toValue: 0,
-          duration: 700,
+          duration: 1100,
           easing: Easing.inOut(Easing.cubic),
           useNativeDriver: true,
         }),
-        Animated.timing(contentOpacity, {
-          toValue: 1,
-          duration: 900,
-          easing: Easing.inOut(Easing.cubic),
-          useNativeDriver: true,
-        }),
+        Animated.sequence([
+          Animated.delay(180),
+          Animated.timing(contentOpacity, {
+            toValue: 1,
+            duration: 1500,
+            easing: Easing.inOut(Easing.cubic),
+            useNativeDriver: true,
+          }),
+        ]),
       ]).start(() => {
         setShowSkeleton(false);
       });
