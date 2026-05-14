@@ -191,7 +191,7 @@ export default function SpecialsScreen() {
   useEffect(() => {
     if (!showContent || dividerY === null || hasScrolledToDivider.current) return;
     requestAnimationFrame(() => {
-      scrollRef.current?.scrollTo?.({ y: Math.max(0, dividerY - 12), animated: false });
+      scrollRef.current?.scrollTo?.({ y: Math.max(0, dividerY - 10), animated: false });
       hasScrolledToDivider.current = true;
     });
   }, [showContent, dividerY, scrollRef]);
@@ -227,7 +227,7 @@ export default function SpecialsScreen() {
 
                     const hourMeta = payload?.open_hours?.[String(entry.bar_id)]?.[dayKey];
                     const isToday = dayKey === payload?.general_data?.current_day;
-                    const isOpen = bar.currently_open ?? bar.is_open_now;
+                    const isOpen = bar.is_open_now;
                     const hasActiveOrUpcoming = specials.some((special) => ['active', 'live', 'upcoming'].includes(String(special.current_status || '').toLowerCase()));
 
                     return {
@@ -274,7 +274,7 @@ export default function SpecialsScreen() {
                   return (
                     <>
                       {expiredOnly.map((card) => card.node)}
-                      {expiredOnly.length > 0 && activeOrUpcoming.length > 0 ? <View style={styles.activeUpcomingDivider} onLayout={(event) => setDividerY(event.nativeEvent.layout.y)}><View style={styles.dividerLine} /><Text style={styles.dividerLabel}>Active + Upcoming</Text><View style={styles.dividerLine} /></View> : null}
+                      {expiredOnly.length > 0 && activeOrUpcoming.length > 0 ? <View style={styles.activeUpcomingDivider} onLayout={(event) => setDividerY(event.nativeEvent.layout.y)}><View style={styles.dividerLine} /><Text style={styles.dividerLabel}>Active + Upcoming Today</Text><View style={styles.dividerLine} /></View> : null}
                       {activeOrUpcoming.map((card) => card.node)}
                     </>
                   );
@@ -297,7 +297,7 @@ const styles = StyleSheet.create({
   daySection: { gap: 12 },
   dayHeader: { color: '#636366', fontSize: 16, fontWeight: '700', borderBottomWidth: 1, borderBottomColor: '#ccc', paddingBottom: 10 },
   noSpecials: { color: '#555', fontStyle: 'italic', textAlign: 'center' },
-  card: { backgroundColor: '#fff', borderRadius: 14, overflow: 'hidden', shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 14, shadowOffset: { width: 0, height: 6 }, elevation: 5 },
+  card: { backgroundColor: '#fff', borderRadius: 14, overflow: 'hidden', shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 14, shadowOffset: { width: 0, height: 6 }, elevation: 5, marginBottom: 10 },
   cardImage: { width: '100%', height: 180 },
   cardContent: { padding: 16 },
   headingRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 10 },
