@@ -1,3 +1,4 @@
+const MAPS_WEB_API_KEY = globalThis.GOOGLE_MAPS_WEB_API_KEY || '';
 const MAP_DAY_KEYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 
 let barsMap = null;
@@ -82,7 +83,7 @@ function loadGoogleMapsApi() {
     return googleMapsLoaderPromise;
   }
 
-  const apiKey = startupPayload?.general_data?.google_api_key;
+  const apiKey = MAPS_WEB_API_KEY;
   if (!apiKey) {
     return Promise.reject(new Error('Google Maps API key is missing from startup payload.'));
   }

@@ -446,7 +446,6 @@ def build_startup_payload(device_id=None):
                 'general_data': {
                     'current_day': current_day_key,
                     'generated_at': now.isoformat(),
-                    'google_api_key': GOOGLE_API_KEY,
                     'google_map_id': GOOGLE_MAP_ID
                 },
                 'bars': bars_lookup,

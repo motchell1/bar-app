@@ -1,3 +1,4 @@
+const MAPS_WEB_API_KEY = globalThis.GOOGLE_MAPS_WEB_API_KEY || '';
 function getDayKeyFromName(dayName) {
   const dayIndex = DAYS_FULL.findIndex((name) => name === dayName);
   if (dayIndex < 0) return '';
@@ -155,7 +156,7 @@ function updateBarLocationSection(selectedBar) {
   if (!section || !mapFrame) return;
 
   const placeId = selectedBar?.google_place_id;
-  const googleApiKey = startupPayload?.general_data?.google_api_key;
+  const googleApiKey = MAPS_WEB_API_KEY;
   if (!placeId || !googleApiKey) {
     section.style.display = 'none';
     mapFrame.removeAttribute('src');
