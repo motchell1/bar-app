@@ -147,6 +147,7 @@ class DocumentMock {
 
 function loadAppWithoutBoot(document) {
   const scriptFiles = [
+    'js/config.js',
     'js/state.js',
     'js/utils.js',
     'js/render-home.js',
@@ -169,7 +170,7 @@ function loadAppWithoutBoot(document) {
   const context = {
     console,
     document,
-    window: { document, localStorage },
+    window: { document, localStorage, WEB_CONFIG: { GOOGLE_MAPS_WEB_API_KEY: 'client-google-key' } },
     URL,
     localStorage,
     lucide: { createIcons() {} },
@@ -879,7 +880,7 @@ test('showDetail reuses startup payload details when has_special_this_week is tr
 
   vm.runInContext(`
     startupPayload = {
-      general_data: { current_day: 'MON', google_api_key: 'client-google-key' },
+      general_data: { current_day: 'MON' },
       bars: {
         '1': { name: 'Startup Bar', neighborhood: 'Downtown', image_url: 'bar.jpg', google_place_id: 'abc123', is_open_now: false, has_special_this_week: true }
       },
@@ -921,10 +922,11 @@ test('showDetail reuses startup payload details when has_special_this_week is tr
   assert.equal(mapSrc, 'https://www.google.com/maps/embed/v1/place?key=client-google-key&q=place_id%3Aabc123');
 });
 
-test('showDetail hides location map when google_api_key is missing from startup general_data', async () => {
+test('showDetail hides location map when web config google maps key is missing', async () => {
   const document = new DocumentMock();
   mountBaseNodes(document);
   const ctx = loadAppWithoutBoot(document);
+  ctx.window.WEB_CONFIG.GOOGLE_MAPS_WEB_API_KEY = 'REPLACE_WITH_GOOGLE_MAPS_WEB_API_KEY';
 
   vm.runInContext(`
     startupPayload = {
