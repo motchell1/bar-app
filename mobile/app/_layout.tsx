@@ -1,6 +1,9 @@
 import { Tabs } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { theme } from '../constants/theme';
+import { prefetchStartupPayload } from '../services/api';
+
+prefetchStartupPayload().catch(() => null);
 
 export default function RootLayout() {
   return (
