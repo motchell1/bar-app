@@ -133,14 +133,15 @@ The folders inside `functions/` each correspond to an AWS Lambda function.
 
 ## Client map key configuration
 
-### Netlify (web)
-Set this environment variable in Netlify site settings:
+### Web client key
+Use this environment variable in whatever system builds/deploys the web bundle (CI/CD, S3 deploy script, etc.):
 - `GOOGLE_MAPS_WEB_API_KEY` (restricted browser key for Maps JavaScript + Maps Embed APIs)
 
-During Netlify build, `scripts/generate-web-maps-config.sh` writes `web/js/maps-config.js` from `GOOGLE_MAPS_WEB_API_KEY`.
+That deploy step should generate `web/js/maps-config.js` with:
+- `window.GOOGLE_MAPS_WEB_API_KEY = "<value>";`
 
-### Mobile (Expo/iOS)
-Set this environment variable in your Expo/EAS build environment:
+### Mobile (Expo/iOS) key
+If Netlify is building your mobile client, set this variable in Netlify env vars:
 - `EXPO_PUBLIC_GOOGLE_MAPS_IOS_API_KEY` (restricted iOS key)
 
-The app reads this value from `mobile/services/maps.ts`.
+The mobile app reads this value from `mobile/services/maps.ts`.
