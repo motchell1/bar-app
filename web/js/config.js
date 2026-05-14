@@ -1,0 +1,4 @@
+window.WEB_CONFIG = {
+  GOOGLE_MAPS_WEB_API_KEY: 'REPLACE_WITH_GOOGLE_MAPS_WEB_API_KEY',
+  ...(window.WEB_CONFIG || {})
+};

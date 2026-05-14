@@ -155,8 +155,8 @@ function updateBarLocationSection(selectedBar) {
   if (!section || !mapFrame) return;
 
   const placeId = selectedBar?.google_place_id;
-  const googleApiKey = startupPayload?.general_data?.google_api_key;
-  if (!placeId || !googleApiKey) {
+  const googleApiKey = window.WEB_CONFIG?.GOOGLE_MAPS_WEB_API_KEY;
+  if (!placeId || !googleApiKey || googleApiKey === 'REPLACE_WITH_GOOGLE_MAPS_WEB_API_KEY') {
     section.style.display = 'none';
     mapFrame.removeAttribute('src');
     if (detailLocationMapState.mapContainer) {

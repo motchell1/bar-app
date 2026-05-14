@@ -1,6 +1,4 @@
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'https://example.com/api';
-const STARTUP_API_URL = process.env.EXPO_PUBLIC_STARTUP_API_URL
-  ?? 'https://qz5rs9i9ya.execute-api.us-east-2.amazonaws.com/default/getStartupData';
+import { API_BASE_URL, STARTUP_API_URL } from './config';
 
 async function getJson<T>(path: string): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`);
