@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { ReactElement, useEffect, useMemo, useRef, useState } from 'react';
 import { useScrollToTop } from '@react-navigation/native';
-import { Animated, Easing, Image, StyleSheet, Text, View } from 'react-native';
+import { Animated, Easing, Image, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { ScreenContainer } from '../components/ScreenContainer';
 import { theme } from '../constants/theme';
 import { fetchStartupPayload, StartupPayload } from '../services/api';
@@ -141,6 +141,10 @@ export default function SpecialsScreen() {
   const hasScrolledToDivider = useRef(false);
   const [showSkeleton, setShowSkeleton] = useState(true);
   const [showContent, setShowContent] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [favoritesOnly, setFavoritesOnly] = useState(false);
+  const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
+  const [selectedNeighborhoods, setSelectedNeighborhoods] = useState<string[]>([]);
   const contentOpacity = useRef(new Animated.Value(0)).current;
   const skeletonOpacity = useRef(new Animated.Value(1)).current;
 
@@ -186,6 +190,14 @@ export default function SpecialsScreen() {
   }, [loading, contentOpacity, skeletonOpacity]);
 
   const weekDays = useMemo(() => orderedDayKeys(payload?.general_data?.current_day), [payload?.general_data?.current_day]);
+  const neighborhoods = useMemo(() => {
+    const all = Object.values(payload?.bars || {}).map((b) => b.neighborhood).filter(Boolean);
+    return Array.from(new Set(all)).sort((a, b) => a.localeCompare(b));
+  }, [payload?.bars]);
+
+  function toggleSelection(current: string[], value: string) {
+    return current.includes(value) ? current.filter((item) => item !== value) : [...current, value];
+  }
 
 
   useEffect(() => {
@@ -200,13 +212,39 @@ export default function SpecialsScreen() {
     <View style={styles.toolbar}>
       <View style={styles.toolbarInner}>
         <Text style={styles.toolbarTitle} onPress={() => scrollRef.current?.scrollTo?.({ top: 0, animated: true })}>BAR APP</Text>
-        <Text style={styles.hamburgerButton}>☰</Text>
+        <Text style={styles.hamburgerButton} onPress={() => setMenuOpen(true)}>☰</Text>
       </View>
     </View>
   );
 
   return (
     <ScreenContainer scrollViewRef={scrollRef} stickyHeader={toolbar}>
+      <Modal visible={menuOpen} transparent animationType="fade" onRequestClose={() => setMenuOpen(false)}>
+        <Pressable style={styles.sideMenuOverlay} onPress={() => setMenuOpen(false)} />
+        <View style={styles.sideMenu}>
+          <Text style={styles.sideMenuHeader}>Filters</Text>
+          <View style={styles.sideMenuContent}>
+            <Text style={styles.filterSectionTitle}>Special Types</Text>
+            {['food', 'drink', 'combo'].map((type) => (
+              <Pressable key={type} style={[styles.filterRow, selectedTypes.includes(type) ? styles.filterRowSelected : null]} onPress={() => setSelectedTypes((prev) => toggleSelection(prev, type))}>
+                <Text style={styles.filterLabel}>{type.toUpperCase()}</Text>
+              </Pressable>
+            ))}
+
+            <Text style={styles.filterSectionTitle}>Neighborhoods</Text>
+            {neighborhoods.map((neighborhood) => (
+              <Pressable key={neighborhood} style={[styles.filterRow, selectedNeighborhoods.includes(neighborhood) ? styles.filterRowSelected : null]} onPress={() => setSelectedNeighborhoods((prev) => toggleSelection(prev, neighborhood))}>
+                <Text style={styles.filterLabel}>{neighborhood}</Text>
+              </Pressable>
+            ))}
+
+            <Text style={styles.filterSectionTitle}>Favorites</Text>
+            <Pressable style={[styles.filterRow, favoritesOnly ? styles.filterRowSelected : null]} onPress={() => setFavoritesOnly((v) => !v)}>
+              <Text style={styles.filterLabel}>Only favorites</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
       {showSkeleton ? <Animated.View style={{ opacity: skeletonOpacity }}><LoadingSkeleton /></Animated.View> : null}
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
       {!loading && !error && showContent ? (
@@ -221,14 +259,22 @@ export default function SpecialsScreen() {
                   const cards = entries.map((entry) => {
                     const bar = payload?.bars?.[String(entry.bar_id)];
                     if (!bar) return null;
+                    if (selectedNeighborhoods.length > 0 && !selectedNeighborhoods.includes(bar.neighborhood)) return null;
                     const specialRows = (entry.specials ?? []).map((id) => payload?.specials?.[String(id)]).filter(Boolean) as SpecialItem[];
+                    const isBarFavorite = bar.favorite === true;
                     const specials = groupSpecialsForUI(specialRows).filter((special) => special.description);
-                    if (specials.length === 0) return null;
+                    const filteredSpecials = specials.filter((special) => {
+                      const specialType = String(special.special_type || special.type || '').toLowerCase();
+                      const matchesType = selectedTypes.length === 0 || selectedTypes.includes(specialType);
+                      const matchesFavorite = !favoritesOnly || isBarFavorite;
+                      return matchesType && matchesFavorite;
+                    });
+                    if (filteredSpecials.length === 0) return null;
 
                     const hourMeta = payload?.open_hours?.[String(entry.bar_id)]?.[dayKey];
                     const isToday = dayKey === payload?.general_data?.current_day;
                     const isOpen = bar.is_open_now;
-                    const hasActiveOrUpcoming = specials.some((special) => ['active', 'live', 'upcoming'].includes(String(special.current_status || '').toLowerCase()));
+                    const hasActiveOrUpcoming = filteredSpecials.some((special) => ['active', 'live', 'upcoming'].includes(String(special.current_status || '').toLowerCase()));
 
                     return {
                       key: `${dayKey}-${entry.bar_id}`,
@@ -239,7 +285,7 @@ export default function SpecialsScreen() {
                           <View style={styles.cardContent}>
                             <View style={styles.headingRow}><Text style={styles.barName}>{bar.name}</Text><Text style={styles.neighborhood}>{bar.neighborhood}</Text></View>
                             <View style={styles.specialsList}>
-                              {specials.map((special, index) => {
+                              {filteredSpecials.map((special, index) => {
                                 const status = (special.current_status ?? '').toLowerCase();
                                 const isLive = status === 'active' || status === 'live';
                                 return (
@@ -328,4 +374,12 @@ const styles = StyleSheet.create({
   activeUpcomingDivider: { marginTop: 12, marginBottom: 12, flexDirection: 'row', alignItems: 'center', gap: 10 },
   dividerLine: { flex: 1, height: 1, backgroundColor: '#d1d5db' },
   dividerLabel: { color: '#6b7280', fontSize: 12, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.4 },
+  sideMenuOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.4)' },
+  sideMenu: { marginLeft: 'auto', width: 300, height: '100%', backgroundColor: '#fff', paddingBottom: 70 },
+  sideMenuHeader: { height: 60, textAlign: 'center', textAlignVertical: 'center', fontWeight: '700', fontSize: 18, borderBottomWidth: 1, borderBottomColor: '#e6ecf5', backgroundColor: '#f7f9fc', paddingTop: 18 },
+  sideMenuContent: { padding: 16, gap: 10 },
+  filterSectionTitle: { fontSize: 14, textTransform: 'uppercase', color: '#555', letterSpacing: 1, marginTop: 8 },
+  filterRow: { borderWidth: 1.5, borderColor: '#d9d9d9', borderRadius: 5, paddingHorizontal: 14, paddingVertical: 12 },
+  filterRowSelected: { backgroundColor: '#e6f0ff', borderColor: '#1d4ed8' },
+  filterLabel: { color: '#111827' },
 });
