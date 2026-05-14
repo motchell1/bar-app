@@ -26,6 +26,8 @@ export type StartupPayload = {
     neighborhood: string;
     image_url?: string | null;
     is_open_now?: boolean;
+    currently_open?: boolean;
+    favorite?: boolean;
   }>;
   specials?: Record<string, {
     bar_id: number;
