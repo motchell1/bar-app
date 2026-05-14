@@ -59,9 +59,7 @@ export default function BarsScreen() {
 
   return (
     <ScreenContainer scrollViewRef={scrollRef}>
-      <Text style={styles.title}>Bars</Text>
-
-      <View style={styles.filtersCard}>
+      <View style={styles.searchWrap}>
         <TextInput
           placeholder="Search bars"
           placeholderTextColor="#9aa0aa"
@@ -127,24 +125,47 @@ export default function BarsScreen() {
 }
 
 const styles = StyleSheet.create({
-  title: { color: theme.colors.text, fontSize: 28, fontWeight: '800', marginBottom: 14 },
-  filtersCard: { backgroundColor: '#1a1d25', borderRadius: 16, borderWidth: 1, borderColor: '#2c313d', padding: 12, marginBottom: 14 },
-  input: { backgroundColor: '#10141d', color: theme.colors.text, borderRadius: 10, borderWidth: 1, borderColor: '#31384a', paddingHorizontal: 12, paddingVertical: 10, marginBottom: 12 },
-  rowWrap: { marginBottom: 10 },
+  searchWrap: { backgroundColor: '#f5f5f5' },
+  input: {
+    backgroundColor: '#fff',
+    color: '#333',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#e1e1e6',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 12,
+    fontSize: 14,
+  },
+  rowWrap: { marginBottom: 8 },
   favoritesRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  filterLabel: { color: '#cfd5e2', fontSize: 13, fontWeight: '700', marginBottom: 8 },
+  filterLabel: { color: '#666', fontSize: 12, fontWeight: '700', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.6 },
   chipsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: { borderWidth: 1, borderColor: '#444d62', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6 },
-  chipActive: { backgroundColor: theme.colors.accent, borderColor: theme.colors.accent },
-  chipText: { color: '#c7ceda', fontSize: 12, fontWeight: '600' },
-  chipTextActive: { color: '#111723' },
-  statusText: { color: '#c0c7d3', marginBottom: 10 },
-  errorText: { color: '#f77979', marginBottom: 10 },
-  card: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#1a1d25', borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: '#2b3040', marginBottom: 10 },
-  thumb: { width: 76, height: 76, backgroundColor: '#2d3342' },
-  content: { flex: 1, paddingHorizontal: 12, paddingVertical: 8 },
-  name: { color: theme.colors.text, fontSize: 16, fontWeight: '700' },
-  neighborhood: { color: '#a6afbf', fontSize: 12, marginTop: 2 },
-  meta: { color: '#d2d8e4', fontSize: 12, marginTop: 8 },
-  chevron: { color: '#7d8797', fontSize: 24, paddingHorizontal: 10 },
+  chip: { borderWidth: 1, borderColor: '#d8d8df', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6, backgroundColor: '#fff' },
+  chipActive: { backgroundColor: '#007aff', borderColor: '#007aff' },
+  chipText: { color: '#555', fontSize: 12, fontWeight: '600' },
+  chipTextActive: { color: '#fff' },
+  statusText: { color: '#666', marginBottom: 10, fontStyle: 'italic' },
+  errorText: { color: '#c62828', marginBottom: 10 },
+  card: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    shadowColor: '#000',
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 2,
+    marginBottom: 10,
+  },
+  thumb: { width: 58, height: 58, borderRadius: 10, backgroundColor: '#ececf1' },
+  content: { flex: 1 },
+  name: { color: '#222', fontSize: 15, fontWeight: '700' },
+  neighborhood: { color: '#777', fontSize: 11, marginTop: 2, textTransform: 'uppercase', letterSpacing: 0.8 },
+  meta: { color: '#666', fontSize: 12, marginTop: 6 },
+  chevron: { color: '#b0b0b7', fontSize: 24, paddingHorizontal: 4 },
 });
