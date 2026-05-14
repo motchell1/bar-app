@@ -83,7 +83,6 @@ async function loadBars() {
     }
   } catch (err) {
     console.error('Failed to load bars:', err);
-    startupPayloadPromise = requestStartupPayload();
   } finally {
     isInitialDataLoading = false;
     renderCurrentTabData();
