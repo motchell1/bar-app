@@ -61,12 +61,19 @@ function buildBarDetailsUrl(barId) {
   return url.toString();
 }
 
+
+function requestStartupPayload() {
+  return fetch(buildStartupUrl())
+    .then((response) => response.json())
+    .then((data) => (typeof data.body === 'string' ? JSON.parse(data.body) : data))
+    .then((parsed) => parsed.startup_payload || null);
+}
+
+// Start startup payload fetch immediately and reuse it during initial load.
+let startupPayloadPromise = requestStartupPayload();
 async function loadBars() {
   try {
-    const response = await fetch(buildStartupUrl());
-    const data = await response.json();
-    const parsed = typeof data.body === 'string' ? JSON.parse(data.body) : data;
-    startupPayload = parsed.startup_payload || null;
+    startupPayload = await startupPayloadPromise;
     barDetailsById = {};
     mapSelectedDayKey = startupPayload?.general_data?.current_day || null;
 

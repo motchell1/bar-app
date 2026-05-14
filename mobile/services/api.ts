@@ -60,13 +60,33 @@ function buildStartupUrl(deviceId?: string) {
   return url.toString();
 }
 
-export async function fetchStartupPayload(deviceId?: string): Promise<StartupPayload | null> {
-  const response = await fetch(buildStartupUrl(deviceId));
-  if (!response.ok) {
-    throw new Error(`Startup request failed: ${response.status}`);
-  }
 
-  const data = await response.json();
-  const parsed = typeof data?.body === 'string' ? JSON.parse(data.body) : data;
-  return parsed?.startup_payload ?? null;
+// Shared in-flight startup request to avoid duplicate calls during app boot.
+let startupPayloadPromise: Promise<StartupPayload | null> | null = null;
+
+function requestStartupPayload(deviceId?: string): Promise<StartupPayload | null> {
+  return fetch(buildStartupUrl(deviceId))
+    .then((response) => {
+      if (!response.ok) {
+        throw new Error(`Startup request failed: ${response.status}`);
+      }
+      return response.json();
+    })
+    .then((data) => {
+      const parsed = typeof data?.body === 'string' ? JSON.parse(data.body) : data;
+      return parsed?.startup_payload ?? null;
+    });
+}
+
+export function prefetchStartupPayload(deviceId?: string): Promise<StartupPayload | null> {
+  if (!startupPayloadPromise) {
+    startupPayloadPromise = requestStartupPayload(deviceId).catch((err) => {
+      startupPayloadPromise = null;
+      throw err;
+    });
+  }
+  return startupPayloadPromise;
+}
+export async function fetchStartupPayload(deviceId?: string): Promise<StartupPayload | null> {
+  return prefetchStartupPayload(deviceId);
 }
