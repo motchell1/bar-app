@@ -26,6 +26,8 @@ export type StartupPayload = {
     neighborhood: string;
     image_url?: string | null;
     is_open_now?: boolean;
+    currently_open?: boolean;
+    favorite?: boolean;
   }>;
   specials?: Record<string, {
     bar_id: number;
@@ -51,6 +53,10 @@ export async function fetchBars() {
 }
 
 
+let startupPayloadCache: StartupPayload | null = null;
+let startupPayloadPromise: Promise<StartupPayload | null> | null = null;
+let startupPayloadCacheDeviceId: string | undefined;
+
 function buildStartupUrl(deviceId?: string) {
   const base = API_BASE_URL.endsWith('/') ? API_BASE_URL : `${API_BASE_URL}/`;
   const url = new URL(STARTUP_API_URL, base);
@@ -60,13 +66,34 @@ function buildStartupUrl(deviceId?: string) {
   return url.toString();
 }
 
-export async function fetchStartupPayload(deviceId?: string): Promise<StartupPayload | null> {
-  const response = await fetch(buildStartupUrl(deviceId));
-  if (!response.ok) {
-    throw new Error(`Startup request failed: ${response.status}`);
+export async function fetchStartupPayload(deviceId?: string, options?: { forceRefresh?: boolean }): Promise<StartupPayload | null> {
+  const normalizedDeviceId = deviceId ? String(deviceId) : undefined;
+
+  if (options?.forceRefresh !== true) {
+    if (startupPayloadCache && startupPayloadCacheDeviceId === normalizedDeviceId) {
+      return startupPayloadCache;
+    }
+    if (startupPayloadPromise && startupPayloadCacheDeviceId === normalizedDeviceId) {
+      return startupPayloadPromise;
+    }
   }
 
-  const data = await response.json();
-  const parsed = typeof data?.body === 'string' ? JSON.parse(data.body) : data;
-  return parsed?.startup_payload ?? null;
+  startupPayloadCacheDeviceId = normalizedDeviceId;
+  startupPayloadPromise = (async () => {
+    const response = await fetch(buildStartupUrl(deviceId));
+    if (!response.ok) {
+      throw new Error(`Startup request failed: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const parsed = typeof data?.body === 'string' ? JSON.parse(data.body) : data;
+    startupPayloadCache = parsed?.startup_payload ?? null;
+    return startupPayloadCache;
+  })();
+
+  try {
+    return await startupPayloadPromise;
+  } finally {
+    startupPayloadPromise = null;
+  }
 }
