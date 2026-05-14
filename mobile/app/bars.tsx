@@ -57,8 +57,17 @@ export default function BarsScreen() {
     });
   }, [bars, query, selectedNeighborhood, favoritesOnly]);
 
+  const toolbar = (
+    <View style={styles.toolbar}>
+      <View style={styles.toolbarInner}>
+        <Text style={styles.toolbarTitle} onPress={() => scrollRef.current?.scrollTo?.({ y: 0, animated: true })}>BAR APP</Text>
+        <Text style={styles.hamburgerButton}>☰</Text>
+      </View>
+    </View>
+  );
+
   return (
-    <ScreenContainer scrollViewRef={scrollRef}>
+    <ScreenContainer scrollViewRef={scrollRef} stickyHeader={toolbar}>
       <View style={styles.searchWrap}>
         <TextInput
           placeholder="Search bars"
@@ -104,8 +113,7 @@ export default function BarsScreen() {
         <Text style={styles.statusText}>No bars match your current filters.</Text>
       ) : null}
 
-      {!loading && !error
-        ? filteredBars.map((bar) => (
+      {!loading && !error ? <View style={styles.listWrap}>{filteredBars.map((bar) => (
             <View key={`${bar.bar_id}-${bar.name}`} style={styles.card}>
               <Image
                 source={{ uri: bar.image_url && bar.image_url !== 'null' ? bar.image_url : 'https://placehold.co/144x144?text=Bar' }}
@@ -118,13 +126,16 @@ export default function BarsScreen() {
               </View>
               <Text style={styles.chevron}>›</Text>
             </View>
-          ))
-        : null}
+          ))}</View> : null}
     </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
+  toolbar: { backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#e6e6eb' },
+  toolbarInner: { height: 52, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16 },
+  toolbarTitle: { fontSize: 18, fontWeight: '800', color: '#111' },
+  hamburgerButton: { fontSize: 20, color: '#444' },
   searchWrap: { backgroundColor: '#f5f5f5' },
   input: {
     backgroundColor: '#fff',
@@ -147,6 +158,7 @@ const styles = StyleSheet.create({
   chipTextActive: { color: '#fff' },
   statusText: { color: '#666', marginBottom: 10, fontStyle: 'italic' },
   errorText: { color: '#c62828', marginBottom: 10 },
+  listWrap: { gap: 10 },
   card: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -160,7 +172,6 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 4 },
     elevation: 2,
-    marginBottom: 10,
   },
   thumb: { width: 58, height: 58, borderRadius: 10, backgroundColor: '#ececf1' },
   content: { flex: 1 },
