@@ -85,7 +85,7 @@ function loadGoogleMapsApi() {
 
   const apiKey = MAPS_WEB_API_KEY;
   if (!apiKey) {
-    return Promise.reject(new Error('Google Maps API key is missing from startup payload.'));
+    return Promise.reject(new Error('Google Maps API key is missing from GOOGLE_MAPS_WEB_API_KEY config.'));
   }
 
   googleMapsLoaderPromise = new Promise((resolve, reject) => {

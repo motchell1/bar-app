@@ -130,3 +130,17 @@ The folders inside `functions/` each correspond to an AWS Lambda function.
 4. `googleBarSync` leaves `existing_bars` alone, fetches and uploads images only for `new_bars`, and assigns each one an `image_file`.
 5. `googleBarSync` invokes `dbBarSync` mode `apply_bar_upsert` a second time.
 6. `dbBarSync` inserts new bars and updates open hours for both new and existing bars.
+
+## Client map key configuration
+
+### Netlify (web)
+Set this environment variable in Netlify site settings:
+- `GOOGLE_MAPS_WEB_API_KEY` (restricted browser key for Maps JavaScript + Maps Embed APIs)
+
+During Netlify build, `scripts/generate-web-maps-config.sh` writes `web/js/maps-config.js` from `GOOGLE_MAPS_WEB_API_KEY`.
+
+### Mobile (Expo/iOS)
+Set this environment variable in your Expo/EAS build environment:
+- `EXPO_PUBLIC_GOOGLE_MAPS_IOS_API_KEY` (restricted iOS key)
+
+The app reads this value from `mobile/services/maps.ts`.

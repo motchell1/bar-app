@@ -1,1 +1,1 @@
-const GOOGLE_MAPS_WEB_API_KEY = 'AIzaSyBdlfL9NhFDmo79prLXyBPK4XyvwhZrQyI';
+window.GOOGLE_MAPS_WEB_API_KEY = window.GOOGLE_MAPS_WEB_API_KEY || '';

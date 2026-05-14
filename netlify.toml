@@ -1,0 +1,3 @@
+[build]
+  command = "./scripts/generate-web-maps-config.sh"
+  publish = "web"
