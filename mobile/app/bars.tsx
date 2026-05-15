@@ -158,7 +158,7 @@ export default function BarsScreen() {
               <View style={styles.filterLabelGroup}>
                 <Text style={styles.filterText}>Favorites only</Text>
               </View>
-              <Text style={styles.iconText}>★</Text>
+              <Text style={styles.iconText}>☆</Text>
             </Pressable>
 
             <Text style={styles.sectionTitle}>Neighborhood</Text>
