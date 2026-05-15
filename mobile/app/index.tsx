@@ -286,7 +286,7 @@ export default function SpecialsScreen() {
     });
   }, [showContent, dividerY, scrollRef]);
 
-  const toolbar = (
+  const defaultToolbar = (
     <View style={styles.toolbar}>
       <View style={styles.toolbarInner}>
         <Text style={styles.toolbarTitle} onPress={() => scrollRef.current?.scrollTo?.({ top: 0, animated: true })}>BAR APP</Text>
@@ -295,8 +295,18 @@ export default function SpecialsScreen() {
     </View>
   );
 
+  const detailToolbar = (
+    <View style={styles.toolbar}>
+      <View style={styles.detailToolbarInner}>
+        <Pressable onPress={() => setSpecialDetail(null)} style={styles.detailBackButton}><Text style={styles.detailBackButtonText}>‹</Text></Pressable>
+        <Text style={styles.toolbarTitle}>BAR APP</Text>
+        <View style={styles.detailBackButton} />
+      </View>
+    </View>
+  );
+
   return (
-    <ScreenContainer scrollViewRef={scrollRef} stickyHeader={toolbar}>
+    <ScreenContainer scrollViewRef={scrollRef} stickyHeader={specialDetail ? detailToolbar : defaultToolbar}>
       <Modal visible={menuVisible} transparent animationType="none" onRequestClose={closeMenuDiscardDraft}>
         <Pressable style={styles.sideMenuOverlay} onPress={closeMenuDiscardDraft} />
         <Animated.View style={[styles.sideMenu, { transform: [{ translateX: sideMenuTranslateX }] }]}>
@@ -343,13 +353,6 @@ export default function SpecialsScreen() {
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
       {specialDetail ? (
         <View style={styles.specialDetailWrap}>
-          <View style={styles.toolbar}>
-            <View style={styles.detailToolbarInner}>
-              <Pressable onPress={() => setSpecialDetail(null)} style={styles.detailBackButton}><Text style={styles.detailBackButtonText}>‹</Text></Pressable>
-              <Text style={styles.toolbarTitle}>BAR APP</Text>
-              <View style={styles.detailBackButton} />
-            </View>
-          </View>
           <View style={styles.specialDetailContent}>
             <Image source={{ uri: specialDetail.bar.image_url && specialDetail.bar.image_url !== 'null' ? specialDetail.bar.image_url : 'https://placehold.co/640x360?text=Bar' }} style={styles.specialDetailImage} />
             <View style={styles.specialDetailCard}>
