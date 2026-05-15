@@ -162,8 +162,13 @@ export default function BarsScreen() {
             </Pressable>
 
             <Text style={styles.sectionTitle}>Neighborhood</Text>
-            <View style={styles.pickerWrap}>
-              <Picker selectedValue={draftSelectedNeighborhood} onValueChange={(nextValue) => setDraftSelectedNeighborhood(String(nextValue))}>
+            <View style={styles.dropdownWrap}>
+              <Picker
+                selectedValue={draftSelectedNeighborhood}
+                onValueChange={(nextValue) => setDraftSelectedNeighborhood(String(nextValue))}
+                mode="dropdown"
+                style={styles.nativePicker}
+              >
                 <Picker.Item label="All neighborhoods" value="" />
                 {neighborhoods.map((neighborhood) => (
                   <Picker.Item key={neighborhood} label={neighborhood} value={neighborhood} />
@@ -172,6 +177,7 @@ export default function BarsScreen() {
             </View>
 
             <View style={styles.sideFooter}>
+              <View style={styles.menuDivider} />
               <Pressable
                 style={styles.applyButton}
                 onPress={() => {
@@ -239,8 +245,10 @@ const styles = StyleSheet.create({
   filterLabelGroup: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   filterText: { color: '#222', fontSize: 14 },
   iconText: { color: '#8e8e93', fontSize: 16 },
-  pickerWrap: { marginHorizontal: 16, backgroundColor: '#fff', marginBottom: 8 },
-  sideFooter: { marginTop: 'auto', paddingHorizontal: 16 },
+  dropdownWrap: { marginHorizontal: 16, marginBottom: 8, borderWidth: 1.5, borderColor: '#d9d9d9', borderRadius: 5, overflow: 'hidden' },
+  nativePicker: { backgroundColor: '#fff', color: '#111827' },
+  sideFooter: { marginTop: 'auto', paddingHorizontal: 16, gap: 12 },
+  menuDivider: { height: 1, backgroundColor: '#ccc' },
   applyButton: { backgroundColor: '#007bff', borderRadius: 8, height: 56, alignItems: 'center', justifyContent: 'center' },
   applyText: { color: '#fff', fontSize: 20, fontWeight: '700' },
 });
