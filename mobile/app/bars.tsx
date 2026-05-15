@@ -165,7 +165,7 @@ export default function BarsScreen() {
             <View style={styles.dropdownWrap}>
               <Picker
                 selectedValue={draftSelectedNeighborhood}
-                onValueChange={(nextValue) => setDraftSelectedNeighborhood(String(nextValue))}
+                onValueChange={(nextValue: string | number) => setDraftSelectedNeighborhood(String(nextValue))}
                 mode="dropdown"
                 style={styles.nativePicker}
               >
