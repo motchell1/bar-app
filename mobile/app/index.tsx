@@ -5,15 +5,16 @@ import { useScrollToTop } from '@react-navigation/native';
 import { Animated, Easing, Image, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { ScreenContainer } from '../components/ScreenContainer';
 import { theme } from '../constants/theme';
-import { fetchStartupPayload, StartupPayload } from '../services/api';
+import { fetchStartupPayload, submitSpecialReport, StartupPayload } from '../services/api';
 
 const DAYS_FULL = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 type SpecialItem = NonNullable<StartupPayload['specials']>[string];
+type UISpecialItem = SpecialItem & { special_id?: string; grouped_special_ids?: string[] };
 type SpecialDetailContext = {
   barId: string;
   bar: NonNullable<StartupPayload['bars']>[string];
-  special: SpecialItem;
+  special: UISpecialItem;
   dayLabel: string;
 };
 
@@ -39,8 +40,8 @@ function format12Hour(timeValue?: string | null) {
 }
 
 
-function groupSpecialsForUI(specials: SpecialItem[]) {
-  const groups = new Map<string, SpecialItem[]>();
+function groupSpecialsForUI(specials: UISpecialItem[]) {
+  const groups = new Map<string, UISpecialItem[]>();
   specials.forEach((special) => {
     const specialType = special.special_type || special.type || '';
     const key = [specialType, special.all_day ? 'all-day' : 'timed', special.start_time || '', special.end_time || ''].join('|');
@@ -49,7 +50,7 @@ function groupSpecialsForUI(specials: SpecialItem[]) {
   });
 
   return Array.from(groups.values()).map((group) => {
-    const base = { ...group[0] };
+    const base: UISpecialItem = { ...group[0] };
     const uniqueDescriptions = Array.from(new Set(group.map((s) => (s.description || '').trim()).filter(Boolean)));
     base.description = uniqueDescriptions.join(' • ');
     const hasLive = group.some((s) => s.current_status === 'live' || s.current_status === 'active');
@@ -60,6 +61,7 @@ function groupSpecialsForUI(specials: SpecialItem[]) {
     else if (hasUpcoming) base.current_status = 'upcoming';
     else if (hasPast) base.current_status = 'past';
     if (hasFavorite) base.favorite = true;
+    base.grouped_special_ids = Array.from(new Set(group.map((s) => String(s.special_id || '')).filter(Boolean)));
     return base;
   });
 }
@@ -374,9 +376,32 @@ export default function SpecialsScreen() {
               </Pressable>
               {reportOpen ? (
                 <View style={styles.reportForm}>
-                  <TextInput placeholder="Reason" value={reportReason} onChangeText={setReportReason} style={styles.reportInput} />
+                  <View style={styles.dropdownWrap}>
+                    <Picker selectedValue={reportReason} onValueChange={(value: string | number) => setReportReason(String(value || ''))} mode="dropdown" style={styles.nativePicker}>
+                      <Picker.Item label="Select reason" value="" />
+                      <Picker.Item label="Wrong details" value="wrong_details" />
+                      <Picker.Item label="No longer offered" value="no_longer_offered" />
+                      <Picker.Item label="Timing is incorrect" value="timing_incorrect" />
+                    </Picker>
+                  </View>
                   <TextInput placeholder="Comment (optional)" value={reportComment} onChangeText={setReportComment} style={[styles.reportInput, styles.reportComment]} multiline />
-                  <Pressable style={styles.reportSubmit} onPress={() => { if (!reportReason.trim()) return; setReportSubmitted(true); setReportOpen(false); }}>
+                  <Pressable style={styles.reportSubmit} onPress={async () => {
+                    if (!reportReason.trim()) return;
+                    const specialIds = specialDetail.special.grouped_special_ids?.length
+                      ? specialDetail.special.grouped_special_ids
+                      : (specialDetail.special as UISpecialItem).special_id ? [String((specialDetail.special as UISpecialItem).special_id)] : [];
+                    if (specialIds.length === 0) return;
+                    const results = await Promise.allSettled(specialIds.map((id) => submitSpecialReport({
+                      bar_id: Number(specialDetail.barId),
+                      special_id: id,
+                      reason: reportReason,
+                      comment: reportComment.trim() || null,
+                      user_identifier: null,
+                    })));
+                    const hasFailure = results.some((result) => result.status !== 'fulfilled' || result.value.ok === false);
+                    if (hasFailure) return;
+                    setReportSubmitted(true); setReportOpen(false);
+                  }}>
                     <Text style={styles.reportSubmitText}>Submit report</Text>
                   </Pressable>
                 </View>
@@ -398,7 +423,10 @@ export default function SpecialsScreen() {
                     const bar = payload?.bars?.[String(entry.bar_id)];
                     if (!bar) return null;
                     if (selectedNeighborhoodApplied && selectedNeighborhoodApplied !== bar.neighborhood) return null;
-                    const specialRows = (entry.specials ?? []).map((id) => payload?.specials?.[String(id)]).filter(Boolean) as SpecialItem[];
+                    const specialRows = (entry.specials ?? []).map((id) => {
+                      const special = payload?.specials?.[String(id)];
+                      return special ? { ...special, special_id: String(id) } : null;
+                    }).filter(Boolean) as UISpecialItem[];
                     const isBarFavorite = bar.favorite === true;
                                         const specials = groupSpecialsForUI(specialRows).filter((special) => special.description);
                     const filteredSpecials = specials.filter((special) => {

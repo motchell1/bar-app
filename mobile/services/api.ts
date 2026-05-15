@@ -1,4 +1,4 @@
-import { API_BASE_URL, STARTUP_API_URL } from './config';
+import { API_BASE_URL, SPECIAL_REPORT_API_URL, STARTUP_API_URL } from './config';
 
 async function getJson<T>(path: string): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`);
@@ -49,6 +49,28 @@ export type StartupPayload = {
 
 export async function fetchBars() {
   return getJson<BarSummary[]>('/bars');
+}
+
+export async function submitSpecialReport(payload: {
+  bar_id: number | string | null;
+  special_id: number | string | null;
+  reason: string;
+  comment?: string | null;
+  user_identifier?: string | null;
+}) {
+  const response = await fetch(SPECIAL_REPORT_API_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain' },
+    body: JSON.stringify({
+      report_type: 'special',
+      bar_id: payload.bar_id,
+      special_id: payload.special_id,
+      reason: payload.reason,
+      comment: payload.comment ?? null,
+      user_identifier: payload.user_identifier ?? null,
+    }),
+  });
+  return response;
 }
 
 
