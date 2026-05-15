@@ -49,9 +49,11 @@ function groupSpecialsForUI(specials: SpecialItem[]) {
     const hasLive = group.some((s) => s.current_status === 'live' || s.current_status === 'active');
     const hasUpcoming = group.some((s) => s.current_status === 'upcoming');
     const hasPast = group.some((s) => s.current_status === 'past');
+    const hasFavorite = group.some((s) => s.favorite === true);
     if (hasLive) base.current_status = 'live';
     else if (hasUpcoming) base.current_status = 'upcoming';
     else if (hasPast) base.current_status = 'past';
+    if (hasFavorite) base.favorite = true;
     return base;
   });
 }
