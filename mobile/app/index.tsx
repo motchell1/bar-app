@@ -142,9 +142,10 @@ export default function SpecialsScreen() {
   const [showSkeleton, setShowSkeleton] = useState(true);
   const [showContent, setShowContent] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [favoritesOnly, setFavoritesOnly] = useState(false);
-  const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
-  const [selectedNeighborhoods, setSelectedNeighborhoods] = useState<string[]>([]);
+  const [selectedTypesDraft, setSelectedTypesDraft] = useState<string[]>([]);
+  const [selectedNeighborhoodDraft, setSelectedNeighborhoodDraft] = useState<string>('');
+  const [selectedTypesApplied, setSelectedTypesApplied] = useState<string[]>([]);
+  const [selectedNeighborhoodApplied, setSelectedNeighborhoodApplied] = useState<string>('');
   const contentOpacity = useRef(new Animated.Value(0)).current;
   const skeletonOpacity = useRef(new Animated.Value(1)).current;
 
@@ -199,6 +200,12 @@ export default function SpecialsScreen() {
     return current.includes(value) ? current.filter((item) => item !== value) : [...current, value];
   }
 
+  function applyFilters() {
+    setSelectedTypesApplied(selectedTypesDraft);
+    setSelectedNeighborhoodApplied(selectedNeighborhoodDraft);
+    setMenuOpen(false);
+  }
+
 
   useEffect(() => {
     if (!showContent || dividerY === null || hasScrolledToDivider.current) return;
@@ -224,24 +231,27 @@ export default function SpecialsScreen() {
         <View style={styles.sideMenu}>
           <Text style={styles.sideMenuHeader}>Filters</Text>
           <View style={styles.sideMenuContent}>
-            <Text style={styles.filterSectionTitle}>Special Types</Text>
-            {['food', 'drink', 'combo'].map((type) => (
-              <Pressable key={type} style={[styles.filterRow, selectedTypes.includes(type) ? styles.filterRowSelected : null]} onPress={() => setSelectedTypes((prev) => toggleSelection(prev, type))}>
+            <Text style={styles.filterSectionTitle}>Special Type</Text>
+            {['drink', 'food'].map((type) => (
+              <Pressable key={type} style={[styles.filterRow, selectedTypesDraft.includes(type) ? styles.filterRowSelected : null]} onPress={() => setSelectedTypesDraft((prev) => toggleSelection(prev, type))}>
                 <Text style={styles.filterLabel}>{type.toUpperCase()}</Text>
               </Pressable>
             ))}
 
-            <Text style={styles.filterSectionTitle}>Neighborhoods</Text>
-            {neighborhoods.map((neighborhood) => (
-              <Pressable key={neighborhood} style={[styles.filterRow, selectedNeighborhoods.includes(neighborhood) ? styles.filterRowSelected : null]} onPress={() => setSelectedNeighborhoods((prev) => toggleSelection(prev, neighborhood))}>
-                <Text style={styles.filterLabel}>{neighborhood}</Text>
-              </Pressable>
-            ))}
+            <Text style={styles.filterSectionTitle}>Neighborhood</Text>
+            <View style={styles.dropdownWrap}>
+              <Text style={styles.dropdownOption} onPress={() => setSelectedNeighborhoodDraft('')}>All neighborhoods</Text>
+              {neighborhoods.map((neighborhood) => (
+                <Text key={neighborhood} style={[styles.dropdownOption, selectedNeighborhoodDraft === neighborhood ? styles.dropdownOptionSelected : null]} onPress={() => setSelectedNeighborhoodDraft(neighborhood)}>{neighborhood}</Text>
+              ))}
+            </View>
 
-            <Text style={styles.filterSectionTitle}>Favorites</Text>
-            <Pressable style={[styles.filterRow, favoritesOnly ? styles.filterRowSelected : null]} onPress={() => setFavoritesOnly((v) => !v)}>
-              <Text style={styles.filterLabel}>Only favorites</Text>
-            </Pressable>
+            <View style={styles.sideMenuFooter}>
+              <View style={styles.menuDivider} />
+              <Pressable style={styles.applyFiltersButton} onPress={applyFilters}>
+                <Text style={styles.applyFiltersButtonText}>Apply Filters</Text>
+              </Pressable>
+            </View>
           </View>
         </View>
       </Modal>
@@ -259,15 +269,13 @@ export default function SpecialsScreen() {
                   const cards = entries.map((entry) => {
                     const bar = payload?.bars?.[String(entry.bar_id)];
                     if (!bar) return null;
-                    if (selectedNeighborhoods.length > 0 && !selectedNeighborhoods.includes(bar.neighborhood)) return null;
+                    if (selectedNeighborhoodApplied && selectedNeighborhoodApplied !== bar.neighborhood) return null;
                     const specialRows = (entry.specials ?? []).map((id) => payload?.specials?.[String(id)]).filter(Boolean) as SpecialItem[];
-                    const isBarFavorite = bar.favorite === true;
-                    const specials = groupSpecialsForUI(specialRows).filter((special) => special.description);
+                                        const specials = groupSpecialsForUI(specialRows).filter((special) => special.description);
                     const filteredSpecials = specials.filter((special) => {
                       const specialType = String(special.special_type || special.type || '').toLowerCase();
-                      const matchesType = selectedTypes.length === 0 || selectedTypes.includes(specialType);
-                      const matchesFavorite = !favoritesOnly || isBarFavorite;
-                      return matchesType && matchesFavorite;
+                      const matchesType = selectedTypesApplied.length === 0 || selectedTypesApplied.includes(specialType);
+                      return matchesType;
                     });
                     if (filteredSpecials.length === 0) return null;
 
@@ -382,4 +390,11 @@ const styles = StyleSheet.create({
   filterRow: { borderWidth: 1.5, borderColor: '#d9d9d9', borderRadius: 5, paddingHorizontal: 14, paddingVertical: 12 },
   filterRowSelected: { backgroundColor: '#e6f0ff', borderColor: '#1d4ed8' },
   filterLabel: { color: '#111827' },
+  dropdownWrap: { borderWidth: 1.5, borderColor: '#d9d9d9', borderRadius: 5, overflow: 'hidden' },
+  dropdownOption: { paddingHorizontal: 12, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#eef2f7', color: '#111827' },
+  dropdownOptionSelected: { backgroundColor: '#e6f0ff' },
+  sideMenuFooter: { marginTop: 10, gap: 12 },
+  menuDivider: { height: 1, backgroundColor: '#ccc' },
+  applyFiltersButton: { backgroundColor: '#007bff', borderRadius: 8, height: 52, alignItems: 'center', justifyContent: 'center' },
+  applyFiltersButtonText: { color: '#fff', fontWeight: '700', fontSize: 20 },
 });
