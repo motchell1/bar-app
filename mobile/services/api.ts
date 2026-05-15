@@ -1,5 +1,6 @@
 import { API_BASE_URL, SPECIAL_REPORT_API_URL, STARTUP_API_URL } from './config';
 import Constants from 'expo-constants';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 async function getJson<T>(path: string): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`);
@@ -79,11 +80,28 @@ let startupPayloadCache: StartupPayload | null = null;
 let startupPayloadPromise: Promise<StartupPayload | null> | null = null;
 let startupPayloadCacheDeviceId: string | undefined;
 let userIdentifierCache: string | null = null;
+const USER_IDENTIFIER_STORAGE_KEY = 'userIdentifier';
 
 export async function getUserIdentifier(): Promise<string> {
   if (userIdentifierCache) return userIdentifierCache;
+
+  try {
+    const persisted = await AsyncStorage.getItem(USER_IDENTIFIER_STORAGE_KEY);
+    if (persisted && persisted.trim()) {
+      userIdentifierCache = persisted.trim();
+      return userIdentifierCache;
+    }
+  } catch {
+    // ignore storage read failures and generate fallback
+  }
+
   const runtimeSessionId = Constants.sessionId ? String(Constants.sessionId) : '';
   userIdentifierCache = runtimeSessionId || `mobile-${Math.random().toString(36).slice(2, 14)}`;
+  try {
+    await AsyncStorage.setItem(USER_IDENTIFIER_STORAGE_KEY, userIdentifierCache);
+  } catch {
+    // ignore storage write failures and continue using in-memory cache
+  }
   return userIdentifierCache;
 }
 
