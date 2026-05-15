@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { Picker } from '@react-native-picker/picker';
 import { ReactElement, useEffect, useMemo, useRef, useState } from 'react';
 import { useScrollToTop } from '@react-navigation/native';
 import { Animated, Easing, Image, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
@@ -155,7 +156,6 @@ export default function SpecialsScreen() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [selectedTypesDraft, setSelectedTypesDraft] = useState<string[]>([]);
   const [selectedNeighborhoodDraft, setSelectedNeighborhoodDraft] = useState<string>('');
-  const [neighborhoodDropdownOpen, setNeighborhoodDropdownOpen] = useState(false);
   const [selectedTypesApplied, setSelectedTypesApplied] = useState<string[]>([]);
   const [selectedNeighborhoodApplied, setSelectedNeighborhoodApplied] = useState<string>('');
   const contentOpacity = useRef(new Animated.Value(0)).current;
@@ -221,14 +221,12 @@ export default function SpecialsScreen() {
   function closeMenuDiscardDraft() {
     setSelectedTypesDraft(selectedTypesApplied);
     setSelectedNeighborhoodDraft(selectedNeighborhoodApplied);
-    setNeighborhoodDropdownOpen(false);
     setMenuOpen(false);
   }
 
   function openMenuWithAppliedDrafts() {
     setSelectedTypesDraft(selectedTypesApplied);
     setSelectedNeighborhoodDraft(selectedNeighborhoodApplied);
-    setNeighborhoodDropdownOpen(false);
     setMenuOpen(true);
   }
 
@@ -267,26 +265,17 @@ export default function SpecialsScreen() {
 
             <Text style={styles.filterSectionTitle}>Neighborhood</Text>
             <View style={styles.dropdownWrap}>
-              <Pressable style={styles.dropdownTrigger} onPress={() => setNeighborhoodDropdownOpen((open) => !open)}>
-                <Text style={styles.dropdownTriggerText}>
-                  {selectedNeighborhoodDraft ? `📍 ${selectedNeighborhoodDraft}` : '📍 All neighborhoods'}
-                </Text>
-                <Ionicons name={neighborhoodDropdownOpen ? 'chevron-up' : 'chevron-down'} size={16} color="#6b7280" />
-              </Pressable>
-              {neighborhoodDropdownOpen ? (
-                <View>
-                  <Text style={[styles.dropdownOption, !selectedNeighborhoodDraft ? styles.dropdownOptionSelected : null]} onPress={() => { setSelectedNeighborhoodDraft(''); setNeighborhoodDropdownOpen(false); }}>📍 All neighborhoods</Text>
-                  {neighborhoods.map((neighborhood) => (
-                    <Text
-                      key={neighborhood}
-                      style={[styles.dropdownOption, selectedNeighborhoodDraft === neighborhood ? styles.dropdownOptionSelected : null]}
-                      onPress={() => { setSelectedNeighborhoodDraft(neighborhood); setNeighborhoodDropdownOpen(false); }}
-                    >
-                      📍 {neighborhood}
-                    </Text>
-                  ))}
-                </View>
-              ) : null}
+              <Picker
+                selectedValue={selectedNeighborhoodDraft}
+                onValueChange={(value) => setSelectedNeighborhoodDraft(String(value || ''))}
+                mode="dropdown"
+                style={styles.nativePicker}
+              >
+                <Picker.Item label="📍 All neighborhoods" value="" />
+                {neighborhoods.map((neighborhood) => (
+                  <Picker.Item key={neighborhood} label={`📍 ${neighborhood}`} value={neighborhood} />
+                ))}
+              </Picker>
             </View>
 
             <View style={styles.sideMenuFooter}>
@@ -432,10 +421,7 @@ const styles = StyleSheet.create({
   filterRowSelected: { backgroundColor: '#e6f0ff', borderColor: '#1d4ed8' },
   filterLabel: { color: '#111827' },
   dropdownWrap: { borderWidth: 1.5, borderColor: '#d9d9d9', borderRadius: 5, overflow: 'hidden' },
-  dropdownTrigger: { paddingHorizontal: 12, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#fff' },
-  dropdownTriggerText: { color: '#111827', fontSize: 14 },
-  dropdownOption: { paddingHorizontal: 12, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#eef2f7', color: '#111827' },
-  dropdownOptionSelected: { backgroundColor: '#e6f0ff' },
+  nativePicker: { backgroundColor: '#fff', color: '#111827' },
   sideMenuFooter: { marginTop: 10, gap: 12 },
   menuDivider: { height: 1, backgroundColor: '#ccc' },
   applyFiltersButton: { backgroundColor: '#007bff', borderRadius: 8, height: 52, alignItems: 'center', justifyContent: 'center' },
