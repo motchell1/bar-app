@@ -163,6 +163,7 @@ export default function SpecialsScreen() {
   const [favoritesOnlyApplied, setFavoritesOnlyApplied] = useState(false);
   const [selectedNeighborhoodApplied, setSelectedNeighborhoodApplied] = useState<string>('');
   const sideMenuTranslateX = useRef(new Animated.Value(300)).current;
+  const [menuVisible, setMenuVisible] = useState(false);
   const contentOpacity = useRef(new Animated.Value(0)).current;
   const skeletonOpacity = useRef(new Animated.Value(1)).current;
 
@@ -221,20 +222,37 @@ export default function SpecialsScreen() {
     setSelectedTypesApplied(selectedTypesDraft);
     setFavoritesOnlyApplied(favoritesOnlyDraft);
     setSelectedNeighborhoodApplied(selectedNeighborhoodDraft);
-    setMenuOpen(false);
+    Animated.timing(sideMenuTranslateX, {
+      toValue: 300,
+      duration: 220,
+      easing: Easing.in(Easing.cubic),
+      useNativeDriver: true,
+    }).start(() => {
+      setMenuOpen(false);
+      setMenuVisible(false);
+    });
   }
 
   function closeMenuDiscardDraft() {
     setSelectedTypesDraft(selectedTypesApplied);
     setFavoritesOnlyDraft(favoritesOnlyApplied);
     setSelectedNeighborhoodDraft(selectedNeighborhoodApplied);
-    setMenuOpen(false);
+    Animated.timing(sideMenuTranslateX, {
+      toValue: 300,
+      duration: 220,
+      easing: Easing.in(Easing.cubic),
+      useNativeDriver: true,
+    }).start(() => {
+      setMenuOpen(false);
+      setMenuVisible(false);
+    });
   }
 
   function openMenuWithAppliedDrafts() {
     setSelectedTypesDraft(selectedTypesApplied);
     setFavoritesOnlyDraft(favoritesOnlyApplied);
     setSelectedNeighborhoodDraft(selectedNeighborhoodApplied);
+    setMenuVisible(true);
     setMenuOpen(true);
   }
   useEffect(() => {
@@ -268,7 +286,7 @@ export default function SpecialsScreen() {
 
   return (
     <ScreenContainer scrollViewRef={scrollRef} stickyHeader={toolbar}>
-      <Modal visible={menuOpen} transparent animationType="none" onRequestClose={closeMenuDiscardDraft}>
+      <Modal visible={menuVisible} transparent animationType="none" onRequestClose={closeMenuDiscardDraft}>
         <Pressable style={styles.sideMenuOverlay} onPress={closeMenuDiscardDraft} />
         <Animated.View style={[styles.sideMenu, { transform: [{ translateX: sideMenuTranslateX }] }]}>
           <Text style={styles.sideMenuHeader}>Filters</Text>
@@ -282,8 +300,8 @@ export default function SpecialsScreen() {
             ))}
             <Text style={styles.filterSectionTitle}>Favorites</Text>
             <Pressable style={[styles.filterRow, styles.filterRowCompact, favoritesOnlyDraft ? styles.filterRowSelected : null]} onPress={() => setFavoritesOnlyDraft((v) => !v)}>
-              <Ionicons name="star-outline" size={18} color="#8e8e93" />
               <Text style={styles.filterLabelCompact}>Favorites only</Text>
+              <Ionicons name="star-outline" size={18} color="#8e8e93" />
             </Pressable>
 
             <Text style={styles.filterSectionTitle}>Neighborhood</Text>
