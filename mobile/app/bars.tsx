@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState, useEffect } from 'react';
 import { useScrollToTop } from '@react-navigation/native';
-import { Modal, Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Animated, Easing, Modal, Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { ScreenContainer } from '../components/ScreenContainer';
 import { fetchStartupPayload, StartupPayload } from '../services/api';
 
@@ -18,10 +18,12 @@ export default function BarsScreen() {
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isNeighborhoodDropdownOpen, setIsNeighborhoodDropdownOpen] = useState(false);
   const [favoritesOnly, setFavoritesOnly] = useState(false);
   const [selectedNeighborhood, setSelectedNeighborhood] = useState<string>('');
   const [draftFavoritesOnly, setDraftFavoritesOnly] = useState(false);
   const [draftSelectedNeighborhood, setDraftSelectedNeighborhood] = useState<string>('');
+  const drawerProgress = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     (async () => {
@@ -53,17 +55,38 @@ export default function BarsScreen() {
     });
   }, [bars, query, favoritesOnly, selectedNeighborhood]);
 
+  const openMenu = () => {
+    setDraftFavoritesOnly(favoritesOnly);
+    setDraftSelectedNeighborhood(selectedNeighborhood);
+    setIsNeighborhoodDropdownOpen(false);
+    setIsMenuOpen(true);
+    Animated.timing(drawerProgress, {
+      toValue: 1,
+      duration: 230,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const closeMenu = () => {
+    Animated.timing(drawerProgress, {
+      toValue: 0,
+      duration: 190,
+      easing: Easing.in(Easing.cubic),
+      useNativeDriver: true,
+    }).start(() => {
+      setIsNeighborhoodDropdownOpen(false);
+      setIsMenuOpen(false);
+    });
+  };
+
   const toolbar = (
     <View style={styles.toolbar}>
       <View style={styles.toolbarInner}>
         <Text style={styles.toolbarTitle} onPress={() => scrollRef.current?.scrollTo?.({ top: 0, animated: true })}>BAR APP</Text>
         <Text
           style={styles.hamburgerButton}
-          onPress={() => {
-            setDraftFavoritesOnly(favoritesOnly);
-            setDraftSelectedNeighborhood(selectedNeighborhood);
-            setIsMenuOpen(true);
-          }}
+          onPress={openMenu}
         >
           ☰
         </Text>
@@ -109,9 +132,24 @@ export default function BarsScreen() {
         ) : null}
       </ScreenContainer>
 
-      <Modal visible={isMenuOpen} animationType="slide" transparent onRequestClose={() => setIsMenuOpen(false)}>
-        <Pressable style={styles.overlay} onPress={() => setIsMenuOpen(false)}>
-          <Pressable style={styles.sideMenu} onPress={() => {}}>
+      <Modal visible={isMenuOpen} animationType="none" transparent onRequestClose={closeMenu}>
+        <Animated.View style={[styles.overlay, { opacity: drawerProgress }]}>
+          <Pressable style={styles.overlayTapArea} onPress={closeMenu} />
+          <Animated.View
+            style={[
+              styles.sideMenu,
+              {
+                transform: [
+                  {
+                    translateX: drawerProgress.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [300, 0],
+                    }),
+                  },
+                ],
+              },
+            ]}
+          >
             <Text style={styles.sideHeader}>Filters</Text>
 
             <Text style={styles.sectionTitle}>Bar Options</Text>
@@ -121,23 +159,35 @@ export default function BarsScreen() {
             </Pressable>
 
             <Text style={styles.sectionTitle}>Neighborhood</Text>
-            <Pressable
-              style={[styles.filterRow, draftSelectedNeighborhood === '' ? styles.filterRowSelected : null]}
-              onPress={() => setDraftSelectedNeighborhood('')}
-            >
-              <Text style={styles.filterText}>All neighborhoods</Text>
-              <Text style={styles.checkbox}>{draftSelectedNeighborhood === '' ? '◉' : '○'}</Text>
+            <Pressable style={styles.dropdownButton} onPress={() => setIsNeighborhoodDropdownOpen((current) => !current)}>
+              <Text style={styles.dropdownText}>{draftSelectedNeighborhood || 'All neighborhoods'}</Text>
+              <Text style={styles.dropdownChevron}>{isNeighborhoodDropdownOpen ? '▴' : '▾'}</Text>
             </Pressable>
-            {neighborhoods.map((neighborhood) => (
-              <Pressable
-                key={neighborhood}
-                style={[styles.filterRow, draftSelectedNeighborhood === neighborhood ? styles.filterRowSelected : null]}
-                onPress={() => setDraftSelectedNeighborhood(neighborhood)}
-              >
-                <Text style={styles.filterText}>{neighborhood}</Text>
-                <Text style={styles.checkbox}>{draftSelectedNeighborhood === neighborhood ? '◉' : '○'}</Text>
-              </Pressable>
-            ))}
+            {isNeighborhoodDropdownOpen ? (
+              <View style={styles.dropdownMenu}>
+                <Pressable
+                  style={[styles.dropdownOption, draftSelectedNeighborhood === '' ? styles.dropdownOptionSelected : null]}
+                  onPress={() => {
+                    setDraftSelectedNeighborhood('');
+                    setIsNeighborhoodDropdownOpen(false);
+                  }}
+                >
+                  <Text style={styles.filterText}>All neighborhoods</Text>
+                </Pressable>
+                {neighborhoods.map((neighborhood) => (
+                  <Pressable
+                    key={neighborhood}
+                    style={[styles.dropdownOption, draftSelectedNeighborhood === neighborhood ? styles.dropdownOptionSelected : null]}
+                    onPress={() => {
+                      setDraftSelectedNeighborhood(neighborhood);
+                      setIsNeighborhoodDropdownOpen(false);
+                    }}
+                  >
+                    <Text style={styles.filterText}>{neighborhood}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            ) : null}
 
             <View style={styles.sideFooter}>
               <Pressable
@@ -145,14 +195,14 @@ export default function BarsScreen() {
                 onPress={() => {
                   setFavoritesOnly(draftFavoritesOnly);
                   setSelectedNeighborhood(draftSelectedNeighborhood);
-                  setIsMenuOpen(false);
+                  closeMenu();
                 }}
               >
                 <Text style={styles.applyText}>Apply Filters</Text>
               </Pressable>
             </View>
-          </Pressable>
-        </Pressable>
+          </Animated.View>
+        </Animated.View>
       </Modal>
     </>
   );
@@ -197,7 +247,8 @@ const styles = StyleSheet.create({
   name: { color: '#222', fontSize: 15, fontWeight: '700' },
   neighborhood: { color: '#777', fontSize: 11, marginTop: 2, textTransform: 'uppercase', letterSpacing: 0.8 },
   chevron: { color: '#b0b0b7', fontSize: 24, paddingHorizontal: 4 },
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', alignItems: 'flex-end' },
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', flexDirection: 'row' },
+  overlayTapArea: { flex: 1 },
   sideMenu: { width: 300, height: '100%', backgroundColor: '#fff', paddingBottom: 24 },
   sideHeader: { height: 60, textAlign: 'center', textAlignVertical: 'center', paddingTop: 18, fontWeight: '700', fontSize: 18, borderBottomWidth: 1, borderColor: '#e6ecf5', backgroundColor: '#f7f9fc' },
   sectionTitle: { fontSize: 14, textTransform: 'uppercase', color: '#555', letterSpacing: 1, paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8 },
@@ -205,6 +256,12 @@ const styles = StyleSheet.create({
   filterRowSelected: { backgroundColor: '#e6f0ff', borderColor: '#1d4ed8' },
   filterText: { color: '#222', fontSize: 14 },
   checkbox: { color: '#8e8e93', fontSize: 18 },
+  dropdownButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1.5, borderColor: '#d9d9d9', borderRadius: 5, marginHorizontal: 16, paddingHorizontal: 12, height: 44, backgroundColor: '#fff' },
+  dropdownText: { color: '#222', fontSize: 14 },
+  dropdownChevron: { color: '#8e8e93', fontSize: 14 },
+  dropdownMenu: { marginHorizontal: 16, borderWidth: 1.5, borderColor: '#d9d9d9', borderRadius: 5, backgroundColor: '#fff', marginTop: 8, maxHeight: 230 },
+  dropdownOption: { paddingVertical: 10, paddingHorizontal: 12, borderBottomWidth: 1, borderBottomColor: '#ececf1' },
+  dropdownOptionSelected: { backgroundColor: '#e6f0ff' },
   sideFooter: { marginTop: 'auto', paddingHorizontal: 16 },
   applyButton: { backgroundColor: '#007bff', borderRadius: 8, height: 56, alignItems: 'center', justifyContent: 'center' },
   applyText: { color: '#fff', fontSize: 20, fontWeight: '700' },
