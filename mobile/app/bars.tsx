@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState, useEffect } from 'react';
 import { useScrollToTop } from '@react-navigation/native';
 import { Animated, Easing, Modal, Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Picker } from '@react-native-picker/picker';
 import { ScreenContainer } from '../components/ScreenContainer';
 import { fetchStartupPayload, StartupPayload } from '../services/api';
 
@@ -18,7 +19,6 @@ export default function BarsScreen() {
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [isNeighborhoodDropdownOpen, setIsNeighborhoodDropdownOpen] = useState(false);
   const [favoritesOnly, setFavoritesOnly] = useState(false);
   const [selectedNeighborhood, setSelectedNeighborhood] = useState<string>('');
   const [draftFavoritesOnly, setDraftFavoritesOnly] = useState(false);
@@ -58,7 +58,6 @@ export default function BarsScreen() {
   const openMenu = () => {
     setDraftFavoritesOnly(favoritesOnly);
     setDraftSelectedNeighborhood(selectedNeighborhood);
-    setIsNeighborhoodDropdownOpen(false);
     setIsMenuOpen(true);
     Animated.timing(drawerProgress, {
       toValue: 1,
@@ -75,7 +74,6 @@ export default function BarsScreen() {
       easing: Easing.in(Easing.cubic),
       useNativeDriver: true,
     }).start(() => {
-      setIsNeighborhoodDropdownOpen(false);
       setIsMenuOpen(false);
     });
   };
@@ -154,41 +152,20 @@ export default function BarsScreen() {
 
             <Text style={styles.sectionTitle}>Favorites</Text>
             <Pressable style={[styles.filterRow, draftFavoritesOnly ? styles.filterRowSelected : null]} onPress={() => setDraftFavoritesOnly((current) => !current)}>
-              <Text style={styles.filterText}>Favorites only</Text>
               <Text style={styles.iconText}>★</Text>
+              <Text style={styles.filterText}>Favorites only</Text>
               <Text style={styles.checkbox}>{draftFavoritesOnly ? '☑' : '☐'}</Text>
             </Pressable>
 
             <Text style={styles.sectionTitle}>Neighborhood</Text>
-            <Pressable style={styles.dropdownButton} onPress={() => setIsNeighborhoodDropdownOpen((current) => !current)}>
-              <Text style={styles.dropdownText}>{draftSelectedNeighborhood || 'All neighborhoods'}</Text>
-              <Text style={styles.dropdownChevron}>{isNeighborhoodDropdownOpen ? '▴' : '▾'}</Text>
-            </Pressable>
-            {isNeighborhoodDropdownOpen ? (
-              <View style={styles.dropdownMenu}>
-                <Pressable
-                  style={[styles.dropdownOption, draftSelectedNeighborhood === '' ? styles.dropdownOptionSelected : null]}
-                  onPress={() => {
-                    setDraftSelectedNeighborhood('');
-                    setIsNeighborhoodDropdownOpen(false);
-                  }}
-                >
-                  <Text style={styles.filterText}>All neighborhoods</Text>
-                </Pressable>
+            <View style={styles.pickerWrap}>
+              <Picker selectedValue={draftSelectedNeighborhood} onValueChange={(nextValue) => setDraftSelectedNeighborhood(String(nextValue))}>
+                <Picker.Item label="All neighborhoods" value="" />
                 {neighborhoods.map((neighborhood) => (
-                  <Pressable
-                    key={neighborhood}
-                    style={[styles.dropdownOption, draftSelectedNeighborhood === neighborhood ? styles.dropdownOptionSelected : null]}
-                    onPress={() => {
-                      setDraftSelectedNeighborhood(neighborhood);
-                      setIsNeighborhoodDropdownOpen(false);
-                    }}
-                  >
-                    <Text style={styles.filterText}>{neighborhood}</Text>
-                  </Pressable>
+                  <Picker.Item key={neighborhood} label={neighborhood} value={neighborhood} />
                 ))}
-              </View>
-            ) : null}
+              </Picker>
+            </View>
 
             <View style={styles.sideFooter}>
               <Pressable
@@ -258,12 +235,7 @@ const styles = StyleSheet.create({
   filterText: { color: '#222', fontSize: 14 },
   iconText: { color: '#8e8e93', fontSize: 16, marginRight: 10 },
   checkbox: { color: '#8e8e93', fontSize: 18 },
-  dropdownButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1.5, borderColor: '#d9d9d9', borderRadius: 5, marginHorizontal: 16, paddingHorizontal: 12, height: 44, backgroundColor: '#fff' },
-  dropdownText: { color: '#222', fontSize: 14 },
-  dropdownChevron: { color: '#8e8e93', fontSize: 14 },
-  dropdownMenu: { marginHorizontal: 16, borderWidth: 1.5, borderColor: '#d9d9d9', borderRadius: 5, backgroundColor: '#fff', marginTop: 8, maxHeight: 230 },
-  dropdownOption: { paddingVertical: 10, paddingHorizontal: 12, borderBottomWidth: 1, borderBottomColor: '#ececf1' },
-  dropdownOptionSelected: { backgroundColor: '#e6f0ff' },
+  pickerWrap: { borderWidth: 1.5, borderColor: '#d9d9d9', borderRadius: 5, marginHorizontal: 16, backgroundColor: '#fff', marginBottom: 8 },
   sideFooter: { marginTop: 'auto', paddingHorizontal: 16 },
   applyButton: { backgroundColor: '#007bff', borderRadius: 8, height: 56, alignItems: 'center', justifyContent: 'center' },
   applyText: { color: '#fff', fontSize: 20, fontWeight: '700' },
