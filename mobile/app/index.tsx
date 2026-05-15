@@ -5,7 +5,7 @@ import { useScrollToTop } from '@react-navigation/native';
 import { Animated, Easing, Image, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { ScreenContainer } from '../components/ScreenContainer';
 import { theme } from '../constants/theme';
-import { fetchStartupPayload, submitSpecialReport, StartupPayload } from '../services/api';
+import { fetchStartupPayload, getUserIdentifier, submitSpecialReport, StartupPayload } from '../services/api';
 
 const DAYS_FULL = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -387,6 +387,7 @@ export default function SpecialsScreen() {
                   <TextInput placeholder="Comment (optional)" value={reportComment} onChangeText={setReportComment} style={[styles.reportInput, styles.reportComment]} multiline />
                   <Pressable style={styles.reportSubmit} onPress={async () => {
                     if (!reportReason.trim()) return;
+                    const userIdentifier = await getUserIdentifier();
                     const specialIds = specialDetail.special.grouped_special_ids?.length
                       ? specialDetail.special.grouped_special_ids
                       : (specialDetail.special as UISpecialItem).special_id ? [String((specialDetail.special as UISpecialItem).special_id)] : [];
@@ -396,7 +397,7 @@ export default function SpecialsScreen() {
                       special_id: id,
                       reason: reportReason,
                       comment: reportComment.trim() || null,
-                      user_identifier: null,
+                      user_identifier: userIdentifier,
                     })));
                     const hasFailure = results.some((result) => result.status !== 'fulfilled' || result.value.ok === false);
                     if (hasFailure) return;

@@ -1,4 +1,5 @@
 import { API_BASE_URL, SPECIAL_REPORT_API_URL, STARTUP_API_URL } from './config';
+import Constants from 'expo-constants';
 
 async function getJson<T>(path: string): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`);
@@ -77,6 +78,14 @@ export async function submitSpecialReport(payload: {
 let startupPayloadCache: StartupPayload | null = null;
 let startupPayloadPromise: Promise<StartupPayload | null> | null = null;
 let startupPayloadCacheDeviceId: string | undefined;
+let userIdentifierCache: string | null = null;
+
+export async function getUserIdentifier(): Promise<string> {
+  if (userIdentifierCache) return userIdentifierCache;
+  const runtimeSessionId = Constants.sessionId ? String(Constants.sessionId) : '';
+  userIdentifierCache = runtimeSessionId || `mobile-${Math.random().toString(36).slice(2, 14)}`;
+  return userIdentifierCache;
+}
 
 function buildStartupUrl(deviceId?: string) {
   const base = API_BASE_URL.endsWith('/') ? API_BASE_URL : `${API_BASE_URL}/`;
