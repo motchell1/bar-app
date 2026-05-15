@@ -37,6 +37,7 @@ export type StartupPayload = {
     start_time?: string | null;
     end_time?: string | null;
     current_status?: string;
+    favorite?: boolean;
   }>;
   specials_by_day?: Record<string, Array<{ bar_id: number; specials: number[] }>>;
   open_hours?: Record<string, Record<string, {

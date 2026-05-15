@@ -155,9 +155,12 @@ export default function SpecialsScreen() {
   const [showContent, setShowContent] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [selectedTypesDraft, setSelectedTypesDraft] = useState<string[]>([]);
+  const [favoritesOnlyDraft, setFavoritesOnlyDraft] = useState(false);
   const [selectedNeighborhoodDraft, setSelectedNeighborhoodDraft] = useState<string>('');
   const [selectedTypesApplied, setSelectedTypesApplied] = useState<string[]>([]);
+  const [favoritesOnlyApplied, setFavoritesOnlyApplied] = useState(false);
   const [selectedNeighborhoodApplied, setSelectedNeighborhoodApplied] = useState<string>('');
+  const sideMenuTranslateX = useRef(new Animated.Value(300)).current;
   const contentOpacity = useRef(new Animated.Value(0)).current;
   const skeletonOpacity = useRef(new Animated.Value(1)).current;
 
@@ -214,21 +217,34 @@ export default function SpecialsScreen() {
 
   function applyFilters() {
     setSelectedTypesApplied(selectedTypesDraft);
+    setFavoritesOnlyApplied(favoritesOnlyDraft);
     setSelectedNeighborhoodApplied(selectedNeighborhoodDraft);
     setMenuOpen(false);
   }
 
   function closeMenuDiscardDraft() {
     setSelectedTypesDraft(selectedTypesApplied);
+    setFavoritesOnlyDraft(favoritesOnlyApplied);
     setSelectedNeighborhoodDraft(selectedNeighborhoodApplied);
     setMenuOpen(false);
   }
 
   function openMenuWithAppliedDrafts() {
     setSelectedTypesDraft(selectedTypesApplied);
+    setFavoritesOnlyDraft(favoritesOnlyApplied);
     setSelectedNeighborhoodDraft(selectedNeighborhoodApplied);
     setMenuOpen(true);
   }
+  useEffect(() => {
+    if (!menuOpen) return;
+    sideMenuTranslateX.setValue(300);
+    Animated.timing(sideMenuTranslateX, {
+      toValue: 0,
+      duration: 240,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [menuOpen, sideMenuTranslateX]);
 
 
   useEffect(() => {
@@ -250,9 +266,9 @@ export default function SpecialsScreen() {
 
   return (
     <ScreenContainer scrollViewRef={scrollRef} stickyHeader={toolbar}>
-      <Modal visible={menuOpen} transparent animationType="fade" onRequestClose={closeMenuDiscardDraft}>
+      <Modal visible={menuOpen} transparent animationType="none" onRequestClose={closeMenuDiscardDraft}>
         <Pressable style={styles.sideMenuOverlay} onPress={closeMenuDiscardDraft} />
-        <View style={styles.sideMenu}>
+        <Animated.View style={[styles.sideMenu, { transform: [{ translateX: sideMenuTranslateX }] }]}>
           <Text style={styles.sideMenuHeader}>Filters</Text>
           <View style={styles.sideMenuContent}>
             <Text style={styles.filterSectionTitle}>Special Type</Text>
@@ -262,18 +278,23 @@ export default function SpecialsScreen() {
                 <Ionicons name={type === 'drink' ? 'wine-outline' : 'restaurant-outline'} size={18} color="#8e8e93" />
               </Pressable>
             ))}
+            <Text style={styles.filterSectionTitle}>Favorites</Text>
+            <Pressable style={[styles.filterRow, styles.filterRowCompact, favoritesOnlyDraft ? styles.filterRowSelected : null]} onPress={() => setFavoritesOnlyDraft((v) => !v)}>
+              <Ionicons name="star-outline" size={18} color="#8e8e93" />
+              <Text style={styles.filterLabelCompact}>Favorites only</Text>
+            </Pressable>
 
             <Text style={styles.filterSectionTitle}>Neighborhood</Text>
             <View style={styles.dropdownWrap}>
               <Picker
                 selectedValue={selectedNeighborhoodDraft}
-                onValueChange={(value) => setSelectedNeighborhoodDraft(String(value || ''))}
+                onValueChange={(value: string | number) => setSelectedNeighborhoodDraft(String(value || ''))}
                 mode="dropdown"
                 style={styles.nativePicker}
               >
-                <Picker.Item label="📍 All neighborhoods" value="" />
+                <Picker.Item label="All neighborhoods" value="" />
                 {neighborhoods.map((neighborhood) => (
-                  <Picker.Item key={neighborhood} label={`📍 ${neighborhood}`} value={neighborhood} />
+                  <Picker.Item key={neighborhood} label={neighborhood} value={neighborhood} />
                 ))}
               </Picker>
             </View>
@@ -285,7 +306,7 @@ export default function SpecialsScreen() {
               </Pressable>
             </View>
           </View>
-        </View>
+        </Animated.View>
       </Modal>
       {showSkeleton ? <Animated.View style={{ opacity: skeletonOpacity }}><LoadingSkeleton /></Animated.View> : null}
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
@@ -303,9 +324,12 @@ export default function SpecialsScreen() {
                     if (!bar) return null;
                     if (selectedNeighborhoodApplied && selectedNeighborhoodApplied !== bar.neighborhood) return null;
                     const specialRows = (entry.specials ?? []).map((id) => payload?.specials?.[String(id)]).filter(Boolean) as SpecialItem[];
+                    const isBarFavorite = bar.favorite === true;
                                         const specials = groupSpecialsForUI(specialRows).filter((special) => special.description);
                     const filteredSpecials = specials.filter((special) => {
-                      return specialMatchesTypeFilters(special.special_type || special.type, selectedTypesApplied);
+                      const matchesType = specialMatchesTypeFilters(special.special_type || special.type, selectedTypesApplied);
+                      const matchesFavorite = !favoritesOnlyApplied || special.favorite === true || isBarFavorite;
+                      return matchesType && matchesFavorite;
                     });
                     if (filteredSpecials.length === 0) return null;
 
@@ -418,8 +442,10 @@ const styles = StyleSheet.create({
   sideMenuContent: { padding: 16, gap: 10 },
   filterSectionTitle: { fontSize: 14, textTransform: 'uppercase', color: '#555', letterSpacing: 1, marginTop: 8 },
   filterRow: { borderWidth: 1.5, borderColor: '#d9d9d9', borderRadius: 5, paddingHorizontal: 14, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  filterRowCompact: { justifyContent: 'flex-start', gap: 8 },
   filterRowSelected: { backgroundColor: '#e6f0ff', borderColor: '#1d4ed8' },
   filterLabel: { color: '#111827' },
+  filterLabelCompact: { color: '#111827' },
   dropdownWrap: { borderWidth: 1.5, borderColor: '#d9d9d9', borderRadius: 5, overflow: 'hidden' },
   nativePicker: { backgroundColor: '#fff', color: '#111827' },
   sideMenuFooter: { marginTop: 10, gap: 12 },
