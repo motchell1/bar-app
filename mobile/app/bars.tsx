@@ -152,8 +152,10 @@ export default function BarsScreen() {
 
             <Text style={styles.sectionTitle}>Favorites</Text>
             <Pressable style={[styles.filterRow, draftFavoritesOnly ? styles.filterRowSelected : null]} onPress={() => setDraftFavoritesOnly((current) => !current)}>
-              <Text style={styles.iconText}>★</Text>
-              <Text style={styles.filterText}>Favorites only</Text>
+              <View style={styles.filterLabelGroup}>
+                <Text style={styles.iconText}>★</Text>
+                <Text style={styles.filterText}>Favorites only</Text>
+              </View>
               <Text style={styles.checkbox}>{draftFavoritesOnly ? '☑' : '☐'}</Text>
             </Pressable>
 
@@ -232,8 +234,9 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 14, textTransform: 'uppercase', color: '#555', letterSpacing: 1, paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8 },
   filterRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, paddingHorizontal: 14, borderWidth: 1.5, borderColor: '#d9d9d9', borderRadius: 5, marginHorizontal: 16, marginBottom: 10 },
   filterRowSelected: { backgroundColor: '#e6f0ff', borderColor: '#1d4ed8' },
+  filterLabelGroup: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   filterText: { color: '#222', fontSize: 14 },
-  iconText: { color: '#8e8e93', fontSize: 16, marginRight: 10 },
+  iconText: { color: '#8e8e93', fontSize: 16 },
   checkbox: { color: '#8e8e93', fontSize: 18 },
   pickerWrap: { borderWidth: 1.5, borderColor: '#d9d9d9', borderRadius: 5, marginHorizontal: 16, backgroundColor: '#fff', marginBottom: 8 },
   sideFooter: { marginTop: 'auto', paddingHorizontal: 16 },
