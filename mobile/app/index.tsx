@@ -299,7 +299,7 @@ export default function SpecialsScreen() {
               </Pressable>
             ))}
             <Text style={styles.filterSectionTitle}>Favorites</Text>
-            <Pressable style={[styles.filterRow, styles.filterRowCompact, favoritesOnlyDraft ? styles.filterRowSelected : null]} onPress={() => setFavoritesOnlyDraft((v) => !v)}>
+            <Pressable style={[styles.filterRow, favoritesOnlyDraft ? styles.filterRowSelected : null]} onPress={() => setFavoritesOnlyDraft((v) => !v)}>
               <Text style={styles.filterLabelCompact}>Favorites only</Text>
               <Ionicons name="star-outline" size={18} color="#8e8e93" />
             </Pressable>
@@ -462,7 +462,6 @@ const styles = StyleSheet.create({
   sideMenuContent: { padding: 16, gap: 10 },
   filterSectionTitle: { fontSize: 14, textTransform: 'uppercase', color: '#555', letterSpacing: 1, marginTop: 8 },
   filterRow: { borderWidth: 1.5, borderColor: '#d9d9d9', borderRadius: 5, paddingHorizontal: 14, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  filterRowCompact: { justifyContent: 'flex-start', gap: 8 },
   filterRowSelected: { backgroundColor: '#e6f0ff', borderColor: '#1d4ed8' },
   filterLabel: { color: '#111827' },
   filterLabelCompact: { color: '#111827' },
