@@ -56,6 +56,7 @@ export default function BarsScreen() {
   }, [bars, query, favoritesOnly, selectedNeighborhood]);
 
   const openMenu = () => {
+    drawerProgress.stopAnimation();
     setDraftFavoritesOnly(favoritesOnly);
     setDraftSelectedNeighborhood(selectedNeighborhood);
     setIsMenuOpen(true);
@@ -68,12 +69,14 @@ export default function BarsScreen() {
   };
 
   const closeMenu = () => {
+    drawerProgress.stopAnimation();
     Animated.timing(drawerProgress, {
       toValue: 0,
       duration: 190,
       easing: Easing.in(Easing.cubic),
       useNativeDriver: true,
-    }).start(() => {
+    }).start(({ finished }) => {
+      if (!finished) return;
       setIsMenuOpen(false);
     });
   };
