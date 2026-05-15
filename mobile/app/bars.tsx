@@ -177,6 +177,7 @@ export default function BarsScreen() {
             </View>
 
             <View style={styles.sideFooter}>
+              <View style={styles.menuDivider} />
               <Pressable
                 style={styles.applyButton}
                 onPress={() => {
@@ -246,7 +247,8 @@ const styles = StyleSheet.create({
   iconText: { color: '#8e8e93', fontSize: 16 },
   dropdownWrap: { marginHorizontal: 16, marginBottom: 8, borderWidth: 1.5, borderColor: '#d9d9d9', borderRadius: 5, overflow: 'hidden' },
   nativePicker: { backgroundColor: '#fff', color: '#111827' },
-  sideFooter: { marginTop: 'auto', paddingHorizontal: 16 },
+  sideFooter: { marginTop: 'auto', paddingHorizontal: 16, gap: 12 },
+  menuDivider: { height: 1, backgroundColor: '#ccc' },
   applyButton: { backgroundColor: '#007bff', borderRadius: 8, height: 56, alignItems: 'center', justifyContent: 'center' },
   applyText: { color: '#fff', fontSize: 20, fontWeight: '700' },
 });
