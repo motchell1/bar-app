@@ -156,10 +156,9 @@ export default function BarsScreen() {
             <Text style={styles.sectionTitle}>Favorites</Text>
             <Pressable style={[styles.filterRow, draftFavoritesOnly ? styles.filterRowSelected : null]} onPress={() => setDraftFavoritesOnly((current) => !current)}>
               <View style={styles.filterLabelGroup}>
-                <Text style={styles.iconText}>★</Text>
                 <Text style={styles.filterText}>Favorites only</Text>
               </View>
-              <Text style={styles.checkbox}>{draftFavoritesOnly ? '☑' : '☐'}</Text>
+              <Text style={styles.iconText}>★</Text>
             </Pressable>
 
             <Text style={styles.sectionTitle}>Neighborhood</Text>
@@ -240,8 +239,7 @@ const styles = StyleSheet.create({
   filterLabelGroup: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   filterText: { color: '#222', fontSize: 14 },
   iconText: { color: '#8e8e93', fontSize: 16 },
-  checkbox: { color: '#8e8e93', fontSize: 18 },
-  pickerWrap: { borderWidth: 1.5, borderColor: '#d9d9d9', borderRadius: 5, marginHorizontal: 16, backgroundColor: '#fff', marginBottom: 8 },
+  pickerWrap: { marginHorizontal: 16, backgroundColor: '#fff', marginBottom: 8 },
   sideFooter: { marginTop: 'auto', paddingHorizontal: 16 },
   applyButton: { backgroundColor: '#007bff', borderRadius: 8, height: 56, alignItems: 'center', justifyContent: 'center' },
   applyText: { color: '#fff', fontSize: 20, fontWeight: '700' },
