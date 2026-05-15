@@ -217,6 +217,18 @@ export default function SpecialsScreen() {
     setMenuOpen(false);
   }
 
+  function closeMenuDiscardDraft() {
+    setSelectedTypesDraft(selectedTypesApplied);
+    setSelectedNeighborhoodDraft(selectedNeighborhoodApplied);
+    setMenuOpen(false);
+  }
+
+  function openMenuWithAppliedDrafts() {
+    setSelectedTypesDraft(selectedTypesApplied);
+    setSelectedNeighborhoodDraft(selectedNeighborhoodApplied);
+    setMenuOpen(true);
+  }
+
 
   useEffect(() => {
     if (!showContent || dividerY === null || hasScrolledToDivider.current) return;
@@ -230,15 +242,15 @@ export default function SpecialsScreen() {
     <View style={styles.toolbar}>
       <View style={styles.toolbarInner}>
         <Text style={styles.toolbarTitle} onPress={() => scrollRef.current?.scrollTo?.({ top: 0, animated: true })}>BAR APP</Text>
-        <Text style={styles.hamburgerButton} onPress={() => setMenuOpen(true)}>☰</Text>
+        <Text style={styles.hamburgerButton} onPress={openMenuWithAppliedDrafts}>☰</Text>
       </View>
     </View>
   );
 
   return (
     <ScreenContainer scrollViewRef={scrollRef} stickyHeader={toolbar}>
-      <Modal visible={menuOpen} transparent animationType="fade" onRequestClose={() => setMenuOpen(false)}>
-        <Pressable style={styles.sideMenuOverlay} onPress={() => setMenuOpen(false)} />
+      <Modal visible={menuOpen} transparent animationType="fade" onRequestClose={closeMenuDiscardDraft}>
+        <Pressable style={styles.sideMenuOverlay} onPress={closeMenuDiscardDraft} />
         <View style={styles.sideMenu}>
           <Text style={styles.sideMenuHeader}>Filters</Text>
           <View style={styles.sideMenuContent}>
