@@ -63,6 +63,17 @@ function iconForType(type?: string) {
   return [];
 }
 
+function specialMatchesTypeFilters(specialType?: string, selectedTypes: string[] = []) {
+  if (!Array.isArray(selectedTypes) || selectedTypes.length === 0) return true;
+  const normalizedSpecialType = String(specialType || '').trim().toLowerCase();
+  const normalizedSelectedTypes = selectedTypes.map((type) => String(type || '').trim().toLowerCase());
+  if (normalizedSpecialType === 'combo') {
+    return normalizedSelectedTypes.includes('combo')
+      || normalizedSelectedTypes.includes('food')
+      || normalizedSelectedTypes.includes('drink');
+  }
+  return normalizedSelectedTypes.includes(normalizedSpecialType);
+}
 
 
 function LoadingSkeleton() {
@@ -234,15 +245,16 @@ export default function SpecialsScreen() {
             <Text style={styles.filterSectionTitle}>Special Type</Text>
             {['drink', 'food'].map((type) => (
               <Pressable key={type} style={[styles.filterRow, selectedTypesDraft.includes(type) ? styles.filterRowSelected : null]} onPress={() => setSelectedTypesDraft((prev) => toggleSelection(prev, type))}>
-                <Text style={styles.filterLabel}>{type.toUpperCase()}</Text>
+                <Text style={styles.filterLabel}>{type === 'drink' ? 'Drinks' : 'Food'}</Text>
+                <Ionicons name={type === 'drink' ? 'wine-outline' : 'restaurant-outline'} size={18} color="#8e8e93" />
               </Pressable>
             ))}
 
             <Text style={styles.filterSectionTitle}>Neighborhood</Text>
             <View style={styles.dropdownWrap}>
-              <Text style={styles.dropdownOption} onPress={() => setSelectedNeighborhoodDraft('')}>All neighborhoods</Text>
+              <Text style={styles.dropdownOption} onPress={() => setSelectedNeighborhoodDraft('')}>📍 All neighborhoods</Text>
               {neighborhoods.map((neighborhood) => (
-                <Text key={neighborhood} style={[styles.dropdownOption, selectedNeighborhoodDraft === neighborhood ? styles.dropdownOptionSelected : null]} onPress={() => setSelectedNeighborhoodDraft(neighborhood)}>{neighborhood}</Text>
+                <Text key={neighborhood} style={[styles.dropdownOption, selectedNeighborhoodDraft === neighborhood ? styles.dropdownOptionSelected : null]} onPress={() => setSelectedNeighborhoodDraft(neighborhood)}>📍 {neighborhood}</Text>
               ))}
             </View>
 
@@ -273,9 +285,7 @@ export default function SpecialsScreen() {
                     const specialRows = (entry.specials ?? []).map((id) => payload?.specials?.[String(id)]).filter(Boolean) as SpecialItem[];
                                         const specials = groupSpecialsForUI(specialRows).filter((special) => special.description);
                     const filteredSpecials = specials.filter((special) => {
-                      const specialType = String(special.special_type || special.type || '').toLowerCase();
-                      const matchesType = selectedTypesApplied.length === 0 || selectedTypesApplied.includes(specialType);
-                      return matchesType;
+                      return specialMatchesTypeFilters(special.special_type || special.type, selectedTypesApplied);
                     });
                     if (filteredSpecials.length === 0) return null;
 
@@ -387,7 +397,7 @@ const styles = StyleSheet.create({
   sideMenuHeader: { height: 60, textAlign: 'center', textAlignVertical: 'center', fontWeight: '700', fontSize: 18, borderBottomWidth: 1, borderBottomColor: '#e6ecf5', backgroundColor: '#f7f9fc', paddingTop: 18 },
   sideMenuContent: { padding: 16, gap: 10 },
   filterSectionTitle: { fontSize: 14, textTransform: 'uppercase', color: '#555', letterSpacing: 1, marginTop: 8 },
-  filterRow: { borderWidth: 1.5, borderColor: '#d9d9d9', borderRadius: 5, paddingHorizontal: 14, paddingVertical: 12 },
+  filterRow: { borderWidth: 1.5, borderColor: '#d9d9d9', borderRadius: 5, paddingHorizontal: 14, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   filterRowSelected: { backgroundColor: '#e6f0ff', borderColor: '#1d4ed8' },
   filterLabel: { color: '#111827' },
   dropdownWrap: { borderWidth: 1.5, borderColor: '#d9d9d9', borderRadius: 5, overflow: 'hidden' },
