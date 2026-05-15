@@ -1,7 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
+import { Picker } from '@react-native-picker/picker';
 import { ReactElement, useEffect, useMemo, useRef, useState } from 'react';
 import { useScrollToTop } from '@react-navigation/native';
-import { Animated, Easing, Image, StyleSheet, Text, View } from 'react-native';
+import { Animated, Easing, Image, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { ScreenContainer } from '../components/ScreenContainer';
 import { theme } from '../constants/theme';
 import { fetchStartupPayload, StartupPayload } from '../services/api';
@@ -48,9 +49,11 @@ function groupSpecialsForUI(specials: SpecialItem[]) {
     const hasLive = group.some((s) => s.current_status === 'live' || s.current_status === 'active');
     const hasUpcoming = group.some((s) => s.current_status === 'upcoming');
     const hasPast = group.some((s) => s.current_status === 'past');
+    const hasFavorite = group.some((s) => s.favorite === true);
     if (hasLive) base.current_status = 'live';
     else if (hasUpcoming) base.current_status = 'upcoming';
     else if (hasPast) base.current_status = 'past';
+    if (hasFavorite) base.favorite = true;
     return base;
   });
 }
@@ -63,6 +66,17 @@ function iconForType(type?: string) {
   return [];
 }
 
+function specialMatchesTypeFilters(specialType?: string, selectedTypes: string[] = []) {
+  if (!Array.isArray(selectedTypes) || selectedTypes.length === 0) return true;
+  const normalizedSpecialType = String(specialType || '').trim().toLowerCase();
+  const normalizedSelectedTypes = selectedTypes.map((type) => String(type || '').trim().toLowerCase());
+  if (normalizedSpecialType === 'combo') {
+    return normalizedSelectedTypes.includes('combo')
+      || normalizedSelectedTypes.includes('food')
+      || normalizedSelectedTypes.includes('drink');
+  }
+  return normalizedSelectedTypes.includes(normalizedSpecialType);
+}
 
 
 function LoadingSkeleton() {
@@ -141,6 +155,15 @@ export default function SpecialsScreen() {
   const hasScrolledToDivider = useRef(false);
   const [showSkeleton, setShowSkeleton] = useState(true);
   const [showContent, setShowContent] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [selectedTypesDraft, setSelectedTypesDraft] = useState<string[]>([]);
+  const [favoritesOnlyDraft, setFavoritesOnlyDraft] = useState(false);
+  const [selectedNeighborhoodDraft, setSelectedNeighborhoodDraft] = useState<string>('');
+  const [selectedTypesApplied, setSelectedTypesApplied] = useState<string[]>([]);
+  const [favoritesOnlyApplied, setFavoritesOnlyApplied] = useState(false);
+  const [selectedNeighborhoodApplied, setSelectedNeighborhoodApplied] = useState<string>('');
+  const sideMenuTranslateX = useRef(new Animated.Value(300)).current;
+  const [menuVisible, setMenuVisible] = useState(false);
   const contentOpacity = useRef(new Animated.Value(0)).current;
   const skeletonOpacity = useRef(new Animated.Value(1)).current;
 
@@ -186,6 +209,62 @@ export default function SpecialsScreen() {
   }, [loading, contentOpacity, skeletonOpacity]);
 
   const weekDays = useMemo(() => orderedDayKeys(payload?.general_data?.current_day), [payload?.general_data?.current_day]);
+  const neighborhoods = useMemo(() => {
+    const all = Object.values(payload?.bars || {}).map((b) => b.neighborhood).filter(Boolean);
+    return Array.from(new Set(all)).sort((a, b) => a.localeCompare(b));
+  }, [payload?.bars]);
+
+  function toggleSelection(current: string[], value: string) {
+    return current.includes(value) ? current.filter((item) => item !== value) : [...current, value];
+  }
+
+  function applyFilters() {
+    setSelectedTypesApplied(selectedTypesDraft);
+    setFavoritesOnlyApplied(favoritesOnlyDraft);
+    setSelectedNeighborhoodApplied(selectedNeighborhoodDraft);
+    Animated.timing(sideMenuTranslateX, {
+      toValue: 300,
+      duration: 220,
+      easing: Easing.in(Easing.cubic),
+      useNativeDriver: true,
+    }).start(() => {
+      setMenuOpen(false);
+      setMenuVisible(false);
+    });
+  }
+
+  function closeMenuDiscardDraft() {
+    setSelectedTypesDraft(selectedTypesApplied);
+    setFavoritesOnlyDraft(favoritesOnlyApplied);
+    setSelectedNeighborhoodDraft(selectedNeighborhoodApplied);
+    Animated.timing(sideMenuTranslateX, {
+      toValue: 300,
+      duration: 220,
+      easing: Easing.in(Easing.cubic),
+      useNativeDriver: true,
+    }).start(() => {
+      setMenuOpen(false);
+      setMenuVisible(false);
+    });
+  }
+
+  function openMenuWithAppliedDrafts() {
+    setSelectedTypesDraft(selectedTypesApplied);
+    setFavoritesOnlyDraft(favoritesOnlyApplied);
+    setSelectedNeighborhoodDraft(selectedNeighborhoodApplied);
+    setMenuVisible(true);
+    setMenuOpen(true);
+  }
+  useEffect(() => {
+    if (!menuOpen) return;
+    sideMenuTranslateX.setValue(300);
+    Animated.timing(sideMenuTranslateX, {
+      toValue: 0,
+      duration: 240,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [menuOpen, sideMenuTranslateX]);
 
 
   useEffect(() => {
@@ -200,13 +279,55 @@ export default function SpecialsScreen() {
     <View style={styles.toolbar}>
       <View style={styles.toolbarInner}>
         <Text style={styles.toolbarTitle} onPress={() => scrollRef.current?.scrollTo?.({ top: 0, animated: true })}>BAR APP</Text>
-        <Text style={styles.hamburgerButton}>☰</Text>
+        <Text style={styles.hamburgerButton} onPress={openMenuWithAppliedDrafts}>☰</Text>
       </View>
     </View>
   );
 
   return (
     <ScreenContainer scrollViewRef={scrollRef} stickyHeader={toolbar}>
+      <Modal visible={menuVisible} transparent animationType="none" onRequestClose={closeMenuDiscardDraft}>
+        <Pressable style={styles.sideMenuOverlay} onPress={closeMenuDiscardDraft} />
+        <Animated.View style={[styles.sideMenu, { transform: [{ translateX: sideMenuTranslateX }] }]}>
+          <Text style={styles.sideMenuHeader}>Filters</Text>
+          <View style={styles.sideMenuContent}>
+            <Text style={styles.filterSectionTitle}>Special Type</Text>
+            {['drink', 'food'].map((type) => (
+              <Pressable key={type} style={[styles.filterRow, selectedTypesDraft.includes(type) ? styles.filterRowSelected : null]} onPress={() => setSelectedTypesDraft((prev) => toggleSelection(prev, type))}>
+                <Text style={styles.filterLabel}>{type === 'drink' ? 'Drinks' : 'Food'}</Text>
+                <Ionicons name={type === 'drink' ? 'wine-outline' : 'restaurant-outline'} size={18} color="#8e8e93" />
+              </Pressable>
+            ))}
+            <Text style={styles.filterSectionTitle}>Favorites</Text>
+            <Pressable style={[styles.filterRow, favoritesOnlyDraft ? styles.filterRowSelected : null]} onPress={() => setFavoritesOnlyDraft((v) => !v)}>
+              <Text style={styles.filterLabelCompact}>Favorites only</Text>
+              <Ionicons name="star-outline" size={18} color="#8e8e93" />
+            </Pressable>
+
+            <Text style={styles.filterSectionTitle}>Neighborhood</Text>
+            <View style={styles.dropdownWrap}>
+              <Picker
+                selectedValue={selectedNeighborhoodDraft}
+                onValueChange={(value: string | number) => setSelectedNeighborhoodDraft(String(value || ''))}
+                mode="dropdown"
+                style={styles.nativePicker}
+              >
+                <Picker.Item label="All neighborhoods" value="" />
+                {neighborhoods.map((neighborhood) => (
+                  <Picker.Item key={neighborhood} label={neighborhood} value={neighborhood} />
+                ))}
+              </Picker>
+            </View>
+
+            <View style={styles.sideMenuFooter}>
+              <View style={styles.menuDivider} />
+              <Pressable style={styles.applyFiltersButton} onPress={applyFilters}>
+                <Text style={styles.applyFiltersButtonText}>Apply Filters</Text>
+              </Pressable>
+            </View>
+          </View>
+        </Animated.View>
+      </Modal>
       {showSkeleton ? <Animated.View style={{ opacity: skeletonOpacity }}><LoadingSkeleton /></Animated.View> : null}
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
       {!loading && !error && showContent ? (
@@ -221,14 +342,21 @@ export default function SpecialsScreen() {
                   const cards = entries.map((entry) => {
                     const bar = payload?.bars?.[String(entry.bar_id)];
                     if (!bar) return null;
+                    if (selectedNeighborhoodApplied && selectedNeighborhoodApplied !== bar.neighborhood) return null;
                     const specialRows = (entry.specials ?? []).map((id) => payload?.specials?.[String(id)]).filter(Boolean) as SpecialItem[];
-                    const specials = groupSpecialsForUI(specialRows).filter((special) => special.description);
-                    if (specials.length === 0) return null;
+                    const isBarFavorite = bar.favorite === true;
+                                        const specials = groupSpecialsForUI(specialRows).filter((special) => special.description);
+                    const filteredSpecials = specials.filter((special) => {
+                      const matchesType = specialMatchesTypeFilters(special.special_type || special.type, selectedTypesApplied);
+                      const matchesFavorite = !favoritesOnlyApplied || special.favorite === true || isBarFavorite;
+                      return matchesType && matchesFavorite;
+                    });
+                    if (filteredSpecials.length === 0) return null;
 
                     const hourMeta = payload?.open_hours?.[String(entry.bar_id)]?.[dayKey];
                     const isToday = dayKey === payload?.general_data?.current_day;
                     const isOpen = bar.is_open_now;
-                    const hasActiveOrUpcoming = specials.some((special) => ['active', 'live', 'upcoming'].includes(String(special.current_status || '').toLowerCase()));
+                    const hasActiveOrUpcoming = filteredSpecials.some((special) => ['active', 'live', 'upcoming'].includes(String(special.current_status || '').toLowerCase()));
 
                     return {
                       key: `${dayKey}-${entry.bar_id}`,
@@ -239,7 +367,7 @@ export default function SpecialsScreen() {
                           <View style={styles.cardContent}>
                             <View style={styles.headingRow}><Text style={styles.barName}>{bar.name}</Text><Text style={styles.neighborhood}>{bar.neighborhood}</Text></View>
                             <View style={styles.specialsList}>
-                              {specials.map((special, index) => {
+                              {filteredSpecials.map((special, index) => {
                                 const status = (special.current_status ?? '').toLowerCase();
                                 const isLive = status === 'active' || status === 'live';
                                 return (
@@ -328,4 +456,19 @@ const styles = StyleSheet.create({
   activeUpcomingDivider: { marginTop: 12, marginBottom: 12, flexDirection: 'row', alignItems: 'center', gap: 10 },
   dividerLine: { flex: 1, height: 1, backgroundColor: '#d1d5db' },
   dividerLabel: { color: '#6b7280', fontSize: 12, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.4 },
+  sideMenuOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.4)' },
+  sideMenu: { marginLeft: 'auto', width: 300, height: '100%', backgroundColor: '#fff', paddingBottom: 70 },
+  sideMenuHeader: { height: 60, textAlign: 'center', textAlignVertical: 'center', fontWeight: '700', fontSize: 18, borderBottomWidth: 1, borderBottomColor: '#e6ecf5', backgroundColor: '#f7f9fc', paddingTop: 18 },
+  sideMenuContent: { padding: 16, gap: 10 },
+  filterSectionTitle: { fontSize: 14, textTransform: 'uppercase', color: '#555', letterSpacing: 1, marginTop: 8 },
+  filterRow: { borderWidth: 1.5, borderColor: '#d9d9d9', borderRadius: 5, paddingHorizontal: 14, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  filterRowSelected: { backgroundColor: '#e6f0ff', borderColor: '#1d4ed8' },
+  filterLabel: { color: '#111827' },
+  filterLabelCompact: { color: '#111827' },
+  dropdownWrap: { borderWidth: 1.5, borderColor: '#d9d9d9', borderRadius: 5, overflow: 'hidden' },
+  nativePicker: { backgroundColor: '#fff', color: '#111827' },
+  sideMenuFooter: { marginTop: 10, gap: 12 },
+  menuDivider: { height: 1, backgroundColor: '#ccc' },
+  applyFiltersButton: { backgroundColor: '#007bff', borderRadius: 8, height: 52, alignItems: 'center', justifyContent: 'center' },
+  applyFiltersButtonText: { color: '#fff', fontWeight: '700', fontSize: 20 },
 });
