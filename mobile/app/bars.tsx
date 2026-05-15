@@ -152,9 +152,10 @@ export default function BarsScreen() {
           >
             <Text style={styles.sideHeader}>Filters</Text>
 
-            <Text style={styles.sectionTitle}>Bar Options</Text>
+            <Text style={styles.sectionTitle}>Favorites</Text>
             <Pressable style={[styles.filterRow, draftFavoritesOnly ? styles.filterRowSelected : null]} onPress={() => setDraftFavoritesOnly((current) => !current)}>
               <Text style={styles.filterText}>Favorites only</Text>
+              <Text style={styles.iconText}>★</Text>
               <Text style={styles.checkbox}>{draftFavoritesOnly ? '☑' : '☐'}</Text>
             </Pressable>
 
@@ -255,6 +256,7 @@ const styles = StyleSheet.create({
   filterRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, paddingHorizontal: 14, borderWidth: 1.5, borderColor: '#d9d9d9', borderRadius: 5, marginHorizontal: 16, marginBottom: 10 },
   filterRowSelected: { backgroundColor: '#e6f0ff', borderColor: '#1d4ed8' },
   filterText: { color: '#222', fontSize: 14 },
+  iconText: { color: '#8e8e93', fontSize: 16, marginRight: 10 },
   checkbox: { color: '#8e8e93', fontSize: 18 },
   dropdownButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1.5, borderColor: '#d9d9d9', borderRadius: 5, marginHorizontal: 16, paddingHorizontal: 12, height: 44, backgroundColor: '#fff' },
   dropdownText: { color: '#222', fontSize: 14 },
