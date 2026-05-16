@@ -96,13 +96,14 @@ export async function getUserIdentifier(): Promise<string> {
   }
 
   const runtimeSessionId = Constants.sessionId ? String(Constants.sessionId) : '';
-  userIdentifierCache = runtimeSessionId || `mobile-${Math.random().toString(36).slice(2, 14)}`;
+  const nextIdentifier = runtimeSessionId || `mobile-${Math.random().toString(36).slice(2, 14)}`;
+  userIdentifierCache = nextIdentifier;
   try {
-    await AsyncStorage.setItem(USER_IDENTIFIER_STORAGE_KEY, userIdentifierCache);
+    await AsyncStorage.setItem(USER_IDENTIFIER_STORAGE_KEY, nextIdentifier);
   } catch {
     // ignore storage write failures and continue using in-memory cache
   }
-  return userIdentifierCache;
+  return nextIdentifier;
 }
 
 function buildStartupUrl(deviceId?: string) {

@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Picker } from '@react-native-picker/picker';
 import { ReactElement, useEffect, useMemo, useRef, useState } from 'react';
 import { useScrollToTop } from '@react-navigation/native';
-import { Animated, Easing, Image, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Animated, Easing, Image, LayoutAnimation, Modal, Platform, Pressable, StyleSheet, Text, TextInput, UIManager, View } from 'react-native';
 import { ScreenContainer } from '../components/ScreenContainer';
 import { theme } from '../constants/theme';
 import { fetchStartupPayload, getUserIdentifier, submitSpecialReport, StartupPayload } from '../services/api';
@@ -179,6 +179,12 @@ export default function SpecialsScreen() {
   const [menuVisible, setMenuVisible] = useState(false);
   const contentOpacity = useRef(new Animated.Value(0)).current;
   const skeletonOpacity = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+      UIManager.setLayoutAnimationEnabledExperimental(true);
+    }
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -371,14 +377,25 @@ export default function SpecialsScreen() {
             <View style={styles.reportSection}>
               <Text style={styles.reportTitle}>Report issue</Text>
               <Text style={styles.reportCopy}>Help us keep specials accurate by flagging anything that looks wrong.</Text>
-              <Pressable style={[styles.reportToggle, reportSubmitted ? styles.reportToggleSubmitted : null]} disabled={reportSubmitted} onPress={() => setReportOpen((v) => !v)}>
+              <Pressable style={[styles.reportToggle, reportSubmitted ? styles.reportToggleSubmitted : null]} disabled={reportSubmitted} onPress={() => {
+                LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                setReportOpen((current) => {
+                  const nextOpen = !current;
+                  if (nextOpen) {
+                    const scrollToReport = () => scrollRef.current?.scrollToEnd?.({ animated: true });
+                    requestAnimationFrame(scrollToReport);
+                    setTimeout(scrollToReport, 260);
+                  }
+                  return nextOpen;
+                });
+              }}>
                 <Text style={[styles.reportToggleText, reportSubmitted ? styles.reportToggleTextSubmitted : null]}>{reportSubmitted ? 'Thanks for your feedback!' : 'Mark for review'}</Text>
               </Pressable>
               {reportOpen ? (
                 <View style={styles.reportForm}>
                   <View style={styles.dropdownWrap}>
                     <Picker selectedValue={reportReason} onValueChange={(value: string | number) => setReportReason(String(value || ''))} mode="dropdown" style={styles.nativePicker}>
-                      <Picker.Item label="Select reason" value="" />
+                      <Picker.Item label="Select reason" value="" enabled={false} />
                       <Picker.Item label="Wrong details" value="wrong_details" />
                       <Picker.Item label="No longer offered" value="no_longer_offered" />
                       <Picker.Item label="Timing is incorrect" value="timing_incorrect" />
@@ -544,13 +561,13 @@ const styles = StyleSheet.create({
   dividerLine: { flex: 1, height: 1, backgroundColor: '#d1d5db' },
   dividerLabel: { color: '#6b7280', fontSize: 12, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.4 },
   specialDetailWrap: { flex: 1, backgroundColor: '#f5f5f5' },
-  specialDetailContent: { padding: 14, paddingTop: 62, gap: 14 },
+  specialDetailContent: { padding: 14, paddingTop: 14, gap: 14 },
   specialDetailImage: { width: '100%', height: 180, borderRadius: 12 },
-  specialDetailCard: { backgroundColor: '#fff', borderRadius: 12, padding: 12 },
+  specialDetailCard: { backgroundColor: '#fff', borderRadius: 12, padding: 12, shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 4 },
   specialDetailBarName: { fontSize: 16, fontWeight: '700', color: '#111827' },
   specialMeta: { marginBottom: 10, marginTop: 8 },
   specialDayBadge: { alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, backgroundColor: '#e7f1ff', color: '#0a58ca', fontSize: 12, fontWeight: '700', textTransform: 'uppercase' },
-  reportSection: { marginTop: 2, backgroundColor: '#fff', borderRadius: 12, padding: 12 },
+  reportSection: { marginTop: 2, backgroundColor: '#fff', borderRadius: 12, padding: 12, shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 4 },
   reportTitle: { textTransform: 'uppercase', fontSize: 14, color: '#555', fontWeight: '700' },
   reportCopy: { marginTop: 8, fontSize: 14, color: '#666' },
   reportToggle: { marginTop: 12, borderWidth: 1, borderColor: '#007bff', backgroundColor: '#f0f7ff', borderRadius: 10, paddingVertical: 10, paddingHorizontal: 12 },
