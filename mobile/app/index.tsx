@@ -180,6 +180,7 @@ export default function SpecialsScreen() {
   const contentOpacity = useRef(new Animated.Value(0)).current;
   const skeletonOpacity = useRef(new Animated.Value(1)).current;
   const reportAnim = useRef(new Animated.Value(0)).current;
+  const reportSubmissionTokenRef = useRef(0);
 
   useEffect(() => {
     if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -423,13 +424,16 @@ export default function SpecialsScreen() {
                   <TextInput placeholder="Comment (optional)" value={reportComment} onChangeText={setReportComment} style={[styles.reportInput, styles.reportComment]} multiline />
                   <Pressable style={styles.reportSubmit} onPress={async () => {
                     if (!reportReason.trim()) return;
+                    const submissionToken = ++reportSubmissionTokenRef.current;
+                    const detailSnapshot = specialDetail;
+                    const specialSnapshotId = (detailSnapshot.special as UISpecialItem).special_id || detailSnapshot.special.grouped_special_ids?.join('|') || '';
                     const userIdentifier = await getUserIdentifier();
-                    const specialIds = specialDetail.special.grouped_special_ids?.length
-                      ? specialDetail.special.grouped_special_ids
-                      : (specialDetail.special as UISpecialItem).special_id ? [String((specialDetail.special as UISpecialItem).special_id)] : [];
+                    const specialIds = detailSnapshot.special.grouped_special_ids?.length
+                      ? detailSnapshot.special.grouped_special_ids
+                      : (detailSnapshot.special as UISpecialItem).special_id ? [String((detailSnapshot.special as UISpecialItem).special_id)] : [];
                     if (specialIds.length === 0) return;
                     const results = await Promise.allSettled(specialIds.map((id) => submitSpecialReport({
-                      bar_id: Number(specialDetail.barId),
+                      bar_id: Number(detailSnapshot.barId),
                       special_id: id,
                       reason: reportReason,
                       comment: reportComment.trim() || null,
@@ -437,6 +441,15 @@ export default function SpecialsScreen() {
                     })));
                     const hasFailure = results.some((result) => result.status !== 'fulfilled' || result.value.ok === false);
                     if (hasFailure) return;
+                    const activeSpecialId = specialDetail
+                      ? ((specialDetail.special as UISpecialItem).special_id || specialDetail.special.grouped_special_ids?.join('|') || '')
+                      : '';
+                    const sameDetailStillOpen = Boolean(
+                      specialDetail
+                      && specialDetail.barId === detailSnapshot.barId
+                      && activeSpecialId === specialSnapshotId
+                    );
+                    if (reportSubmissionTokenRef.current !== submissionToken || !sameDetailStillOpen) return;
                     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
                     setReportSubmitted(true);
                     setReportOpen(false);
