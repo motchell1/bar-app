@@ -415,9 +415,9 @@ export default function SpecialsScreen() {
                   <View style={styles.dropdownWrap}>
                     <Picker selectedValue={reportReason} onValueChange={(value: string | number) => setReportReason(String(value || ''))} mode="dropdown" style={styles.nativePicker}>
                       <Picker.Item label="Select reason" value="" enabled={false} />
-                      <Picker.Item label="Wrong details" value="wrong_details" />
-                      <Picker.Item label="No longer offered" value="no_longer_offered" />
-                      <Picker.Item label="Timing is incorrect" value="timing_incorrect" />
+                      <Picker.Item label="Special is no longer active" value="Special is no longer active" />
+                      <Picker.Item label="Special details are inaccurate" value="Special details are inaccurate" />
+                      <Picker.Item label="Other" value="Other" />
                     </Picker>
                   </View>
                   <TextInput placeholder="Comment (optional)" value={reportComment} onChangeText={setReportComment} style={[styles.reportInput, styles.reportComment]} multiline />
