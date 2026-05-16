@@ -2,14 +2,21 @@ import { Ionicons } from '@expo/vector-icons';
 import { Picker } from '@react-native-picker/picker';
 import { ReactElement, useEffect, useMemo, useRef, useState } from 'react';
 import { useScrollToTop } from '@react-navigation/native';
-import { Animated, Easing, Image, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Easing, Image, LayoutAnimation, Modal, Platform, Pressable, StyleSheet, Text, TextInput, UIManager, View } from 'react-native';
 import { ScreenContainer } from '../components/ScreenContainer';
 import { theme } from '../constants/theme';
-import { fetchStartupPayload, StartupPayload } from '../services/api';
+import { fetchStartupPayload, getUserIdentifier, submitSpecialReport, StartupPayload } from '../services/api';
 
 const DAYS_FULL = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 type SpecialItem = NonNullable<StartupPayload['specials']>[string];
+type UISpecialItem = SpecialItem & { special_id?: string; grouped_special_ids?: string[] };
+type SpecialDetailContext = {
+  barId: string;
+  bar: NonNullable<StartupPayload['bars']>[string];
+  special: UISpecialItem;
+  dayLabel: string;
+};
 
 function orderedDayKeys(currentDay?: string) {
   const configuredStartIndex = DAYS_FULL.findIndex((day) => day.slice(0, 3).toUpperCase() === currentDay);
@@ -33,8 +40,8 @@ function format12Hour(timeValue?: string | null) {
 }
 
 
-function groupSpecialsForUI(specials: SpecialItem[]) {
-  const groups = new Map<string, SpecialItem[]>();
+function groupSpecialsForUI(specials: UISpecialItem[]) {
+  const groups = new Map<string, UISpecialItem[]>();
   specials.forEach((special) => {
     const specialType = special.special_type || special.type || '';
     const key = [specialType, special.all_day ? 'all-day' : 'timed', special.start_time || '', special.end_time || ''].join('|');
@@ -43,7 +50,7 @@ function groupSpecialsForUI(specials: SpecialItem[]) {
   });
 
   return Array.from(groups.values()).map((group) => {
-    const base = { ...group[0] };
+    const base: UISpecialItem = { ...group[0] };
     const uniqueDescriptions = Array.from(new Set(group.map((s) => (s.description || '').trim()).filter(Boolean)));
     base.description = uniqueDescriptions.join(' • ');
     const hasLive = group.some((s) => s.current_status === 'live' || s.current_status === 'active');
@@ -54,6 +61,7 @@ function groupSpecialsForUI(specials: SpecialItem[]) {
     else if (hasUpcoming) base.current_status = 'upcoming';
     else if (hasPast) base.current_status = 'past';
     if (hasFavorite) base.favorite = true;
+    base.grouped_special_ids = Array.from(new Set(group.map((s) => String(s.special_id || '')).filter(Boolean)));
     return base;
   });
 }
@@ -162,10 +170,32 @@ export default function SpecialsScreen() {
   const [selectedTypesApplied, setSelectedTypesApplied] = useState<string[]>([]);
   const [favoritesOnlyApplied, setFavoritesOnlyApplied] = useState(false);
   const [selectedNeighborhoodApplied, setSelectedNeighborhoodApplied] = useState<string>('');
+  const [specialDetail, setSpecialDetail] = useState<SpecialDetailContext | null>(null);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportReason, setReportReason] = useState('');
+  const [reportComment, setReportComment] = useState('');
+  const [reportSubmitted, setReportSubmitted] = useState(false);
   const sideMenuTranslateX = useRef(new Animated.Value(300)).current;
   const [menuVisible, setMenuVisible] = useState(false);
   const contentOpacity = useRef(new Animated.Value(0)).current;
   const skeletonOpacity = useRef(new Animated.Value(1)).current;
+  const reportAnim = useRef(new Animated.Value(0)).current;
+  const reportSubmissionTokenRef = useRef(0);
+
+  useEffect(() => {
+    if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+      UIManager.setLayoutAnimationEnabledExperimental(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    Animated.timing(reportAnim, {
+      toValue: reportOpen ? 1 : 0,
+      duration: 240,
+      easing: Easing.inOut(Easing.cubic),
+      useNativeDriver: false,
+    }).start();
+  }, [reportOpen, reportAnim]);
 
   useEffect(() => {
     (async () => {
@@ -275,7 +305,7 @@ export default function SpecialsScreen() {
     });
   }, [showContent, dividerY, scrollRef]);
 
-  const toolbar = (
+  const defaultToolbar = (
     <View style={styles.toolbar}>
       <View style={styles.toolbarInner}>
         <Text style={styles.toolbarTitle} onPress={() => scrollRef.current?.scrollTo?.({ top: 0, animated: true })}>BAR APP</Text>
@@ -284,8 +314,18 @@ export default function SpecialsScreen() {
     </View>
   );
 
+  const detailToolbar = (
+    <View style={styles.toolbar}>
+      <View style={styles.detailToolbarInner}>
+        <Pressable onPress={() => setSpecialDetail(null)} style={styles.detailBackButton}><Text style={styles.detailBackButtonText}>‹</Text></Pressable>
+        <Text style={styles.toolbarTitle}>BAR APP</Text>
+        <View style={styles.detailBackButton} />
+      </View>
+    </View>
+  );
+
   return (
-    <ScreenContainer scrollViewRef={scrollRef} stickyHeader={toolbar}>
+    <ScreenContainer scrollViewRef={scrollRef} stickyHeader={specialDetail ? detailToolbar : defaultToolbar}>
       <Modal visible={menuVisible} transparent animationType="none" onRequestClose={closeMenuDiscardDraft}>
         <Pressable style={styles.sideMenuOverlay} onPress={closeMenuDiscardDraft} />
         <Animated.View style={[styles.sideMenu, { transform: [{ translateX: sideMenuTranslateX }] }]}>
@@ -330,7 +370,99 @@ export default function SpecialsScreen() {
       </Modal>
       {showSkeleton ? <Animated.View style={{ opacity: skeletonOpacity }}><LoadingSkeleton /></Animated.View> : null}
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
-      {!loading && !error && showContent ? (
+      {specialDetail ? (
+        <View style={styles.specialDetailWrap}>
+          <View style={styles.specialDetailContent}>
+            <Image source={{ uri: specialDetail.bar.image_url && specialDetail.bar.image_url !== 'null' ? specialDetail.bar.image_url : 'https://placehold.co/640x360?text=Bar' }} style={styles.specialDetailImage} />
+            <View style={styles.specialDetailCard}>
+              <Text style={styles.specialDetailBarName}>{specialDetail.bar.name}</Text>
+              <View style={styles.specialMeta}><Text style={styles.specialDayBadge}>{specialDetail.dayLabel || 'Day unavailable'}</Text></View>
+              <View style={styles.specialItem}>
+                <View style={[styles.timeBadge, (specialDetail.special.current_status ?? '').toLowerCase() === 'past' ? styles.timeBadgePast : null]}>
+                  <Text style={[styles.timeBadgeText, (specialDetail.special.current_status ?? '').toLowerCase() === 'past' ? styles.timeBadgeTextPast : null]}>{specialDetail.special.all_day ? 'ALL DAY' : `${format12Hour(specialDetail.special.start_time) || ''}\n${format12Hour(specialDetail.special.end_time) || ''}`.trim()}</Text>
+                </View>
+                <Text style={styles.specialDescription}>{specialDetail.special.description}</Text>
+                <View style={styles.typeIconWrap}>{iconForType(specialDetail.special.special_type || specialDetail.special.type).map((icon) => <Ionicons key={icon} name={icon as any} size={24} color="#8e8e93" />)}</View>
+              </View>
+            </View>
+            <View style={styles.reportSection}>
+              <Text style={styles.reportTitle}>Report issue</Text>
+              <Text style={styles.reportCopy}>Help us keep specials accurate by flagging anything that looks wrong.</Text>
+              <Pressable style={[styles.reportToggle, reportSubmitted ? styles.reportToggleSubmitted : null]} disabled={reportSubmitted} onPress={() => {
+                LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                setReportOpen((current) => {
+                  const nextOpen = !current;
+                  if (nextOpen) {
+                    const scrollToReport = () => scrollRef.current?.scrollToEnd?.({ animated: true });
+                    requestAnimationFrame(scrollToReport);
+                    setTimeout(scrollToReport, 260);
+                  }
+                  return nextOpen;
+                });
+              }}>
+                <Text style={[styles.reportToggleText, reportSubmitted ? styles.reportToggleTextSubmitted : null]}>{reportSubmitted ? 'Thanks for your feedback!' : 'Mark for review'}</Text>
+              </Pressable>
+              <Animated.View
+                style={[
+                  styles.reportFormAnimatedWrap,
+                  {
+                    maxHeight: reportAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 260] }),
+                    opacity: reportAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 1] }),
+                  },
+                ]}
+                pointerEvents={reportOpen ? 'auto' : 'none'}
+              >
+                <View style={styles.reportForm}>
+                  <View style={styles.dropdownWrap}>
+                    <Picker selectedValue={reportReason} onValueChange={(value: string | number) => setReportReason(String(value || ''))} mode="dropdown" style={styles.nativePicker}>
+                      <Picker.Item label="Select reason" value="" enabled={false} />
+                      <Picker.Item label="Special is no longer active" value="Special is no longer active" />
+                      <Picker.Item label="Special details are inaccurate" value="Special details are inaccurate" />
+                      <Picker.Item label="Other" value="Other" />
+                    </Picker>
+                  </View>
+                  <TextInput placeholder="Comment (optional)" value={reportComment} onChangeText={setReportComment} style={[styles.reportInput, styles.reportComment]} multiline />
+                  <Pressable style={styles.reportSubmit} onPress={async () => {
+                    if (!reportReason.trim()) return;
+                    const submissionToken = ++reportSubmissionTokenRef.current;
+                    const detailSnapshot = specialDetail;
+                    const specialSnapshotId = (detailSnapshot.special as UISpecialItem).special_id || detailSnapshot.special.grouped_special_ids?.join('|') || '';
+                    const userIdentifier = await getUserIdentifier();
+                    const specialIds = detailSnapshot.special.grouped_special_ids?.length
+                      ? detailSnapshot.special.grouped_special_ids
+                      : (detailSnapshot.special as UISpecialItem).special_id ? [String((detailSnapshot.special as UISpecialItem).special_id)] : [];
+                    if (specialIds.length === 0) return;
+                    const results = await Promise.allSettled(specialIds.map((id) => submitSpecialReport({
+                      bar_id: Number(detailSnapshot.barId),
+                      special_id: id,
+                      reason: reportReason,
+                      comment: reportComment.trim() || null,
+                      user_identifier: userIdentifier,
+                    })));
+                    const hasFailure = results.some((result) => result.status !== 'fulfilled' || result.value.ok === false);
+                    if (hasFailure) return;
+                    const activeSpecialId = specialDetail
+                      ? ((specialDetail.special as UISpecialItem).special_id || specialDetail.special.grouped_special_ids?.join('|') || '')
+                      : '';
+                    const sameDetailStillOpen = Boolean(
+                      specialDetail
+                      && specialDetail.barId === detailSnapshot.barId
+                      && activeSpecialId === specialSnapshotId
+                    );
+                    if (reportSubmissionTokenRef.current !== submissionToken || !sameDetailStillOpen) return;
+                    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                    setReportSubmitted(true);
+                    setReportOpen(false);
+                  }}>
+                    <Text style={styles.reportSubmitText}>Submit report</Text>
+                  </Pressable>
+                </View>
+              </Animated.View>
+            </View>
+          </View>
+        </View>
+      ) : null}
+      {!specialDetail && !loading && !error && showContent ? (
         <Animated.View style={{ opacity: contentOpacity }}>
           {weekDays.map(({ dayKey, dayLabel }) => {
             const entries = payload?.specials_by_day?.[dayKey] ?? [];
@@ -343,7 +475,10 @@ export default function SpecialsScreen() {
                     const bar = payload?.bars?.[String(entry.bar_id)];
                     if (!bar) return null;
                     if (selectedNeighborhoodApplied && selectedNeighborhoodApplied !== bar.neighborhood) return null;
-                    const specialRows = (entry.specials ?? []).map((id) => payload?.specials?.[String(id)]).filter(Boolean) as SpecialItem[];
+                    const specialRows = (entry.specials ?? []).map((id) => {
+                      const special = payload?.specials?.[String(id)];
+                      return special ? { ...special, special_id: String(id) } : null;
+                    }).filter(Boolean) as UISpecialItem[];
                     const isBarFavorite = bar.favorite === true;
                                         const specials = groupSpecialsForUI(specialRows).filter((special) => special.description);
                     const filteredSpecials = specials.filter((special) => {
@@ -371,14 +506,14 @@ export default function SpecialsScreen() {
                                 const status = (special.current_status ?? '').toLowerCase();
                                 const isLive = status === 'active' || status === 'live';
                                 return (
-                                  <View key={`${index}-${special.description}`} style={[styles.specialItem, isLive ? styles.specialItemLive : null]}>
+                                  <Pressable key={`${index}-${special.description}`} style={[styles.specialItem, isLive ? styles.specialItemLive : null]} onPress={() => { setSpecialDetail({ barId: String(entry.bar_id), bar, special, dayLabel }); setReportOpen(false); setReportReason(''); setReportComment(''); setReportSubmitted(false); }}>
                                     <View style={[styles.timeBadge, status === 'past' ? styles.timeBadgePast : null]}>
                                       <Text style={[styles.timeBadgeText, status === 'past' ? styles.timeBadgeTextPast : null]}>{special.all_day ? 'ALL DAY' : `${format12Hour(special.start_time) || ''}\n${format12Hour(special.end_time) || ''}`.trim()}</Text>
                                     </View>
                                     <Text style={styles.specialDescription}>{special.description}</Text>
                                     <View style={styles.typeIconWrap}>{iconForType(special.special_type || special.type).map((icon) => <Ionicons key={icon} name={icon as any} size={24} color="#8e8e93" />)}</View>
                                     {isLive ? <ActiveDot /> : null}
-                                  </View>
+                                  </Pressable>
                                 );
                               })}
                             </View>
@@ -420,6 +555,9 @@ const styles = StyleSheet.create({
 
   toolbar: { backgroundColor: '#007bff', shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 3 },
   toolbarInner: { height: 48, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center' },
+  detailToolbarInner: { height: 48, paddingHorizontal: 8, alignItems: 'center', justifyContent: 'space-between', flexDirection: 'row' },
+  detailBackButton: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+  detailBackButtonText: { color: '#fff', fontSize: 26, lineHeight: 26 },
   toolbarTitle: { color: '#fff', fontSize: 16, fontWeight: '700', textTransform: 'uppercase' },
   hamburgerButton: { position: 'absolute', right: 16, top: 10, color: '#fff', fontSize: 24, lineHeight: 28 },
   daySection: { gap: 12 },
@@ -456,6 +594,26 @@ const styles = StyleSheet.create({
   activeUpcomingDivider: { marginTop: 12, marginBottom: 12, flexDirection: 'row', alignItems: 'center', gap: 10 },
   dividerLine: { flex: 1, height: 1, backgroundColor: '#d1d5db' },
   dividerLabel: { color: '#6b7280', fontSize: 12, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.4 },
+  specialDetailWrap: { flex: 1, backgroundColor: '#f5f5f5' },
+  specialDetailContent: { padding: 14, paddingTop: 14, gap: 14 },
+  specialDetailImage: { width: '100%', height: 180, borderRadius: 12 },
+  specialDetailCard: { backgroundColor: '#fff', borderRadius: 12, padding: 12, shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 4 },
+  specialDetailBarName: { fontSize: 16, fontWeight: '700', color: '#111827' },
+  specialMeta: { marginBottom: 10, marginTop: 8 },
+  specialDayBadge: { alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, backgroundColor: '#e7f1ff', color: '#0a58ca', fontSize: 12, fontWeight: '700', textTransform: 'uppercase' },
+  reportSection: { marginTop: 2, backgroundColor: '#fff', borderRadius: 12, padding: 12, shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 4 },
+  reportTitle: { textTransform: 'uppercase', fontSize: 14, color: '#555', fontWeight: '700' },
+  reportCopy: { marginTop: 8, fontSize: 14, color: '#666' },
+  reportToggle: { marginTop: 12, borderWidth: 1, borderColor: '#007bff', backgroundColor: '#f0f7ff', borderRadius: 10, paddingVertical: 10, paddingHorizontal: 12 },
+  reportToggleText: { color: '#007bff', fontWeight: '600', textAlign: 'center' },
+  reportToggleSubmitted: { borderColor: '#c5c9d3', backgroundColor: '#e9ecf2' },
+  reportToggleTextSubmitted: { color: '#5f6673' },
+  reportFormAnimatedWrap: { overflow: 'hidden' },
+  reportForm: { marginTop: 10, gap: 8 },
+  reportInput: { borderWidth: 1, borderColor: '#d3dae6', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 10, backgroundColor: '#fff' },
+  reportComment: { minHeight: 82, textAlignVertical: 'top' },
+  reportSubmit: { backgroundColor: '#007bff', borderRadius: 8, height: 40, alignItems: 'center', justifyContent: 'center' },
+  reportSubmitText: { color: '#fff', fontWeight: '700' },
   sideMenuOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.4)' },
   sideMenu: { marginLeft: 'auto', width: 300, height: '100%', backgroundColor: '#fff', paddingBottom: 24 },
   sideMenuHeader: { height: 60, textAlign: 'center', textAlignVertical: 'center', fontWeight: '700', fontSize: 18, borderBottomWidth: 1, borderBottomColor: '#e6ecf5', backgroundColor: '#f7f9fc', paddingTop: 18 },
