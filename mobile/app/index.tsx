@@ -179,12 +179,22 @@ export default function SpecialsScreen() {
   const [menuVisible, setMenuVisible] = useState(false);
   const contentOpacity = useRef(new Animated.Value(0)).current;
   const skeletonOpacity = useRef(new Animated.Value(1)).current;
+  const reportAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
       UIManager.setLayoutAnimationEnabledExperimental(true);
     }
   }, []);
+
+  useEffect(() => {
+    Animated.timing(reportAnim, {
+      toValue: reportOpen ? 1 : 0,
+      duration: 240,
+      easing: Easing.inOut(Easing.cubic),
+      useNativeDriver: false,
+    }).start();
+  }, [reportOpen, reportAnim]);
 
   useEffect(() => {
     (async () => {
@@ -391,7 +401,16 @@ export default function SpecialsScreen() {
               }}>
                 <Text style={[styles.reportToggleText, reportSubmitted ? styles.reportToggleTextSubmitted : null]}>{reportSubmitted ? 'Thanks for your feedback!' : 'Mark for review'}</Text>
               </Pressable>
-              {reportOpen ? (
+              <Animated.View
+                style={[
+                  styles.reportFormAnimatedWrap,
+                  {
+                    maxHeight: reportAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 260] }),
+                    opacity: reportAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 1] }),
+                  },
+                ]}
+                pointerEvents={reportOpen ? 'auto' : 'none'}
+              >
                 <View style={styles.reportForm}>
                   <View style={styles.dropdownWrap}>
                     <Picker selectedValue={reportReason} onValueChange={(value: string | number) => setReportReason(String(value || ''))} mode="dropdown" style={styles.nativePicker}>
@@ -418,12 +437,14 @@ export default function SpecialsScreen() {
                     })));
                     const hasFailure = results.some((result) => result.status !== 'fulfilled' || result.value.ok === false);
                     if (hasFailure) return;
-                    setReportSubmitted(true); setReportOpen(false);
+                    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                    setReportSubmitted(true);
+                    setReportOpen(false);
                   }}>
                     <Text style={styles.reportSubmitText}>Submit report</Text>
                   </Pressable>
                 </View>
-              ) : null}
+              </Animated.View>
             </View>
           </View>
         </View>
@@ -574,6 +595,7 @@ const styles = StyleSheet.create({
   reportToggleText: { color: '#007bff', fontWeight: '600', textAlign: 'center' },
   reportToggleSubmitted: { borderColor: '#c5c9d3', backgroundColor: '#e9ecf2' },
   reportToggleTextSubmitted: { color: '#5f6673' },
+  reportFormAnimatedWrap: { overflow: 'hidden' },
   reportForm: { marginTop: 10, gap: 8 },
   reportInput: { borderWidth: 1, borderColor: '#d3dae6', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 10, backgroundColor: '#fff' },
   reportComment: { minHeight: 82, textAlignVertical: 'top' },
